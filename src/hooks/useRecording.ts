@@ -248,17 +248,42 @@ export function useRecording() {
         videoRecorderRef.current = createRecorder(videoOnlyStream, getVideoMimeType());
 
         if (settings.systemAudioEnabled) {
-          const audioTracks = displayStream.getAudioTracks();
-          if (audioTracks.length > 0) {
-            const systemStream = new MediaStream(audioTracks);
-            systemAudioRecorderRef.current = createRecorder(systemStream, getAudioMimeType());
+          if (settings.selectedSpeakerId?.startsWith('window:')) {
+            try {
+              const appStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                  mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: settings.selectedSpeakerId
+                  }
+                } as any,
+                video: {
+                  mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: settings.selectedSpeakerId
+                  }
+                } as any
+              });
+              const sysAudioTracks = appStream.getAudioTracks();
+              if (sysAudioTracks.length > 0) {
+                systemAudioRecorderRef.current = createRecorder(new MediaStream(sysAudioTracks), getAudioMimeType());
+              }
+            } catch (err) {
+              console.warn('Uygulama sesi alınamadı', err);
+            }
+          } else {
+            const audioTracks = displayStream.getAudioTracks();
+            if (audioTracks.length > 0) {
+              const systemStream = new MediaStream(audioTracks);
+              systemAudioRecorderRef.current = createRecorder(systemStream, getAudioMimeType());
+            }
           }
         }
 
         if (settings.microphoneEnabled) {
           try {
             const micStream = await navigator.mediaDevices.getUserMedia({
-              audio: true,
+              audio: settings.selectedMicId ? { deviceId: { exact: settings.selectedMicId } } : true,
               video: false,
             });
             micRecorderRef.current = createRecorder(micStream, getAudioMimeType());

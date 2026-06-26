@@ -26,10 +26,16 @@ export default function CountdownOverlay() {
   if (countdown === null || countdown === 0) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none bg-black/80 backdrop-blur-md">
       <div 
         key={countdown} 
-        className="text-[150px] font-black text-white tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.8)] animate-pulse"
+        className="absolute text-[200px] font-black text-white tracking-tighter drop-shadow-[0_10px_30px_rgba(0,0,0,0.8)] animate-ping opacity-30"
+      >
+        {countdown}
+      </div>
+      <div 
+        key={`${countdown}-solid`} 
+        className="text-[200px] font-black text-white tracking-tighter drop-shadow-[0_0_60px_rgba(255,255,255,0.6)] animate-pulse"
       >
         {countdown}
       </div>

@@ -7,8 +7,6 @@ import {
   snapshotVideo,
   describeMediaError,
 } from '../../lib/videoDebug';
-import VideoDebugPanel from './VideoDebugPanel';
-import type { VideoDebugPanelProps } from './VideoDebugPanel';
 
 export default function VideoPreview() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -23,7 +21,7 @@ export default function VideoPreview() {
     setIsPlaying,
   } = useEditorStore();
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [fileInfo, setFileInfo] = useState<VideoDebugPanelProps['fileInfo']>(null);
+  const [fileInfo, setFileInfo] = useState<any>(null);
   const [videoState, setVideoState] = useState<Record<string, unknown> | null>(null);
 
   const refreshVideoState = useCallback(() => {
@@ -180,13 +178,27 @@ export default function VideoPreview() {
         const videoHeight = video.videoHeight || 1080;
         
         const zoom = getActiveZoomAtTime(zoomEffects, timeSec);
-        const transform = zoom ? `scale(${zoom.scale})` : 'scale(1)';
-        const transformOrigin = zoom 
-          ? `${(zoom.targetX / videoWidth) * 100}% ${(zoom.targetY / videoHeight) * 100}%` 
-          : 'center';
+        if (zoom) {
+          const vw = videoWidth / zoom.scale;
+          const vh = videoHeight / zoom.scale;
+          
+          let cx = zoom.targetX - vw / 2;
+          let cy = zoom.targetY - vh / 2;
+          
+          if (cx < 0) cx = 0;
+          if (cx + vw > videoWidth) cx = videoWidth - vw;
+          if (cy < 0) cy = 0;
+          if (cy + vh > videoHeight) cy = videoHeight - vh;
 
-        video.style.transform = transform;
-        video.style.transformOrigin = transformOrigin;
+          const percentX = (cx / videoWidth) * 100;
+          const percentY = (cy / videoHeight) * 100;
+
+          video.style.transformOrigin = '0 0';
+          video.style.transform = `scale(${zoom.scale}) translate(-${percentX}%, -${percentY}%)`;
+        } else {
+          video.style.transformOrigin = 'center';
+          video.style.transform = 'scale(1)';
+        }
       }
       
       animationFrameId = requestAnimationFrame(renderLoop);
@@ -230,22 +242,11 @@ export default function VideoPreview() {
         )}
 
         <div
-          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm cursor-pointer z-10"
+          className="absolute inset-0 bg-transparent flex items-center justify-center cursor-pointer z-10"
           onClick={togglePlay}
         >
-          <button className="w-16 h-16 bg-primary/20 backdrop-blur-md border border-primary/50 rounded-full flex items-center justify-center text-primary shadow-[0_0_30px_rgba(192,193,255,0.3)] hover:scale-110 transition-transform">
-            <span className="material-symbols-outlined text-4xl ml-1 fill">
-              {isPlaying ? 'pause' : 'play_arrow'}
-            </span>
-          </button>
         </div>
 
-        <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-2 py-1 rounded border border-white/10 font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1 z-10">
-          <span className={`w-2 h-2 rounded-full ${loadError ? 'bg-red-500' : isPlaying ? 'bg-yellow-500' : 'bg-green-500'}`} />
-          {isPlaying ? 'Oynatılıyor' : loadError ? 'Hata' : 'Hazır'}
-        </div>
-
-        <VideoDebugPanel videoState={videoState} fileInfo={fileInfo} />
       </div>
     </div>
   );

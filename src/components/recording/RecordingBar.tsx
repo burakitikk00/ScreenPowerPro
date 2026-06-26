@@ -3,6 +3,8 @@ import { useAppStore } from '../../stores/appStore';
 import { useRecording } from '../../hooks/useRecording';
 import { useMediaDevices } from '../../hooks/useMediaDevices';
 import { useAudioLevel } from '../../hooks/useAudioLevel';
+import { useSystemAudioLevel } from '../../hooks/useSystemAudioLevel';
+import type { ScreenSource } from '../../shared/types';
 
 export default function RecordingBar() {
   const isOverlay = window.location.hash === '#/recording-bar';
@@ -16,8 +18,14 @@ export default function RecordingBar() {
   const { startRecording, isPreparing } = useRecording();
   const { mics, speakers, cameras } = useMediaDevices();
   const micLevel = useAudioLevel('default', settings.microphoneEnabled);
+  const sysLevel = useSystemAudioLevel(settings.systemAudioEnabled, settings.selectedSpeakerId);
 
   const [openDropdown, setOpenDropdown] = useState<'camera' | 'mic' | 'speaker' | null>(null);
+  const [windowSources, setWindowSources] = useState<ScreenSource[]>([]);
+
+  useEffect(() => {
+    window.electronAPI.getScreenSources().then(s => setWindowSources(s.filter(x => x.id.startsWith('window:'))));
+  }, []);
 
   useEffect(() => {
     if (!isOverlay && !isRecording) return;
@@ -61,24 +69,32 @@ export default function RecordingBar() {
   const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
   const secs = (elapsed % 60).toString().padStart(2, '0');
 
-  // Active recording bar
-  if (isRecording) {
+  // Active recording bar (Small top notification)
+  if (isRecording || isOverlay) {
+    if (!isOverlay) return null; // Sadece overlay penceresinde gösterilsin
+    
     return (
-      <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-4 bg-[#1e1f27]/95 backdrop-blur-xl border border-white/10 rounded-full px-6 py-3 shadow-[0_20px_40px_rgba(0,0,0,0.4)] ${isOverlay ? 'top-1/2 bottom-auto -translate-y-1/2' : ''}`} style={isOverlay ? { WebkitAppRegion: 'drag' } as React.CSSProperties : {}}>
-        <div className="flex items-center gap-2" style={isOverlay ? { WebkitAppRegion: 'no-drag' } as React.CSSProperties : {}}>
-          <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-          <span className="font-label-md text-label-md text-on-surface">REC</span>
+      <div 
+        className="fixed inset-0 flex items-center justify-between px-4 bg-[#1e1f27]/90 backdrop-blur-md border border-white/10 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.5)] select-none"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+          <span className="font-label-sm text-xs font-medium text-white/90">Kayıt Ediliyor</span>
         </div>
-        <span className="font-label-md text-label-md text-primary tabular-nums">
-          {mins}:{secs}
-        </span>
-        <button
-          onClick={handleStop}
-          className="px-4 py-1.5 rounded-full bg-red-600 hover:bg-red-500 text-white font-label-md text-label-md transition-colors"
-          style={isOverlay ? { WebkitAppRegion: 'no-drag' } as React.CSSProperties : {}}
-        >
-          Durdur
-        </button>
+        <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <span className="font-mono text-xs text-indigo-400 tabular-nums font-semibold">
+            {mins}:{secs}
+          </span>
+          <div className="w-px h-3 bg-white/20" />
+          <button
+            onClick={handleStop}
+            className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-500/20 text-red-500 transition-colors"
+            title="Kaydı Durdur"
+          >
+            <span className="material-symbols-outlined text-[16px]">stop</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -111,7 +127,7 @@ export default function RecordingBar() {
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors text-white/90 ${settings.cameraEnabled ? 'bg-[#2b2b40]' : 'hover:bg-white/10'}`}
           >
             <span className="material-symbols-outlined text-[18px]">{settings.cameraEnabled ? 'videocam' : 'videocam_off'}</span>
-            <span className="text-[13px] max-w-[120px] truncate">{settings.cameraEnabled ? (cameras[0]?.label || 'Camera') : 'None'}</span>
+            <span className="text-[13px] max-w-[120px] truncate">{settings.cameraEnabled ? (cameras.find(c => c.deviceId === settings.selectedCameraId)?.label || cameras[0]?.label || 'Camera') : 'None'}</span>
             <span className="material-symbols-outlined text-[16px] text-white/50">expand_more</span>
           </button>
 
@@ -127,7 +143,7 @@ export default function RecordingBar() {
               {cameras.map(camera => (
                 <button 
                   key={camera.deviceId}
-                  onClick={() => { updateSettings({ cameraEnabled: true }); setOpenDropdown(null); }}
+                  onClick={() => { updateSettings({ cameraEnabled: true, selectedCameraId: camera.deviceId }); setOpenDropdown(null); }}
                   className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
                 >
                   {camera.label || 'Camera'}
@@ -152,7 +168,7 @@ export default function RecordingBar() {
                 />
               )}
             </div>
-            <span className="text-[13px] max-w-[120px] truncate">{settings.microphoneEnabled ? (mics[0]?.label || 'Microphone Arr...') : 'None'}</span>
+            <span className="text-[13px] max-w-[120px] truncate">{settings.microphoneEnabled ? (mics.find(m => m.deviceId === settings.selectedMicId)?.label || mics[0]?.label || 'Microphone') : 'None'}</span>
             <span className="material-symbols-outlined text-[16px] text-white/50">expand_more</span>
           </button>
 
@@ -168,7 +184,7 @@ export default function RecordingBar() {
               {mics.map(mic => (
                 <button 
                   key={mic.deviceId}
-                  onClick={() => { updateSettings({ microphoneEnabled: true }); setOpenDropdown(null); }}
+                  onClick={() => { updateSettings({ microphoneEnabled: true, selectedMicId: mic.deviceId }); setOpenDropdown(null); }}
                   className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
                 >
                   {mic.label || 'Microphone'}
@@ -181,11 +197,24 @@ export default function RecordingBar() {
         {/* Speaker Dropdown */}
         <div className="relative" onClick={(e) => e.stopPropagation()} style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <button 
-            onClick={() => setOpenDropdown(openDropdown === 'speaker' ? null : 'speaker')}
+            onClick={() => {
+              setOpenDropdown(openDropdown === 'speaker' ? null : 'speaker');
+              if (openDropdown !== 'speaker') {
+                window.electronAPI.getScreenSources().then(s => setWindowSources(s.filter(x => x.id.startsWith('window:'))));
+              }
+            }}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors text-white/90 ${settings.systemAudioEnabled ? 'bg-[#2b2b40]' : 'hover:bg-white/10'}`}
           >
-            <span className="material-symbols-outlined text-[18px]">{settings.systemAudioEnabled ? 'volume_up' : 'volume_off'}</span>
-            <span className="text-[13px] max-w-[120px] truncate">{settings.systemAudioEnabled ? (speakers[0]?.label || 'Speaker (Realtek...') : 'None'}</span>
+            <div className="relative flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px] z-10 relative">{settings.systemAudioEnabled ? 'volume_up' : 'volume_off'}</span>
+              {settings.systemAudioEnabled && sysLevel > 0.05 && (
+                <div 
+                  className="absolute inset-[-4px] rounded-full bg-indigo-400 opacity-40 pointer-events-none transition-transform duration-75"
+                  style={{ transform: `scale(${1 + sysLevel})` }}
+                />
+              )}
+            </div>
+            <span className="text-[13px] max-w-[120px] truncate">{settings.systemAudioEnabled ? (settings.selectedSpeakerId?.startsWith('window:') ? windowSources.find(w => w.id === settings.selectedSpeakerId)?.name : speakers.find(s => s.deviceId === settings.selectedSpeakerId)?.label) || speakers[0]?.label || 'Speaker' : 'None'}</span>
             <span className="material-symbols-outlined text-[16px] text-white/50">expand_more</span>
           </button>
 
@@ -201,12 +230,27 @@ export default function RecordingBar() {
               {speakers.map(speaker => (
                 <button 
                   key={speaker.deviceId}
-                  onClick={() => { updateSettings({ systemAudioEnabled: true }); setOpenDropdown(null); }}
+                  onClick={() => { updateSettings({ systemAudioEnabled: true, selectedSpeakerId: speaker.deviceId }); setOpenDropdown(null); }}
                   className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
                 >
                   {speaker.label || 'Speaker'}
                 </button>
               ))}
+              
+              {windowSources.length > 0 && (
+                <>
+                  <div className="px-4 pt-3 pb-1 text-[11px] font-semibold text-white/50 uppercase tracking-wider">Only app audio</div>
+                  {windowSources.map(src => (
+                    <button 
+                      key={src.id}
+                      onClick={() => { updateSettings({ systemAudioEnabled: true, selectedSpeakerId: src.id }); setOpenDropdown(null); }}
+                      className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
+                    >
+                      {src.name}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>

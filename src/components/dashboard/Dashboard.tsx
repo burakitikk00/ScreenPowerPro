@@ -3,8 +3,10 @@ import { useAppStore } from '../../stores/appStore';
 import { useRecording } from '../../hooks/useRecording';
 import { useMediaDevices } from '../../hooks/useMediaDevices';
 import { useAudioLevel } from '../../hooks/useAudioLevel';
+import { useSystemAudioLevel } from '../../hooks/useSystemAudioLevel';
 import type { RecordingMode } from '../../types';
 import WindowPickerModal from '../recording/WindowPickerModal';
+import type { ScreenSource } from '../../shared/types';
 
 const modes: { id: RecordingMode; icon: string; label: string }[] = [
   { id: 'fullscreen', icon: 'fullscreen', label: 'Full Screen' },
@@ -25,16 +27,20 @@ export default function Dashboard() {
     setSelectedSource,
     preRecordingBarOpen,
     setPreRecordingBarOpen,
+    setScreen,
   } = useAppStore();
   const { startRecording, isPreparing, isRecording } = useRecording();
   const { mics, speakers, cameras } = useMediaDevices();
   const [openDropdown, setOpenDropdown] = useState<'mic' | 'speaker' | 'camera' | null>(null);
+  const [windowSources, setWindowSources] = useState<ScreenSource[]>([]);
 
-  const selectedMicId = mics[0]?.deviceId;
+  const selectedMicId = settings.selectedMicId || mics[0]?.deviceId;
   const micVolume = useAudioLevel(selectedMicId, settings.microphoneEnabled);
+  const sysVolume = useSystemAudioLevel(settings.systemAudioEnabled, settings.selectedSpeakerId);
   
-  // Calculate dynamic scale based on micVolume (1 to 1.3)
+  // Calculate dynamic scale based on volume (1 to 1.3)
   const micScale = 1 + micVolume * 0.3;
+  const sysScale = 1 + sysVolume * 0.3;
 
   const handleModeSelect = (modeId: RecordingMode) => {
     setRecordingMode(modeId);
@@ -56,6 +62,7 @@ export default function Dashboard() {
   React.useEffect(() => {
     const handleClickOutside = () => setOpenDropdown(null);
     document.addEventListener('click', handleClickOutside);
+    window.electronAPI.getScreenSources().then(s => setWindowSources(s.filter(x => x.id.startsWith('window:'))));
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
@@ -153,7 +160,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <span className="flex-1 text-left text-[13px] text-white/90 truncate pr-4">
-                    {settings.microphoneEnabled ? (mics[0]?.label || 'Microphone Array...') : 'None'}
+                    {settings.microphoneEnabled ? (mics.find(m => m.deviceId === settings.selectedMicId)?.label || mics[0]?.label || 'Microphone') : 'None'}
                   </span>
                   <span className="material-symbols-outlined text-white/30 text-[18px]">expand_more</span>
                 </button>
@@ -170,7 +177,7 @@ export default function Dashboard() {
                     {mics.map(mic => (
                       <button 
                         key={mic.deviceId}
-                        onClick={() => { updateSettings({ microphoneEnabled: true }); setOpenDropdown(null); }}
+                        onClick={() => { updateSettings({ microphoneEnabled: true, selectedMicId: mic.deviceId }); setOpenDropdown(null); }}
                         className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
                       >
                         {mic.label || 'Microphone'}
@@ -185,22 +192,30 @@ export default function Dashboard() {
               {/* Speaker */}
               <div className="relative group" onClick={(e) => e.stopPropagation()}>
                 <button 
-                  onClick={() => setOpenDropdown(openDropdown === 'speaker' ? null : 'speaker')}
+                  onClick={() => {
+                    setOpenDropdown(openDropdown === 'speaker' ? null : 'speaker');
+                    if (openDropdown !== 'speaker') {
+                      window.electronAPI.getScreenSources().then(s => setWindowSources(s.filter(x => x.id.startsWith('window:'))));
+                    }
+                  }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${settings.systemAudioEnabled ? 'bg-indigo-500/10' : 'hover:bg-white/5'}`}
                 >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${settings.systemAudioEnabled ? 'bg-indigo-500/20 text-indigo-400 animate-audio-pulse' : 'bg-white/5 text-white/50'}`}>
+                  <div 
+                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform duration-75 ${settings.systemAudioEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/50'}`}
+                    style={{ transform: settings.systemAudioEnabled ? `scale(${sysScale})` : 'scale(1)' }}
+                  >
                     <span className="material-symbols-outlined text-[16px]">
                       {settings.systemAudioEnabled ? 'volume_up' : 'volume_off'}
                     </span>
                   </div>
                   <span className="flex-1 text-left text-[13px] text-white/90 truncate pr-4">
-                    {settings.systemAudioEnabled ? (speakers[0]?.label || 'Speaker (Realtek...') : 'None'}
+                    {settings.systemAudioEnabled ? (settings.selectedSpeakerId?.startsWith('window:') ? windowSources.find(w => w.id === settings.selectedSpeakerId)?.name : speakers.find(s => s.deviceId === settings.selectedSpeakerId)?.label) || speakers[0]?.label || 'Speaker' : 'None'}
                   </span>
                   <span className="material-symbols-outlined text-white/30 text-[18px]">expand_more</span>
                 </button>
 
                 {openDropdown === 'speaker' && (
-                  <div className="absolute bottom-full left-0 mb-2 w-full bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+                  <div className="absolute bottom-full left-0 mb-2 w-full max-h-48 overflow-y-auto bg-[#252530] border border-white/10 rounded-xl shadow-xl z-50 py-1 scrollbar-thin scrollbar-thumb-white/10">
                     <button 
                       onClick={() => { updateSettings({ systemAudioEnabled: false }); setOpenDropdown(null); }}
                       className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
@@ -211,12 +226,27 @@ export default function Dashboard() {
                     {speakers.map(speaker => (
                       <button 
                         key={speaker.deviceId}
-                        onClick={() => { updateSettings({ systemAudioEnabled: true }); setOpenDropdown(null); }}
+                        onClick={() => { updateSettings({ systemAudioEnabled: true, selectedSpeakerId: speaker.deviceId }); setOpenDropdown(null); }}
                         className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
                       >
                         {speaker.label || 'Speaker'}
                       </button>
                     ))}
+                    
+                    {windowSources.length > 0 && (
+                      <>
+                        <div className="px-4 pt-3 pb-1 text-[11px] font-semibold text-white/50 uppercase tracking-wider">Only app audio</div>
+                        {windowSources.map(src => (
+                          <button 
+                            key={src.id}
+                            onClick={() => { updateSettings({ systemAudioEnabled: true, selectedSpeakerId: src.id }); setOpenDropdown(null); }}
+                            className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
+                          >
+                            {src.name}
+                          </button>
+                        ))}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -235,7 +265,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <span className="flex-1 text-left text-[13px] text-white/90 truncate pr-4">
-                    {settings.cameraEnabled ? (cameras[0]?.label || 'Camera...') : 'None'}
+                    {settings.cameraEnabled ? (cameras.find(c => c.deviceId === settings.selectedCameraId)?.label || cameras[0]?.label || 'Camera') : 'None'}
                   </span>
                   <span className="material-symbols-outlined text-white/30 text-[18px]">expand_more</span>
                 </button>
@@ -252,7 +282,7 @@ export default function Dashboard() {
                     {cameras.map(camera => (
                       <button 
                         key={camera.deviceId}
-                        onClick={() => { updateSettings({ cameraEnabled: true }); setOpenDropdown(null); }}
+                        onClick={() => { updateSettings({ cameraEnabled: true, selectedCameraId: camera.deviceId }); setOpenDropdown(null); }}
                         className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
                       >
                         {camera.label || 'Camera'}

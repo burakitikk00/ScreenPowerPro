@@ -230,16 +230,24 @@ export function buildZoompanFilter(
   const xExpr = effects
     .map((e) => {
       const end = e.startTime + e.duration;
-      const cx = e.targetX - videoWidth / (2 * e.scale);
-      return `if(between(t,${e.startTime.toFixed(3)},${end.toFixed(3)}),${cx.toFixed(0)},iw/2-(iw/zoom/2))`;
+      // cx = targetX - width/(2*scale)
+      // clamp to [0, videoWidth - width/scale]
+      const vwExpr = `(iw/${e.scale})`;
+      const rawCx = `(${e.targetX}-${vwExpr}/2)`;
+      const clampX = `max(0, min(${rawCx}, iw-${vwExpr}))`;
+      return `if(between(t,${e.startTime.toFixed(3)},${end.toFixed(3)}),${clampX},iw/2-(iw/zoom/2))`;
     })
     .join(':');
 
   const yExpr = effects
     .map((e) => {
       const end = e.startTime + e.duration;
-      const cy = e.targetY - videoHeight / (2 * e.scale);
-      return `if(between(t,${e.startTime.toFixed(3)},${end.toFixed(3)}),${cy.toFixed(0)},ih/2-(ih/zoom/2))`;
+      // cy = targetY - height/(2*scale)
+      // clamp to [0, videoHeight - height/scale]
+      const vhExpr = `(ih/${e.scale})`;
+      const rawCy = `(${e.targetY}-${vhExpr}/2)`;
+      const clampY = `max(0, min(${rawCy}, ih-${vhExpr}))`;
+      return `if(between(t,${e.startTime.toFixed(3)},${end.toFixed(3)}),${clampY},ih/2-(ih/zoom/2))`;
     })
     .join(':');
 

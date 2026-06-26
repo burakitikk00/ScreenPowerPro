@@ -52,6 +52,12 @@ export interface ZoomEffect {
   easing: 'ease-in-out' | 'linear' | 'instant';
 }
 
+export interface TrackState {
+  offset: number;     // Başlangıçtan ötelenme miktarı (timeline pozisyonu)
+  trimStart: number;  // Başlangıçtan kırpma miktarı
+  trimEnd: number;    // Sondan kırpma miktarı (veya orijinal uzunluk)
+}
+
 export interface TimelineSettings {
   cursorSmoothing: CursorSmoothing;
   motionBlur: boolean;
@@ -61,6 +67,16 @@ export interface TimelineSettings {
   backgroundOpacity: number;
   defaultZoomScale: number;
   motionBlurAmount: number;
+  // Yeni özellikler
+  videoSpeed: number;
+  cursorSize: number;
+  cursorVisible: boolean;
+  cameraVisible: boolean;
+  cameraShape: 'circle' | 'square';
+  cameraSize: number;
+  micVolume: number;
+  sysVolume: number;
+  watermarkText: string;
 }
 
 export interface ProjectManifest {
@@ -72,6 +88,9 @@ export interface ProjectManifest {
   timeline: {
     zoomEffects: ZoomEffect[];
     settings: TimelineSettings;
+    videoTrack?: TrackState;
+    micTrack?: TrackState;
+    sysTrack?: TrackState;
   };
 }
 
@@ -89,6 +108,9 @@ export interface AppSettings {
   microphoneEnabled?: boolean;
   systemAudioEnabled?: boolean;
   cameraEnabled?: boolean;
+  selectedCameraId?: string;
+  selectedMicId?: string;
+  selectedSpeakerId?: string;
   customCropBounds?: {
     x: number;
     y: number;

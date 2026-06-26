@@ -37,8 +37,8 @@ export function createRecordingWindow() {
   if (recordingWindow) return recordingWindow;
 
   recordingWindow = new BrowserWindow({
-    width: 320,
-    height: 56,
+    width: 220,
+    height: 48,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -70,8 +70,8 @@ export function createRecordingWindow() {
 
 export function showRecordingWindow() {
   const recWin = createRecordingWindow();
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  recWin.setPosition(Math.round((width - 320) / 2), height - 80);
+  const { width } = screen.getPrimaryDisplay().workAreaSize;
+  recWin.setPosition(Math.round((width - 220) / 2), 10); // Üst orta kısma konumlandır
   recWin.show();
 }
 
@@ -165,7 +165,7 @@ export function createMaskWindow(bounds: { x: number; y: number; width: number; 
     },
   });
 
-  maskWindow.setIgnoreMouseEvents(true);
+  maskWindow.setIgnoreMouseEvents(true, { forward: true });
 
   if (isDev) {
     maskWindow.loadURL(`http://localhost:5173/#/mask-overlay?bounds=${JSON.stringify(bounds)}`);

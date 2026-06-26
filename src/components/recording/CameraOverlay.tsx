@@ -1,12 +1,16 @@
 import { useEffect, useRef } from 'react';
+import { useAppStore } from '../../stores/appStore';
 
 export default function CameraOverlay() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const settings = useAppStore(s => s.settings);
 
   useEffect(() => {
     async function startCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: settings.selectedCameraId ? { deviceId: { exact: settings.selectedCameraId } } : true 
+        });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -22,7 +26,7 @@ export default function CameraOverlay() {
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, []);
+  }, [settings.selectedCameraId]);
 
   return (
     <div

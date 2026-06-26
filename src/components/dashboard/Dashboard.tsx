@@ -1,16 +1,14 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useRecording } from '../../hooks/useRecording';
+import { useMediaDevices } from '../../hooks/useMediaDevices';
 import type { RecordingMode } from '../../types';
-import TopNav from '../layout/TopNav';
-import SideNav from '../layout/SideNav';
 import WindowPickerModal from '../recording/WindowPickerModal';
 
 const modes: { id: RecordingMode; icon: string; label: string }[] = [
-  { id: 'fullscreen', icon: 'fullscreen', label: 'Tam Ekran' },
-  { id: 'custom', icon: 'crop', label: 'Özel Alan' },
-  { id: 'window', icon: 'window', label: 'Pencere' },
-  { id: 'camera', icon: 'photo_camera', label: 'Sadece Kamera' },
+  { id: 'fullscreen', icon: 'fullscreen', label: 'Full Screen' },
+  { id: 'custom', icon: 'crop', label: 'Custom' },
+  { id: 'window', icon: 'window', label: 'Window' },
 ];
 
 export default function Dashboard() {
@@ -24,131 +22,188 @@ export default function Dashboard() {
     setWindowPickerOpen,
     selectedSourceName,
     setSelectedSource,
+    preRecordingBarOpen,
+    setPreRecordingBarOpen,
   } = useAppStore();
   const { startRecording, isPreparing } = useRecording();
+  const { mics, speakers } = useMediaDevices();
+  const [openDropdown, setOpenDropdown] = useState<'mic' | 'speaker' | null>(null);
 
-  const handleStart = async () => {
-    if (recordingMode === 'window' || recordingMode === 'custom') {
-      setWindowPickerOpen(true);
-      return;
-    }
-    await startRecording();
+  const handleModeSelect = (modeId: RecordingMode) => {
+    setRecordingMode(modeId);
+    setPreRecordingBarOpen(true);
   };
 
-  const handleSourceSelected = async (sourceId: string) => {
-    setWindowPickerOpen(false);
-    const sources = await window.electronAPI.getScreenSources();
-    const src = sources.find((s) => s.id === sourceId);
-    setSelectedSource(sourceId, src?.name || null);
-    await startRecording(sourceId);
-  };
+  React.useEffect(() => {
+    const handleClickOutside = () => setOpenDropdown(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  if (preRecordingBarOpen) return null;
 
   return (
-    <div className="min-h-screen relative flex flex-col">
-      <TopNav />
-      <SideNav active="dashboard" />
+    <div 
+      className="h-screen w-screen relative flex flex-col bg-[#0f1015] text-white overflow-hidden"
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+    >
+      {/* Custom Title Bar for Launcher */}
+      <div className="flex items-center justify-between px-4 py-3 h-12 w-full">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
+              <span className="material-symbols-outlined text-[14px] text-white">videocam</span>
+            </div>
+            <span className="font-headline-sm text-sm font-semibold tracking-wide">FocuSee</span>
+          </div>
+          <div className="w-px h-4 bg-white/10" />
+          <button className="text-[13px] text-white/70 hover:text-white transition-colors flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            <span className="material-symbols-outlined text-[16px]">video_library</span> Library
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-white/50" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <button onClick={() => window.electronAPI.windowMinimize()} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
+            <span className="material-symbols-outlined text-[16px]">remove</span>
+          </button>
+          <button onClick={() => window.electronAPI.windowMaximize()} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
+            <span className="material-symbols-outlined text-[14px]">crop_square</span>
+          </button>
+          <button onClick={() => window.electronAPI.windowClose()} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-500 hover:text-white transition-colors">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      </div>
 
       {windowPickerOpen && (
         <WindowPickerModal
-          onSelect={handleSourceSelected}
+          onSelect={(id) => {
+            setWindowPickerOpen(false);
+            setSelectedSource(id, id);
+          }}
           onClose={() => setWindowPickerOpen(false)}
         />
       )}
 
-      <main className="flex-1 ml-0 md:ml-sidebar-width mt-toolbar-height h-[calc(100vh-48px)] flex items-center justify-center p-4 relative z-10">
-        {countdown !== null && (
-          <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center">
-            <span className="font-display-lg text-display-lg text-white animate-pulse">
-              {countdown}
-            </span>
-          </div>
-        )}
-
-        <div className="w-full max-w-[600px] bg-surface-container/60 backdrop-blur-2xl rounded-[24px] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.5)] p-8 flex flex-col gap-8 relative overflow-hidden">
-          <div className="absolute -top-32 -left-32 w-64 h-64 bg-primary/20 rounded-full blur-[80px] pointer-events-none" />
-
-          <div className="text-center relative z-10">
-            <h1 className="font-headline-lg text-headline-lg text-on-surface mb-2">Kayda Hazır</h1>
-            <p className="text-on-surface-variant font-body-lg text-body-lg">
-              Kayıt modunuzu seçin ve cihazları yapılandırın.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 relative z-10">
+      <main className="flex-1 flex px-8 py-4 gap-8 relative z-10" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        {/* Left Side: Recording Modes */}
+        <div className="flex-1 flex flex-col gap-4">
+          <h2 className="text-on-surface-variant font-body-lg text-[15px]">Please select the recording mode</h2>
+          <div className="grid grid-cols-3 gap-4 h-32">
             {modes.map((mode) => (
               <button
                 key={mode.id}
-                onClick={() => setRecordingMode(mode.id)}
-                className={`group relative rounded-2xl p-6 flex flex-col items-center justify-center gap-4 transition-all duration-300 border ${
-                  recordingMode === mode.id
-                    ? 'bg-primary/10 border-primary/50'
-                    : 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-primary/50'
+                onClick={() => handleModeSelect(mode.id)}
+                className={`group relative rounded-[16px] p-4 flex flex-col items-center justify-center gap-3 transition-all duration-300 border bg-[#1e1f27] hover:bg-[#252630] border-transparent ${
+                  recordingMode === mode.id ? 'ring-2 ring-indigo-500 border-transparent' : ''
                 }`}
               >
-                <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center border border-white/10 group-hover:border-primary/50 transition-colors">
-                  <span className="material-symbols-outlined text-3xl text-on-surface-variant group-hover:text-primary transition-colors">
+                <div className="w-full flex-1 rounded-xl bg-[#2a2b36] flex items-center justify-center overflow-hidden relative">
+                  <span className="material-symbols-outlined text-4xl text-indigo-400 group-hover:scale-110 transition-transform">
                     {mode.icon}
                   </span>
+                  {mode.id === 'custom' && (
+                    <div className="absolute inset-3 border-2 border-dashed border-indigo-400/50 rounded-lg pointer-events-none" />
+                  )}
                 </div>
-                <span className="font-headline-md text-base text-on-surface">{mode.label}</span>
+                <span className="font-headline-sm text-[13px] font-medium text-white/90">{mode.label}</span>
               </button>
             ))}
           </div>
+        </div>
 
-          {(recordingMode === 'window' || recordingMode === 'custom') && selectedSourceName && (
-            <p className="text-center text-primary font-label-md text-label-md relative z-10">
-              Seçili: {selectedSourceName}
-            </p>
-          )}
+        {/* Right Side: Device & Tool */}
+        <div className="w-[280px] flex flex-col gap-4">
+          <h2 className="text-on-surface-variant font-body-lg text-[15px]">Device & Tool</h2>
+          <div className="flex flex-col gap-2">
+            
+            <div className="flex flex-col bg-[#1e1f27] rounded-[16px] p-1.5">
+              {/* Microphone */}
+              <div className="relative group" onClick={(e) => e.stopPropagation()}>
+                <button 
+                  onClick={() => setOpenDropdown(openDropdown === 'mic' ? null : 'mic')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${settings.microphoneEnabled ? 'bg-indigo-500/10' : 'hover:bg-white/5'}`}
+                >
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${settings.microphoneEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/50'}`}>
+                    <span className="material-symbols-outlined text-[16px]">
+                      {settings.microphoneEnabled ? 'mic' : 'mic_off'}
+                    </span>
+                  </div>
+                  <span className="flex-1 text-left text-[13px] text-white/90 truncate pr-4">
+                    {settings.microphoneEnabled ? (mics[0]?.label || 'Microphone Array...') : 'None'}
+                  </span>
+                  <span className="material-symbols-outlined text-white/30 text-[18px]">expand_more</span>
+                </button>
 
-          <div className="bg-surface-container-high rounded-full border border-white/10 p-2 flex items-center justify-between gap-2 w-full relative z-10 shadow-inner flex-wrap">
-            <button
-              onClick={() => updateSettings({ microphoneEnabled: !settings.microphoneEnabled })}
-              className={`flex-1 min-w-[140px] flex items-center gap-3 px-4 py-2 rounded-full transition-colors ${
-                settings.microphoneEnabled ? 'bg-primary/10' : 'opacity-50'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[20px]">mic</span>
-              <div className="flex flex-col text-left">
-                <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Mikrofon</span>
-                <span className="font-body-md text-[13px] text-on-surface">
-                  {settings.microphoneEnabled ? 'Açık' : 'Kapalı'}
-                </span>
+                {openDropdown === 'mic' && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+                    <button 
+                      onClick={() => { updateSettings({ microphoneEnabled: false }); setOpenDropdown(null); }}
+                      className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">mic_off</span> None
+                    </button>
+                    <div className="h-px bg-white/10 my-1" />
+                    {mics.map(mic => (
+                      <button 
+                        key={mic.deviceId}
+                        onClick={() => { updateSettings({ microphoneEnabled: true }); setOpenDropdown(null); }}
+                        className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
+                      >
+                        {mic.label || 'Microphone'}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </button>
-            <div className="w-px h-8 bg-white/10 hidden sm:block" />
-            <button
-              onClick={() => updateSettings({ systemAudioEnabled: !settings.systemAudioEnabled })}
-              className={`flex-1 min-w-[140px] flex items-center gap-3 px-4 py-2 rounded-full transition-colors ${
-                settings.systemAudioEnabled ? 'bg-primary/10' : 'opacity-50'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[20px]">volume_up</span>
-              <div className="flex flex-col text-left">
-                <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Sistem Sesi</span>
-                <span className="font-body-md text-[13px] text-on-surface">
-                  {settings.systemAudioEnabled ? 'Açık' : 'Kapalı'}
-                </span>
+
+              <div className="h-px w-full bg-white/5 my-0.5" />
+
+              {/* Speaker */}
+              <div className="relative group" onClick={(e) => e.stopPropagation()}>
+                <button 
+                  onClick={() => setOpenDropdown(openDropdown === 'speaker' ? null : 'speaker')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${settings.systemAudioEnabled ? 'bg-indigo-500/10' : 'hover:bg-white/5'}`}
+                >
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${settings.systemAudioEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/50'}`}>
+                    <span className="material-symbols-outlined text-[16px]">
+                      {settings.systemAudioEnabled ? 'volume_up' : 'volume_off'}
+                    </span>
+                  </div>
+                  <span className="flex-1 text-left text-[13px] text-white/90 truncate pr-4">
+                    {settings.systemAudioEnabled ? (speakers[0]?.label || 'Speaker (Realtek...') : 'None'}
+                  </span>
+                  <span className="material-symbols-outlined text-white/30 text-[18px]">expand_more</span>
+                </button>
+
+                {openDropdown === 'speaker' && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+                    <button 
+                      onClick={() => { updateSettings({ systemAudioEnabled: false }); setOpenDropdown(null); }}
+                      className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">volume_off</span> None
+                    </button>
+                    <div className="h-px bg-white/10 my-1" />
+                    {speakers.map(speaker => (
+                      <button 
+                        key={speaker.deviceId}
+                        onClick={() => { updateSettings({ systemAudioEnabled: true }); setOpenDropdown(null); }}
+                        className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
+                      >
+                        {speaker.label || 'Speaker'}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+            </div>
+
+            {/* Teleprompter Button */}
+            <button className="flex items-center justify-center gap-2 bg-[#1e1f27] hover:bg-[#252630] rounded-[16px] py-3 transition-colors mt-1">
+              <span className="material-symbols-outlined text-[18px] text-white/70">picture_in_picture</span>
+              <span className="text-[13px] font-medium text-white/90">Teleprompter</span>
             </button>
           </div>
-
-          <div className="flex justify-center mt-4 relative z-10">
-            <button
-              onClick={handleStart}
-              disabled={isPreparing}
-              className="relative group h-14 px-12 rounded-full font-headline-md text-white bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 border border-white/20 recording-pulse transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              <div className="w-3 h-3 rounded-full bg-white shadow-[0_0_10px_white] animate-pulse" />
-              <span>{isPreparing ? 'Hazırlanıyor...' : 'Kaydı Başlat'}</span>
-            </button>
-          </div>
-
-          {settings.autoZoom !== 'none' && (
-            <p className="text-center text-on-surface-variant font-label-md text-label-md relative z-10">
-              Otomatik zoom: {settings.autoZoom === 'smooth' ? 'Yumuşak' : 'Anında'}
-            </p>
-          )}
         </div>
       </main>
     </div>

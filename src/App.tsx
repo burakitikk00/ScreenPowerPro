@@ -6,8 +6,10 @@ import EditorWorkspace from './components/editor/EditorWorkspace';
 import ExportScreen from './components/export/ExportScreen';
 import SettingsModal from './components/settings/SettingsModal';
 import RecordingBar from './components/recording/RecordingBar';
+import CameraOverlay from './components/recording/CameraOverlay';
 
 const isRecordingBarOnly = window.location.hash === '#/recording-bar';
+const isCameraOverlay = window.location.hash === '#/camera-overlay';
 
 export default function App() {
   const { screen, updateSettings } = useAppStore();
@@ -39,6 +41,14 @@ export default function App() {
     return (
       <div className="dark h-screen w-screen overflow-hidden bg-transparent">
         <RecordingBar />
+      </div>
+    );
+  }
+
+  if (isCameraOverlay) {
+    return (
+      <div className="dark h-screen w-screen overflow-hidden bg-transparent">
+        <CameraOverlay />
       </div>
     );
   }

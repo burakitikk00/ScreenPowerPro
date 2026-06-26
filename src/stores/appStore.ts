@@ -31,6 +31,7 @@ interface AppState {
   setExportProgress: (progress: ExportProgress | null) => void;
   setSettingsOpen: (open: boolean) => void;
   setWindowPickerOpen: (open: boolean) => void;
+  setPreRecordingBarOpen: (open: boolean) => void;
 }
 
 const defaultSettings: AppSettings = {
@@ -46,6 +47,7 @@ const defaultSettings: AppSettings = {
   exportResolution: '1080p',
   microphoneEnabled: true,
   systemAudioEnabled: true,
+  cameraEnabled: false,
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -61,6 +63,7 @@ export const useAppStore = create<AppState>((set) => ({
   exportProgress: null,
   settingsOpen: false,
   windowPickerOpen: false,
+  preRecordingBarOpen: false,
 
   setScreen: (screen) => set({ screen }),
   setRecordingMode: (mode) => set({ recordingMode: mode, selectedSourceId: null, selectedSourceName: null }),
@@ -74,4 +77,5 @@ export const useAppStore = create<AppState>((set) => ({
   setExportProgress: (progress) => set({ exportProgress: progress }),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   setWindowPickerOpen: (open) => set({ windowPickerOpen: open }),
+  setPreRecordingBarOpen: (open) => set({ preRecordingBarOpen: open }),
 }));

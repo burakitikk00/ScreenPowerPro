@@ -154,13 +154,18 @@ export function useRecording() {
 
       await window.electronAPI.saveProjectManifest(projectPathRef.current, manifest);
       await window.electronAPI.restoreAfterRecording();
+      await window.electronAPI.closeCameraOverlay();
 
       setCurrentProject(manifest, projectPathRef.current);
       loadEditor(manifest.timeline.zoomEffects, manifest.timeline.settings, duration);
+      
+      // Resize window for the editor
+      await window.electronAPI.resizeForEditor();
       setScreen('editor');
     } catch (err) {
       console.error('Kayıt kaydetme hatası:', err);
       await window.electronAPI.restoreAfterRecording();
+      await window.electronAPI.closeCameraOverlay();
       alert(err instanceof Error ? err.message : 'Kayıt kaydedilemedi');
     } finally {
       setIsRecording(false);
@@ -247,6 +252,10 @@ export function useRecording() {
           } catch {
             console.warn('Mikrofon erişimi reddedildi');
           }
+        }
+
+        if (settings.cameraEnabled) {
+          await window.electronAPI.createCameraOverlay();
         }
 
         setIsRecording(true);

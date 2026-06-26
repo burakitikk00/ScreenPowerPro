@@ -77,11 +77,12 @@ export interface AppSettings {
   hideTaskbar: boolean;
   resolution: Resolution;
   countdown: 0 | 3 | 5 | 10;
-  exportFormat: 'mp4';
-  exportFps: ExportFps;
-  exportResolution: Resolution;
-  microphoneEnabled: boolean;
-  systemAudioEnabled: boolean;
+  exportFormat: 'mp4' | 'webm';
+  exportFps: number;
+  exportResolution: '1080p' | '720p' | '4k';
+  microphoneEnabled?: boolean;
+  systemAudioEnabled?: boolean;
+  cameraEnabled?: boolean;
 }
 
 export interface ScreenSource {

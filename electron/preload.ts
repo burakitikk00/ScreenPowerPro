@@ -107,6 +107,14 @@ const api = {
     ipcRenderer.invoke('get-default-paths'),
 
   requestStopRecording: (): Promise<void> => ipcRenderer.invoke('trigger-stop-recording'),
+  
+  resizeForEditor: (): Promise<void> => ipcRenderer.invoke('resize-for-editor'),
+  createCameraOverlay: (): Promise<void> => ipcRenderer.invoke('create-camera-overlay'),
+  closeCameraOverlay: (): Promise<void> => ipcRenderer.invoke('close-camera-overlay'),
+
+  windowMinimize: (): Promise<void> => ipcRenderer.invoke('window-minimize'),
+  windowMaximize: (): Promise<void> => ipcRenderer.invoke('window-maximize'),
+  windowClose: (): Promise<void> => ipcRenderer.invoke('window-close'),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

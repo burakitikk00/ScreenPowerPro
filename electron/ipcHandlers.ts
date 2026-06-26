@@ -21,6 +21,8 @@ import {
   restoreAfterRecording,
   getMainWindow,
   getRecordingWindow,
+  createCameraOverlay,
+  closeCameraOverlay,
 } from './windowManager';
 import type { AppSettings, ProjectManifest, RecordingMetadata } from '../shared/types';
 
@@ -190,5 +192,41 @@ export function registerIpcHandlers() {
   ipcMain.handle('trigger-stop-recording', () => {
     const main = getMainWindow();
     main?.webContents.send('stop-recording-request');
+  });
+
+  ipcMain.handle('resize-for-editor', () => {
+    const main = getMainWindow();
+    if (main) {
+      main.setResizable(true);
+      main.setSize(1200, 800);
+      main.center();
+    }
+  });
+
+  ipcMain.handle('create-camera-overlay', () => {
+    createCameraOverlay();
+  });
+
+  ipcMain.handle('close-camera-overlay', () => {
+    closeCameraOverlay();
+  });
+
+  ipcMain.handle('window-minimize', () => {
+    const main = getMainWindow();
+    main?.minimize();
+  });
+
+  ipcMain.handle('window-maximize', () => {
+    const main = getMainWindow();
+    if (!main) return;
+    if (main.isMaximized()) {
+      main.unmaximize();
+    } else {
+      main.maximize();
+    }
+  });
+
+  ipcMain.handle('window-close', () => {
+    app.quit();
   });
 }

@@ -90,3 +90,49 @@ export function restoreAfterRecording() {
   mainWindow?.restore();
   mainWindow?.focus();
 }
+
+let cameraWindow: BrowserWindow | null = null;
+
+export function createCameraOverlay() {
+  if (cameraWindow) return cameraWindow;
+
+  cameraWindow = new BrowserWindow({
+    width: 200,
+    height: 200,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    resizable: true,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Important: setAspectRatio to keep it square
+  cameraWindow.setAspectRatio(1);
+
+  if (!app.isPackaged) {
+    cameraWindow.loadURL('http://localhost:5173/#/camera-overlay');
+  } else {
+    cameraWindow.loadFile(path.join(__dirname, '../../dist/index.html'), {
+      hash: '/camera-overlay',
+    });
+  }
+
+  cameraWindow.on('closed', () => {
+    cameraWindow = null;
+  });
+
+  return cameraWindow;
+}
+
+export function closeCameraOverlay() {
+  if (cameraWindow) {
+    cameraWindow.close();
+    cameraWindow = null;
+  }
+}

@@ -2,7 +2,8 @@ import { app, BrowserWindow, protocol, session, desktopCapturer } from 'electron
 import * as path from 'path';
 import * as fs from 'fs';
 import { registerIpcHandlers, resolveMediaFilePath } from './ipcHandlers';
-import { setMainWindow, getCaptureOptions } from './windowManager';
+import { setMainWindow, getMainWindow, getCaptureOptions } from './windowManager';
+import { ipcMain } from 'electron';
 
 const isDev = !app.isPackaged;
 
@@ -75,14 +76,19 @@ async function serveMediaFile(request: Request): Promise<Response> {
   });
 }
 
+let cameraWindow: BrowserWindow | null = null;
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 1100,
-    minHeight: 700,
-    backgroundColor: '#12131a',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    width: 850,
+    height: 380,
+    minWidth: 850,
+    minHeight: 380,
+    resizable: false,
+    frame: false, // We'll need a custom title bar or just a plain borderless window
+    transparent: true, // FocuSee often has rounded corners, transparent helps
+    backgroundColor: '#00000000',
+    titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -93,13 +99,17 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // We don't want devtools opening in detach mode for a small launcher window initially, 
+    // but it's okay for debugging. We'll leave it out for compactness.
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
   }
 
   mainWindow.on('closed', () => {
     setMainWindow(null);
+    if (cameraWindow) {
+      cameraWindow.close();
+    }
   });
 
   setMainWindow(mainWindow);

@@ -8,11 +8,8 @@ export default function PropertiesPanel() {
   const selectedZoom = zoomEffects.find((z) => z.id === selectedZoomId);
 
   return (
-    <aside className="w-[300px] bg-surface-container border-l border-white/5 flex flex-col overflow-y-auto z-10 shadow-[-10px_0_30px_rgba(0,0,0,0.2)]">
-      <div className="p-4 border-b border-white/5 sticky top-0 bg-surface-container/90 backdrop-blur-md z-10">
-        <h2 className="font-headline-md text-headline-md text-on-surface">Özellikler</h2>
-      </div>
-      <div className="flex flex-col gap-6 p-4">
+    <aside className="w-[320px] bg-[#1e1e26] border-r border-white/5 flex flex-col overflow-y-auto z-10 shrink-0">
+      <div className="flex flex-col gap-8 p-6">
         <section className="flex flex-col gap-4">
           <h3 className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
             İmleç & Bulanıklık

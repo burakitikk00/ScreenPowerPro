@@ -69,10 +69,14 @@ export default function Library() {
                 onClick={() => openProject(project.path)}
                 className="group glass-panel rounded-xl overflow-hidden text-left hover:border-primary/30 transition-all hover:shadow-[0_0_20px_rgba(192,193,255,0.1)]"
               >
-                <div className="aspect-video bg-surface-container-high flex items-center justify-center border-b border-white/5">
-                  <span className="material-symbols-outlined text-4xl text-on-surface-variant group-hover:text-primary transition-colors">
-                    {project.hasVideo ? 'movie' : 'videocam_off'}
-                  </span>
+                <div className="aspect-video bg-surface-container-high flex items-center justify-center border-b border-white/5 overflow-hidden">
+                  {project.videoUrl ? (
+                    <video src={project.videoUrl} className="w-full h-full object-cover pointer-events-none" preload="metadata" muted playsInline />
+                  ) : (
+                    <span className="material-symbols-outlined text-4xl text-on-surface-variant group-hover:text-primary transition-colors">
+                      {project.hasVideo ? 'movie' : 'videocam_off'}
+                    </span>
+                  )}
                 </div>
                 <div className="p-4 flex flex-col gap-1">
                   <span className="font-headline-md text-base text-on-surface truncate group-hover:text-primary transition-colors">

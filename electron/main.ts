@@ -80,10 +80,10 @@ let cameraWindow: BrowserWindow | null = null;
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
-    width: 850,
-    height: 380,
-    minWidth: 850,
-    minHeight: 380,
+    width: 720,
+    height: 310,
+    minWidth: 720,
+    minHeight: 350,
     resizable: false,
     frame: false, // We'll need a custom title bar or just a plain borderless window
     transparent: true, // FocuSee often has rounded corners, transparent helps

@@ -23,6 +23,8 @@ import {
   getRecordingWindow,
   createCameraOverlay,
   closeCameraOverlay,
+  createCropperWindow,
+  closeCropperWindow,
 } from './windowManager';
 import type { AppSettings, ProjectManifest, RecordingMetadata } from '../shared/types';
 
@@ -209,6 +211,71 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('close-camera-overlay', () => {
     closeCameraOverlay();
+  });
+
+  ipcMain.handle('open-cropper', () => {
+    createCropperWindow();
+  });
+
+  ipcMain.handle('close-cropper', () => {
+    closeCropperWindow();
+  });
+
+  ipcMain.handle('open-mask', (_e, bounds) => {
+    const { createMaskWindow } = require('./windowManager');
+    createMaskWindow(bounds);
+  });
+
+  ipcMain.handle('close-mask', () => {
+    const { closeMaskWindow } = require('./windowManager');
+    closeMaskWindow();
+  });
+
+  ipcMain.handle('open-countdown', (_e, seconds: number) => {
+    const { createCountdownWindow } = require('./windowManager');
+    createCountdownWindow(seconds);
+  });
+
+  ipcMain.handle('close-countdown', () => {
+    const { closeCountdownWindow } = require('./windowManager');
+    closeCountdownWindow();
+  });
+
+  ipcMain.handle('cropper-area-selected', (_e, bounds: {x: number, y: number, width: number, height: number}) => {
+    const main = getMainWindow();
+    main?.webContents.send('cropper-area-selected', bounds);
+    closeCropperWindow();
+  });
+
+  ipcMain.handle('resize-for-prerecording', () => {
+    const main = getMainWindow();
+    if (!main) return;
+    main.setSize(850, 300);
+    // Position it near the bottom
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
+    main.setPosition(Math.round(width / 2 - 425), Math.round(height - 350));
+  });
+
+  ipcMain.handle('restore-and-resize-for-prerecording', () => {
+    const main = getMainWindow();
+    if (!main) return;
+    if (main.isMinimized()) {
+      main.restore();
+    }
+    main.setSize(850, 300);
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
+    main.setPosition(Math.round(width / 2 - 425), Math.round(height - 350));
+  });
+
+  ipcMain.handle('restore-dashboard-size', () => {
+    const main = getMainWindow();
+    if (!main) return;
+    main.setSize(720, 350);
+    main.center();
   });
 
   ipcMain.handle('window-minimize', () => {

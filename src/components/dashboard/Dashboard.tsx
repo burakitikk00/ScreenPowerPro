@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useRecording } from '../../hooks/useRecording';
 import { useMediaDevices } from '../../hooks/useMediaDevices';
+import { useAudioLevel } from '../../hooks/useAudioLevel';
 import type { RecordingMode } from '../../types';
 import WindowPickerModal from '../recording/WindowPickerModal';
 
@@ -25,13 +26,31 @@ export default function Dashboard() {
     preRecordingBarOpen,
     setPreRecordingBarOpen,
   } = useAppStore();
-  const { startRecording, isPreparing } = useRecording();
-  const { mics, speakers } = useMediaDevices();
-  const [openDropdown, setOpenDropdown] = useState<'mic' | 'speaker' | null>(null);
+  const { startRecording, isPreparing, isRecording } = useRecording();
+  const { mics, speakers, cameras } = useMediaDevices();
+  const [openDropdown, setOpenDropdown] = useState<'mic' | 'speaker' | 'camera' | null>(null);
+
+  const selectedMicId = mics[0]?.deviceId;
+  const micVolume = useAudioLevel(selectedMicId, settings.microphoneEnabled);
+  
+  // Calculate dynamic scale based on micVolume (1 to 1.3)
+  const micScale = 1 + micVolume * 0.3;
 
   const handleModeSelect = (modeId: RecordingMode) => {
     setRecordingMode(modeId);
-    setPreRecordingBarOpen(true);
+    if (modeId === 'custom') {
+      window.electronAPI.windowMinimize();
+      window.electronAPI.openCropper();
+      const unsub = window.electronAPI.onCropperAreaSelected((bounds) => {
+        updateSettings({ customCropBounds: bounds });
+        window.electronAPI.restoreAndResizeForPrerecording();
+        setPreRecordingBarOpen(true);
+        unsub();
+      });
+    } else {
+      window.electronAPI.resizeForPrerecording();
+      setPreRecordingBarOpen(true);
+    }
   };
 
   React.useEffect(() => {
@@ -57,7 +76,7 @@ export default function Dashboard() {
             <span className="font-headline-sm text-sm font-semibold tracking-wide">FocuSee</span>
           </div>
           <div className="w-px h-4 bg-white/10" />
-          <button className="text-[13px] text-white/70 hover:text-white transition-colors flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <button onClick={() => setScreen('library')} className="text-[13px] text-white/70 hover:text-white transition-colors flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <span className="material-symbols-outlined text-[16px]">video_library</span> Library
           </button>
         </div>
@@ -93,8 +112,10 @@ export default function Dashboard() {
               <button
                 key={mode.id}
                 onClick={() => handleModeSelect(mode.id)}
-                className={`group relative rounded-[16px] p-4 flex flex-col items-center justify-center gap-3 transition-all duration-300 border bg-[#1e1f27] hover:bg-[#252630] border-transparent ${
-                  recordingMode === mode.id ? 'ring-2 ring-indigo-500 border-transparent' : ''
+                className={`group relative rounded-[16px] p-4 flex flex-col items-center justify-center gap-3 transition-all duration-300 border bg-[#1e1f27] hover:bg-[#252630] ${
+                  recordingMode === mode.id 
+                    ? 'ring-2 ring-indigo-500 border-transparent' 
+                    : 'border-transparent hover:ring-2 hover:ring-white/20'
                 }`}
               >
                 <div className="w-full flex-1 rounded-xl bg-[#2a2b36] flex items-center justify-center overflow-hidden relative">
@@ -123,7 +144,10 @@ export default function Dashboard() {
                   onClick={() => setOpenDropdown(openDropdown === 'mic' ? null : 'mic')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${settings.microphoneEnabled ? 'bg-indigo-500/10' : 'hover:bg-white/5'}`}
                 >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${settings.microphoneEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/50'}`}>
+                  <div 
+                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform duration-75 ${settings.microphoneEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/50'}`}
+                    style={{ transform: settings.microphoneEnabled ? `scale(${micScale})` : 'scale(1)' }}
+                  >
                     <span className="material-symbols-outlined text-[16px]">
                       {settings.microphoneEnabled ? 'mic' : 'mic_off'}
                     </span>
@@ -164,7 +188,7 @@ export default function Dashboard() {
                   onClick={() => setOpenDropdown(openDropdown === 'speaker' ? null : 'speaker')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${settings.systemAudioEnabled ? 'bg-indigo-500/10' : 'hover:bg-white/5'}`}
                 >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${settings.systemAudioEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/50'}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${settings.systemAudioEnabled ? 'bg-indigo-500/20 text-indigo-400 animate-audio-pulse' : 'bg-white/5 text-white/50'}`}>
                     <span className="material-symbols-outlined text-[16px]">
                       {settings.systemAudioEnabled ? 'volume_up' : 'volume_off'}
                     </span>
@@ -176,7 +200,7 @@ export default function Dashboard() {
                 </button>
 
                 {openDropdown === 'speaker' && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+                  <div className="absolute bottom-full left-0 mb-2 w-full bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
                     <button 
                       onClick={() => { updateSettings({ systemAudioEnabled: false }); setOpenDropdown(null); }}
                       className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
@@ -191,6 +215,47 @@ export default function Dashboard() {
                         className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
                       >
                         {speaker.label || 'Speaker'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="h-px w-full bg-white/5 my-0.5" />
+
+              {/* Camera */}
+              <div className="relative group" onClick={(e) => e.stopPropagation()}>
+                <button 
+                  onClick={() => setOpenDropdown(openDropdown === 'camera' ? null : 'camera')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${settings.cameraEnabled ? 'bg-indigo-500/10' : 'hover:bg-white/5'}`}
+                >
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${settings.cameraEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/50'}`}>
+                    <span className="material-symbols-outlined text-[16px]">
+                      {settings.cameraEnabled ? 'videocam' : 'videocam_off'}
+                    </span>
+                  </div>
+                  <span className="flex-1 text-left text-[13px] text-white/90 truncate pr-4">
+                    {settings.cameraEnabled ? (cameras[0]?.label || 'Camera...') : 'None'}
+                  </span>
+                  <span className="material-symbols-outlined text-white/30 text-[18px]">expand_more</span>
+                </button>
+
+                {openDropdown === 'camera' && (
+                  <div className="absolute bottom-full left-0 mb-2 w-full bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+                    <button 
+                      onClick={() => { updateSettings({ cameraEnabled: false }); setOpenDropdown(null); }}
+                      className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">videocam_off</span> None
+                    </button>
+                    <div className="h-px bg-white/10 my-1" />
+                    {cameras.map(camera => (
+                      <button 
+                        key={camera.deviceId}
+                        onClick={() => { updateSettings({ cameraEnabled: true }); setOpenDropdown(null); }}
+                        className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
+                      >
+                        {camera.label || 'Camera'}
                       </button>
                     ))}
                   </div>

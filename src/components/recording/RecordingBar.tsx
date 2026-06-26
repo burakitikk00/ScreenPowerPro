@@ -38,6 +38,9 @@ export default function RecordingBar() {
   };
 
   const handleClosePreRecording = () => {
+    if (!isOverlay) {
+      window.electronAPI.restoreDashboardSize();
+    }
     setPreRecordingBarOpen(false);
   };
 
@@ -83,23 +86,26 @@ export default function RecordingBar() {
   // Pre-recording setup bar (Cropped dark purple design)
   if (preRecordingBarOpen) {
     return (
-      <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-1.5 bg-[#1b1b22] rounded-full p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)] border border-white/5`}>
-        <button onClick={handleClosePreRecording} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-white/50 hover:text-white/90">
+      <div 
+        className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-1.5 bg-[#1b1b22] rounded-full p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)] border border-white/5`}
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <button onClick={handleClosePreRecording} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-white/50 hover:text-white/90" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <span className="material-symbols-outlined text-[20px]">close</span>
         </button>
         
         <div className="w-px h-5 bg-white/10 mx-1" />
         
-        <button className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-white/90">
+        <button className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-white/90" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <span className="material-symbols-outlined text-[18px]">picture_in_picture</span>
         </button>
         
-        <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-white/50 hover:text-white/90">
+        <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-white/50 hover:text-white/90" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <span className="material-symbols-outlined text-[18px]">settings</span>
         </button>
         
         {/* Camera Dropdown */}
-        <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="relative" onClick={(e) => e.stopPropagation()} style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <button 
             onClick={() => setOpenDropdown(openDropdown === 'camera' ? null : 'camera')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors text-white/90 ${settings.cameraEnabled ? 'bg-[#2b2b40]' : 'hover:bg-white/10'}`}
@@ -110,7 +116,7 @@ export default function RecordingBar() {
           </button>
 
           {openDropdown === 'camera' && (
-            <div className="absolute bottom-full left-0 mb-2 w-48 bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+            <div className="absolute bottom-full left-0 mb-2 w-48 max-h-48 overflow-y-auto bg-[#252530] border border-white/10 rounded-xl shadow-xl z-50 py-1 scrollbar-thin scrollbar-thumb-white/10">
               <button 
                 onClick={() => { updateSettings({ cameraEnabled: false }); setOpenDropdown(null); }}
                 className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
@@ -132,7 +138,7 @@ export default function RecordingBar() {
         </div>
         
         {/* Microphone Dropdown */}
-        <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="relative" onClick={(e) => e.stopPropagation()} style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <button 
             onClick={() => setOpenDropdown(openDropdown === 'mic' ? null : 'mic')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors text-white/90 ${settings.microphoneEnabled ? 'bg-[#2b2b40]' : 'hover:bg-white/10'}`}
@@ -151,7 +157,7 @@ export default function RecordingBar() {
           </button>
 
           {openDropdown === 'mic' && (
-            <div className="absolute bottom-full left-0 mb-2 w-48 bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+            <div className="absolute bottom-full left-0 mb-2 w-48 max-h-48 overflow-y-auto bg-[#252530] border border-white/10 rounded-xl shadow-xl z-50 py-1 scrollbar-thin scrollbar-thumb-white/10">
               <button 
                 onClick={() => { updateSettings({ microphoneEnabled: false }); setOpenDropdown(null); }}
                 className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
@@ -173,7 +179,7 @@ export default function RecordingBar() {
         </div>
 
         {/* Speaker Dropdown */}
-        <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="relative" onClick={(e) => e.stopPropagation()} style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <button 
             onClick={() => setOpenDropdown(openDropdown === 'speaker' ? null : 'speaker')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors text-white/90 ${settings.systemAudioEnabled ? 'bg-[#2b2b40]' : 'hover:bg-white/10'}`}
@@ -184,7 +190,7 @@ export default function RecordingBar() {
           </button>
 
           {openDropdown === 'speaker' && (
-            <div className="absolute bottom-full left-0 mb-2 w-48 bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+            <div className="absolute bottom-full left-0 mb-2 w-48 max-h-48 overflow-y-auto bg-[#252530] border border-white/10 rounded-xl shadow-xl z-50 py-1 scrollbar-thin scrollbar-thumb-white/10">
               <button 
                 onClick={() => { updateSettings({ systemAudioEnabled: false }); setOpenDropdown(null); }}
                 className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
@@ -210,6 +216,7 @@ export default function RecordingBar() {
           onClick={handleStartRecording}
           disabled={isPreparing}
           className="ml-1 w-12 h-9 flex items-center justify-center rounded-full bg-[#5a67d8] hover:bg-[#667eea] transition-colors text-white font-bold text-[11px] tracking-wider disabled:opacity-50"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           REC
         </button>

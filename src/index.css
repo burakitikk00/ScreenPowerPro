@@ -81,6 +81,15 @@ input[type='range']::-webkit-slider-thumb {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
+@keyframes audio-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+.animate-audio-pulse {
+  animation: audio-pulse 1.5s ease-in-out infinite;
+}
+
 .progress-ring__circle {
   transition: stroke-dashoffset 0.35s;
   transform: rotate(-90deg);

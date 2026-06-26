@@ -10,7 +10,7 @@ import type {
 interface AppState {
   screen: AppScreen;
   settings: AppSettings;
-  recordingMode: RecordingMode;
+  recordingMode: RecordingMode | null;
   selectedSourceId: string | null;
   selectedSourceName: string | null;
   isRecording: boolean;
@@ -22,7 +22,7 @@ interface AppState {
   windowPickerOpen: boolean;
 
   setScreen: (screen: AppScreen) => void;
-  setRecordingMode: (mode: RecordingMode) => void;
+  setRecordingMode: (mode: RecordingMode | null) => void;
   setSelectedSource: (id: string | null, name?: string | null) => void;
   setIsRecording: (v: boolean) => void;
   setCountdown: (v: number | null) => void;
@@ -53,7 +53,7 @@ const defaultSettings: AppSettings = {
 export const useAppStore = create<AppState>((set) => ({
   screen: 'dashboard',
   settings: defaultSettings,
-  recordingMode: 'fullscreen',
+  recordingMode: null,
   selectedSourceId: null,
   selectedSourceName: null,
   isRecording: false,

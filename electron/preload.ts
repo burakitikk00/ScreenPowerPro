@@ -112,6 +112,29 @@ const api = {
   createCameraOverlay: (): Promise<void> => ipcRenderer.invoke('create-camera-overlay'),
   closeCameraOverlay: (): Promise<void> => ipcRenderer.invoke('close-camera-overlay'),
 
+  openCropper: (): Promise<void> => ipcRenderer.invoke('open-cropper'),
+  closeCropper: (): Promise<void> => ipcRenderer.invoke('close-cropper'),
+  openMask: (bounds: {x: number, y: number, width: number, height: number}): Promise<void> => ipcRenderer.invoke('open-mask', bounds),
+  closeMask: (): Promise<void> => ipcRenderer.invoke('close-mask'),
+  openCountdown: (seconds: number): Promise<void> => ipcRenderer.invoke('open-countdown', seconds),
+  closeCountdown: (): Promise<void> => ipcRenderer.invoke('close-countdown'),
+  onStartCountdown: (callback: (seconds: number) => void) => {
+    const handler = (_: unknown, seconds: number) => callback(seconds);
+    ipcRenderer.on('start-countdown', handler);
+    return () => ipcRenderer.removeListener('start-countdown', handler);
+  },
+  onCropperAreaSelected: (callback: (bounds: {x: number, y: number, width: number, height: number}) => void) => {
+    const handler = (_: unknown, bounds: {x: number, y: number, width: number, height: number}) => callback(bounds);
+    ipcRenderer.on('cropper-area-selected', handler);
+    return () => ipcRenderer.removeListener('cropper-area-selected', handler);
+  },
+  sendCropperArea: (bounds: {x: number, y: number, width: number, height: number}): Promise<void> => 
+    ipcRenderer.invoke('cropper-area-selected', bounds),
+
+  resizeForPrerecording: (): Promise<void> => ipcRenderer.invoke('resize-for-prerecording'),
+  restoreAndResizeForPrerecording: (): Promise<void> => ipcRenderer.invoke('restore-and-resize-for-prerecording'),
+  restoreDashboardSize: (): Promise<void> => ipcRenderer.invoke('restore-dashboard-size'),
+
   windowMinimize: (): Promise<void> => ipcRenderer.invoke('window-minimize'),
   windowMaximize: (): Promise<void> => ipcRenderer.invoke('window-maximize'),
   windowClose: (): Promise<void> => ipcRenderer.invoke('window-close'),

@@ -26,17 +26,19 @@ async function finalizeRecorder(active: ActiveRecorder): Promise<Blob> {
     const { recorder, chunks, stream } = active;
     if (recorder.state === 'inactive') {
       stream.getTracks().forEach((t) => t.stop());
-      resolve(new Blob(chunks, { type: recorder.mimeType.split(';')[0] }));
+      resolve(new Blob(chunks, { type: 'video/webm' }));
       return;
     }
     recorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
-      resolve(new Blob(chunks, { type: recorder.mimeType.split(';')[0] }));
+      resolve(new Blob(chunks, { type: 'video/webm' }));
     };
     recorder.onerror = () => reject(new Error('Kayıt hatası'));
     recorder.requestData();
     setTimeout(() => {
-      if (recorder.state !== 'inactive') recorder.stop();
+      if (recorder.state !== 'inactive') {
+        recorder.stop();
+      }
     }, 200);
   });
 }
@@ -63,9 +65,11 @@ export function useRecording() {
 
   const stopRecording = useCallback(async () => {
     try {
+      console.log('stopRecording called! videoActive:', videoRecorderRef.current);
       const videoActive = videoRecorderRef.current;
       if (!videoActive) return;
 
+      console.log('Finalizing recorders...');
       const [videoBlob, micBlob, systemBlob] = await Promise.all([
         finalizeRecorder(videoActive),
         micRecorderRef.current ? finalizeRecorder(micRecorderRef.current) : null,
@@ -74,11 +78,15 @@ export function useRecording() {
           : null,
       ]);
 
+      console.log('Recorders finalized. videoBlob size:', videoBlob.size);
       videoRecorderRef.current = null;
       micRecorderRef.current = null;
       systemAudioRecorderRef.current = null;
 
-      if (videoBlob.size < 1000) {
+      window.electronAPI.closeMask();
+
+      if (videoBlob.size < 100) {
+        console.error('Video blob too small!', videoBlob.size);
         throw new Error('Video kaydı boş — lütfen tekrar deneyin');
       }
 
@@ -115,6 +123,7 @@ export function useRecording() {
         duration,
         recordedAt: new Date().toISOString(),
         mode: recordingMode,
+        ...(recordingMode === 'custom' && settings.customCropBounds ? { customCropBounds: settings.customCropBounds } : {})
       };
 
       await window.electronAPI.saveMetadata(
@@ -212,6 +221,10 @@ export function useRecording() {
             await new Promise((r) => setTimeout(r, 1000));
           }
           setCountdown(null);
+        }
+
+        if (recordingMode === 'custom' && settings.customCropBounds) {
+          await window.electronAPI.openMask(settings.customCropBounds);
         }
 
         await window.electronAPI.prepareCapture({

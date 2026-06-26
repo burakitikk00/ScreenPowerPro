@@ -34,6 +34,12 @@ export interface RecordingMetadata {
   duration: number;
   recordedAt: string;
   mode: RecordingMode;
+  customCropBounds?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface ZoomEffect {
@@ -83,6 +89,12 @@ export interface AppSettings {
   microphoneEnabled?: boolean;
   systemAudioEnabled?: boolean;
   cameraEnabled?: boolean;
+  customCropBounds?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface ScreenSource {
@@ -111,6 +123,7 @@ export interface ProjectSummary {
   duration: number;
   mode: RecordingMode;
   hasVideo: boolean;
+  videoUrl?: string;
 }
 
 export interface ExportProgress {

@@ -136,3 +136,151 @@ export function closeCameraOverlay() {
     cameraWindow = null;
   }
 }
+
+let maskWindow: BrowserWindow | null = null;
+
+export function createMaskWindow(bounds: { x: number; y: number; width: number; height: number }) {
+  if (maskWindow) return maskWindow;
+
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.bounds;
+
+  maskWindow = new BrowserWindow({
+    width,
+    height,
+    x: 0,
+    y: 0,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  maskWindow.setIgnoreMouseEvents(true);
+
+  if (isDev) {
+    maskWindow.loadURL(`http://localhost:5173/#/mask-overlay?bounds=${JSON.stringify(bounds)}`);
+  } else {
+    maskWindow.loadFile(path.join(__dirname, '../../dist/index.html'), {
+      hash: `/mask-overlay?bounds=${JSON.stringify(bounds)}`,
+    });
+  }
+
+  return maskWindow;
+}
+
+export function closeMaskWindow() {
+  if (maskWindow) {
+    maskWindow.close();
+    maskWindow = null;
+  }
+}
+
+let countdownWindow: BrowserWindow | null = null;
+
+export function createCountdownWindow(seconds: number) {
+  if (countdownWindow) {
+    countdownWindow.webContents.send('start-countdown', seconds);
+    return countdownWindow;
+  }
+
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.bounds;
+
+  countdownWindow = new BrowserWindow({
+    width,
+    height,
+    x: 0,
+    y: 0,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  countdownWindow.setIgnoreMouseEvents(true);
+
+  if (isDev) {
+    countdownWindow.loadURL(`http://localhost:5173/#/countdown-overlay?seconds=${seconds}`);
+  } else {
+    countdownWindow.loadFile(path.join(__dirname, '../../dist/index.html'), {
+      hash: `/countdown-overlay?seconds=${seconds}`,
+    });
+  }
+
+  return countdownWindow;
+}
+
+export function closeCountdownWindow() {
+  if (countdownWindow) {
+    countdownWindow.close();
+    countdownWindow = null;
+  }
+}
+
+let cropperWindow: BrowserWindow | null = null;
+
+export function createCropperWindow() {
+  if (cropperWindow) return cropperWindow;
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.bounds;
+
+  cropperWindow = new BrowserWindow({
+    x: 0,
+    y: 0,
+    width,
+    height,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    enableLargerThanScreen: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  if (!app.isPackaged) {
+    cropperWindow.loadURL('http://localhost:5173/#/cropper-overlay');
+  } else {
+    cropperWindow.loadFile(path.join(__dirname, '../../dist/index.html'), {
+      hash: '/cropper-overlay',
+    });
+  }
+
+  cropperWindow.on('closed', () => {
+    cropperWindow = null;
+  });
+
+  return cropperWindow;
+}
+
+export function closeCropperWindow() {
+  if (cropperWindow) {
+    cropperWindow.close();
+    cropperWindow = null;
+  }
+}

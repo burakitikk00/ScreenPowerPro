@@ -30,7 +30,7 @@ export default function WindowPickerModal({ onSelect, onClose }: WindowPickerMod
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
-      <div className="glass-panel w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+      <div className="glass-panel w-full max-w-[660px] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center">
           <h2 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
             <span className="material-symbols-outlined text-primary">window</span>
@@ -41,39 +41,39 @@ export default function WindowPickerModal({ onSelect, onClose }: WindowPickerMod
           </button>
         </div>
 
-        <div className="px-6 py-3 border-b border-white/5">
+        <div className="px-4 py-2 border-b border-white/5">
           <input
             type="text"
             placeholder="Ara..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="w-full glass-input text-on-surface rounded-lg py-2 px-4 font-body-md"
+            className="w-full glass-input text-on-surface rounded-lg py-1.5 px-3 font-body-sm text-[13px]"
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="overflow-x-auto p-4 flex gap-3 items-start min-h-[120px]">
           {loading && (
-            <p className="col-span-full text-center text-on-surface-variant py-8">Yükleniyor...</p>
+            <p className="w-full text-center text-on-surface-variant py-4 text-[13px]">Yükleniyor...</p>
           )}
           {!loading && displayed.length === 0 && (
-            <p className="col-span-full text-center text-on-surface-variant py-8">Kaynak bulunamadı</p>
+            <p className="w-full text-center text-on-surface-variant py-4 text-[13px]">Kaynak bulunamadı</p>
           )}
           {displayed.map((src) => (
             <button
               key={src.id}
               onClick={() => onSelect(src.id)}
-              className="group flex flex-col gap-2 p-3 rounded-lg border border-white/10 hover:border-primary/50 hover:bg-white/5 transition-all text-left"
+              className="group flex flex-col gap-2 p-2 w-32 shrink-0 rounded-lg border border-white/10 hover:border-indigo-500 hover:bg-white/5 transition-all text-left"
             >
               <div className="aspect-video rounded-md overflow-hidden bg-black border border-white/10">
                 {src.thumbnail ? (
                   <img src={src.thumbnail} alt={src.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-on-surface-variant">
-                    <span className="material-symbols-outlined">desktop_windows</span>
+                    <span className="material-symbols-outlined text-[16px]">desktop_windows</span>
                   </div>
                 )}
               </div>
-              <span className="font-body-md text-[13px] text-on-surface truncate group-hover:text-primary transition-colors">
+              <span className="font-body-sm text-[11px] text-on-surface truncate group-hover:text-indigo-400 transition-colors w-full">
                 {src.name}
               </span>
             </button>

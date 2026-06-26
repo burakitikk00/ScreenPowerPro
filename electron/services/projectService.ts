@@ -137,13 +137,22 @@ export function listProjects(basePath: string) {
         metadata = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
       }
       const videoPath = resolveMediaPath(projectPath, manifest.videoPath);
+      const hasVideo = fs.existsSync(videoPath);
+      
+      let videoUrl: string | undefined;
+      if (hasVideo) {
+        // use buildMediaUrl instead of import
+        videoUrl = `media://playback?file=${encodeURIComponent(videoPath)}`;
+      }
+
       projects.push({
         path: projectPath,
         name: manifest.name || entry.name,
         recordedAt: metadata.recordedAt || entry.name,
         duration: metadata.duration,
         mode: metadata.mode,
-        hasVideo: fs.existsSync(videoPath),
+        hasVideo,
+        videoUrl,
       });
     } catch {
       /* skip invalid */

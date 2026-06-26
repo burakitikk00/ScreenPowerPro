@@ -38,28 +38,134 @@ export function generateZoomEffectsFromClicks(
   return effects;
 }
 
+export interface Keyframe {
+  time: number;
+  scale: number;
+  x: number;
+  y: number;
+}
+
+export function buildKeyframes(effects: ZoomEffect[]): Keyframe[] {
+  const kfs: Keyframe[] = [];
+  if (effects.length === 0) return kfs;
+
+  const PAN_THRESHOLD = 3.0; // seconds
+  const ZOOM_IN_TIME = 0.8;
+  const ZOOM_OUT_TIME = 0.8;
+  const HOLD_TIME = 1.0;
+  const PAN_TIME = 0.6;
+
+  const clusters: ZoomEffect[][] = [];
+  let currentCluster: ZoomEffect[] = [effects[0]];
+
+  for (let i = 1; i < effects.length; i++) {
+    const prev = effects[i - 1];
+    const curr = effects[i];
+    if (curr.startTime - prev.startTime <= PAN_THRESHOLD) {
+      currentCluster.push(curr);
+    } else {
+      clusters.push(currentCluster);
+      currentCluster = [curr];
+    }
+  }
+  clusters.push(currentCluster);
+
+  for (const cluster of clusters) {
+    const first = cluster[0];
+    
+    kfs.push({
+      time: Math.max(0, first.startTime - ZOOM_IN_TIME),
+      scale: 1.0,
+      x: first.targetX,
+      y: first.targetY,
+    });
+    kfs.push({
+      time: first.startTime,
+      scale: first.scale,
+      x: first.targetX,
+      y: first.targetY,
+    });
+
+    for (let i = 1; i < cluster.length; i++) {
+      const prev = cluster[i - 1];
+      const curr = cluster[i];
+      
+      const panStartTime = Math.max(prev.startTime, curr.startTime - PAN_TIME);
+      
+      kfs.push({
+        time: panStartTime,
+        scale: prev.scale,
+        x: prev.targetX,
+        y: prev.targetY,
+      });
+
+      kfs.push({
+        time: curr.startTime,
+        scale: curr.scale,
+        x: curr.targetX,
+        y: curr.targetY,
+      });
+    }
+
+    const last = cluster[cluster.length - 1];
+    kfs.push({
+      time: last.startTime + HOLD_TIME,
+      scale: last.scale,
+      x: last.targetX,
+      y: last.targetY,
+    });
+    kfs.push({
+      time: last.startTime + HOLD_TIME + ZOOM_OUT_TIME,
+      scale: 1.0,
+      x: last.targetX,
+      y: last.targetY,
+    });
+  }
+
+  kfs.sort((a, b) => a.time - b.time);
+  const uniqueKfs: Keyframe[] = [];
+  for (const kf of kfs) {
+    if (uniqueKfs.length === 0 || uniqueKfs[uniqueKfs.length - 1].time < kf.time) {
+      uniqueKfs.push(kf);
+    } else if (uniqueKfs[uniqueKfs.length - 1].time === kf.time) {
+      uniqueKfs[uniqueKfs.length - 1] = kf;
+    }
+  }
+
+  return uniqueKfs;
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 export function getActiveZoomAtTime(
   effects: ZoomEffect[],
   timeSec: number
-): { scale: number; translateX: number; translateY: number } | null {
-  const active = effects.find(
-    (e) => timeSec >= e.startTime && timeSec <= e.startTime + e.duration
-  );
-  if (!active) return null;
+): { scale: number; targetX: number; targetY: number } | null {
+  if (effects.length === 0) return null;
+  const kfs = buildKeyframes(effects);
 
-  const progress = (timeSec - active.startTime) / active.duration;
-  let t = progress;
-  if (active.easing === 'ease-in-out') {
-    t = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-  } else if (active.easing === 'instant') {
-    t = progress < 0.1 ? 0 : progress > 0.9 ? 1 : 1;
+  if (timeSec <= kfs[0].time) return null;
+  if (timeSec >= kfs[kfs.length - 1].time) return null;
+
+  for (let i = 0; i < kfs.length - 1; i++) {
+    const k1 = kfs[i];
+    const k2 = kfs[i + 1];
+    if (timeSec >= k1.time && timeSec <= k2.time) {
+      if (k1.time === k2.time) return { scale: k2.scale, targetX: k2.x, targetY: k2.y };
+      
+      const progress = (timeSec - k1.time) / (k2.time - k1.time);
+      const t = easeInOutCubic(progress);
+      
+      const scale = k1.scale + (k2.scale - k1.scale) * t;
+      const targetX = k1.x + (k2.x - k1.x) * t;
+      const targetY = k1.y + (k2.y - k1.y) * t;
+      
+      return { scale, targetX, targetY };
+    }
   }
-
-  const scale = 1 + (active.scale - 1) * t;
-  const translateX = -(active.targetX * (scale - 1));
-  const translateY = -(active.targetY * (scale - 1));
-
-  return { scale, translateX, translateY };
+  return null;
 }
 
 export function normalizeDuration(value: number, fallback = 0): number {

@@ -169,10 +169,35 @@ export default function VideoPreview() {
     setIsPlaying(!isPlaying);
   }, [isPlaying, setIsPlaying]);
 
-  const zoom = getActiveZoomAtTime(zoomEffects, currentTime);
-  const transform = zoom
-    ? `scale(${zoom.scale}) translate(${zoom.translateX / zoom.scale}px, ${zoom.translateY / zoom.scale}px)`
-    : 'scale(1)';
+  useEffect(() => {
+    let animationFrameId: number;
+
+    const renderLoop = () => {
+      const video = videoRef.current;
+      if (video) {
+        const timeSec = video.currentTime;
+        const videoWidth = video.videoWidth || 1920;
+        const videoHeight = video.videoHeight || 1080;
+        
+        const zoom = getActiveZoomAtTime(zoomEffects, timeSec);
+        const transform = zoom ? `scale(${zoom.scale})` : 'scale(1)';
+        const transformOrigin = zoom 
+          ? `${(zoom.targetX / videoWidth) * 100}% ${(zoom.targetY / videoHeight) * 100}%` 
+          : 'center';
+
+        video.style.transform = transform;
+        video.style.transformOrigin = transformOrigin;
+      }
+      
+      animationFrameId = requestAnimationFrame(renderLoop);
+    };
+
+    animationFrameId = requestAnimationFrame(renderLoop);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [zoomEffects]);
 
   return (
     <div
@@ -189,8 +214,7 @@ export default function VideoPreview() {
       <div className="relative w-full max-w-4xl aspect-video bg-black rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 ring-1 ring-white/5 group">
         <video
           ref={videoRef}
-          className="w-full h-full object-contain transition-transform duration-150 ease-out origin-center"
-          style={{ transform }}
+          className="w-full h-full object-contain"
           preload="auto"
           playsInline
         />

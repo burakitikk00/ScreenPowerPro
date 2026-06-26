@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CapturePro - Düzenleyici Çalışma Alanı</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;900&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#ffb2b7",
+                        "on-primary": "#1000a9",
+                        "surface-variant": "#34343c",
+                        "error": "#ffb4ab",
+                        "outline": "#908fa0",
+                        "on-surface": "#e3e1ec",
+                        "on-background": "#e3e1ec",
+                        "on-secondary-container": "#ffc2c4",
+                        "on-tertiary-fixed-variant": "#5516be",
+                        "on-error-container": "#ffdad6",
+                        "inverse-surface": "#e3e1ec",
+                        "tertiary-fixed": "#e9ddff",
+                        "outline-variant": "#464554",
+                        "background": "#12131a",
+                        "primary": "#c0c1ff",
+                        "surface": "#12131a",
+                        "on-primary-fixed": "#07006c",
+                        "on-secondary-fixed": "#40000d",
+                        "secondary-fixed-dim": "#ffb2b7",
+                        "on-secondary-fixed-variant": "#92002a",
+                        "on-tertiary-container": "#340080",
+                        "secondary-fixed": "#ffdadb",
+                        "tertiary-container": "#a078ff",
+                        "on-secondary": "#67001b",
+                        "on-tertiary": "#3c0091",
+                        "surface-container": "#1e1f27",
+                        "surface-container-lowest": "#0d0e15",
+                        "on-tertiary-fixed": "#23005c",
+                        "surface-dim": "#12131a",
+                        "surface-container-low": "#1a1b22",
+                        "primary-fixed": "#e1e0ff",
+                        "tertiary": "#d0bcff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "surface-bright": "#383941",
+                        "on-primary-container": "#0d0096",
+                        "secondary-container": "#b50036",
+                        "surface-container-high": "#292931",
+                        "surface-tint": "#c0c1ff",
+                        "error-container": "#93000a",
+                        "on-surface-variant": "#c7c4d7",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "surface-container-highest": "#34343c",
+                        "tertiary-fixed-dim": "#d0bcff",
+                        "on-error": "#690005",
+                        "inverse-primary": "#494bd6",
+                        "inverse-on-surface": "#2f3038",
+                        "primary-container": "#8083ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "toolbar-height": "48px",
+                        "control-stack": "8px",
+                        "sidebar-width": "260px",
+                        "panel-gap": "16px",
+                        "container-margin": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "display-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-md": ["Geist"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Geist"],
+                        "label-sm": ["Geist"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom scrollbar for timeline and sidebar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #c0c1ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(192, 193, 255, 0.5);
+        }
+        
+        .timeline-grid {
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 100%;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen w-screen overflow-hidden flex flex-col selection:bg-primary/30">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-white/5 backdrop-blur-xl border-b border-white/10 shadow-2xl shadow-black/40 flex justify-between items-center px-container-margin h-toolbar-height">
+<div class="flex items-center gap-panel-gap">
+<span class="font-headline-md text-headline-md font-bold text-on-surface tracking-tight">CapturePro</span>
+<div class="h-4 w-[1px] bg-white/10 mx-2"></div>
+<span class="text-on-surface-variant font-body-md text-body-md flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">edit</span>
+                Adsız Kayıt.mp4
+            </span>
+</div>
+<div class="flex items-center gap-panel-gap hidden">
+<!-- Search bar hidden per JSON -->
+</div>
+<div class="flex items-center gap-4">
+<button aria-label="shopping_cart" class="p-1.5 text-on-surface-variant hover:bg-white/10 transition-colors duration-200 rounded-DEFAULT active:scale-95 transition-transform">
+<span class="material-symbols-outlined">shopping_cart</span>
+</button>
+<button aria-label="key" class="p-1.5 text-on-surface-variant hover:bg-white/10 transition-colors duration-200 rounded-DEFAULT active:scale-95 transition-transform">
+<span class="material-symbols-outlined">key</span>
+</button>
+<button aria-label="settings" class="p-1.5 text-on-surface-variant hover:bg-white/10 transition-colors duration-200 rounded-DEFAULT active:scale-95 transition-transform">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-white/10 ml-2">
+<img alt="User avatar" class="w-full h-full object-cover" data-alt="A highly detailed close-up portrait of a professional content creator smiling subtly. The lighting is soft and cinematic, with a cool blue rim light emphasizing the dark, high-end studio environment. The aesthetic perfectly matches the soft dark, premium glassmorphism theme of the CapturePro interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmTmrE5Ms4ueXCCFRgOSiyMn4r4eQk-3BlJ6ZxeFNXQFpQCUA2R8AedJeogb1DNNc01sleU3HsGkWtmtIKhs8IB9LTroWj6wos6cWjXRLF71h19A4RuxqLuKG3aEx9cFfH3Rux7Kty1GXpZD4K2uxRtkS2v5FU7MVjJKIJviE_Ar1ph2MW-asrQVC9USEGn59UP3Z705_i8z-N8EHw5vh89uy_gDVNk-UQGPm1huNQm4ER-UfXXmskHFBfuY0_T855OnXv8ktYOSU"/>
+</div>
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded-DEFAULT font-label-md text-label-md hover:bg-primary/90 transition-colors shadow-[0_0_15px_rgba(192,193,255,0.3)] ml-2">
+                Dışa Aktar
+            </button>
+</div>
+</nav>
+<!-- SideNavBar -->
+<nav class="hidden md:flex fixed left-0 top-toolbar-height h-[calc(100vh-toolbar-height)] w-sidebar-width bg-white/5 backdrop-blur-md border-r border-white/10 shadow-xl flex flex-col py-panel-gap z-40">
+<div class="px-container-margin mb-8 mt-4 flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-tertiary flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined fill text-on-primary">videocam</span>
+</div>
+<div>
+<div class="font-headline-sm text-headline-sm font-black text-on-primary-container">CapturePro</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">V 2.4.0</div>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-2 px-3 overflow-y-auto">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg group text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">videocam</span>
+<span class="font-label-md text-label-md">Kaydedici</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg group text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">video_library</span>
+<span class="font-label-md text-label-md">Kütüphane</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg group bg-primary/20 text-primary border-r-2 border-primary" href="#">
+<span class="material-symbols-outlined fill group-hover:translate-x-1 transition-transform">edit_note</span>
+<span class="font-label-md text-label-md font-bold">Düzenleyiciler</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg group text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">handyman</span>
+<span class="font-label-md text-label-md">Araçlar</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg group text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">insights</span>
+<span class="font-label-md text-label-md">Analitik</span>
+</a>
+</div>
+<div class="mt-auto px-3 flex flex-col gap-2 pt-4 border-t border-white/5">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg group text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">help</span>
+<span class="font-label-md text-label-md">Destek</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-lg group text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">person</span>
+<span class="font-label-md text-label-md">Hesap</span>
+</a>
+<div class="px-4 py-4 mt-2">
+<button class="w-full bg-surface-container-high border border-white/10 text-primary font-label-md text-label-md py-2 rounded-lg hover:bg-surface-bright transition-colors duration-200">
+                    Pro'ya Yükselt
+                </button>
+</div>
+</div>
+</nav>
+<!-- Main Workspace -->
+<main class="flex-1 flex flex-col md:ml-sidebar-width mt-toolbar-height h-[calc(100vh-toolbar-height)] relative bg-surface-container-lowest">
+<!-- Top Section: Editor Canvas & Properties Sidebar -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Center Canvas (Video Preview) -->
+<div class="flex-1 flex items-center justify-center p-8 bg-[#0d0e15] relative overflow-hidden">
+<!-- Background subtle grid/texture could go here -->
+<div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle at 50% 50%, rgba(192, 193, 255, 0.1) 0%, transparent 50%);"></div>
+<!-- Video Container (16:9) -->
+<div class="relative w-full max-w-4xl aspect-video bg-black rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 ring-1 ring-white/5 group">
+<img alt="Video Preview" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" data-alt="A highly detailed screenshot of a high-end code editor interface showing vibrant syntax highlighting on a dark theme background, specifically styled for a screen recording preview canvas. The visual style is crisp, professional, and seamlessly integrates with the dark mode glassmorphism UI surrounding it." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR2Pc7m6r_HFnH6XttPPtquuzCo8-15SvQpdCQz9hqvXw4jE-wvZEIiDvWlczrRtIA8SZdjH7LHsPFxj6R55MyagrHrKBsK2H7iyH4R7St2ZkiL8jIc4nGa8bSEkrfE99TFN7sZMHonmqzQSjFWce8gttPafq9i8Sv9lxZQo_XvnFnX9rR2SwQpEsMfbdl357Rotez2IBMexO4p2ff9EH-R2duAMtXXnc_XgOvxI3OBda_BsSxZ6ogbeaL8O-vxUOxfii7zNbCD_U"/>
+<!-- Playback Controls Overlay (Visible on hover) -->
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
+<button class="w-16 h-16 bg-primary/20 backdrop-blur-md border border-primary/50 rounded-full flex items-center justify-center text-primary shadow-[0_0_30px_rgba(192,193,255,0.3)] hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-4xl ml-1 fill">play_arrow</span>
+</button>
+</div>
+<!-- Canvas Zoom/Resolution Badge -->
+<div class="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-2 py-1 rounded border border-white/10 font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-green-500"></span>
+                        1080p • 60fps
+                    </div>
+</div>
+</div>
+<!-- Right Editor Properties Sidebar -->
+<aside class="w-[300px] bg-surface-container border-l border-white/5 flex flex-col overflow-y-auto z-10 shadow-[-10px_0_30px_rgba(0,0,0,0.2)]">
+<div class="p-4 border-b border-white/5 sticky top-0 bg-surface-container/90 backdrop-blur-md z-10">
+<h2 class="font-headline-md text-headline-md text-on-surface">Özellikler</h2>
+</div>
+<div class="flex flex-col gap-6 p-4">
+<!-- Section: Cursor & Blur -->
+<section class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">İmleç ve Bulanıklık</h3>
+<button class="text-primary hover:text-primary-fixed"><span class="material-symbols-outlined text-[18px]">add</span></button>
+</div>
+<div class="bg-surface-container-high rounded-lg p-4 border border-white/5 flex flex-col gap-4">
+<!-- Zoom-in Slider -->
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<label class="font-body-md text-body-md text-on-surface text-sm">Yakınlaştırma Seviyesi</label>
+<span class="font-label-sm text-label-sm text-primary bg-primary/10 px-2 py-0.5 rounded">150%</span>
+</div>
+<input max="300" min="100" type="range" value="150"/>
+</div>
+<!-- Screen Motion Blur Slider -->
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<label class="font-body-md text-body-md text-on-surface text-sm">Hareket Bulanıklığı</label>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-white/5 px-2 py-0.5 rounded">30%</span>
+</div>
+<input max="100" min="0" type="range" value="30"/>
+</div>
+</div>
+</section>
+<!-- Section: Cursor Movement -->
+<section class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">İmleç Hareketi</h3>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-surface-bright peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="bg-surface-container-high rounded-lg p-1 border border-white/5 flex">
+<button class="flex-1 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface rounded-md transition-colors">Yavaş</button>
+<button class="flex-1 py-1.5 font-label-sm text-label-sm bg-surface-container-lowest text-primary rounded-md shadow-sm border border-white/5 transition-colors">Orta</button>
+<button class="flex-1 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface rounded-md transition-colors">Hızlı</button>
+</div>
+</section>
+<!-- Section: Style -->
+<section class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Stil</h3>
+</div>
+<div class="bg-surface-container-high rounded-lg p-4 border border-white/5 flex flex-col gap-4">
+<!-- Shortcut Keys Toggle -->
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md text-on-surface text-sm">Kısayol Tuşlarını Göster</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-surface-bright peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<hr class="border-white/5"/>
+<!-- Background Color Picker -->
+<div class="flex flex-col gap-3">
+<span class="font-body-md text-body-md text-on-surface text-sm">Tuval Arka Planı</span>
+<div class="flex gap-2">
+<button class="w-6 h-6 rounded-full bg-black ring-2 ring-primary ring-offset-2 ring-offset-surface-container-high"></button>
+<button class="w-6 h-6 rounded-full bg-[#1A1A1A] hover:ring-2 ring-white/20 ring-offset-2 ring-offset-surface-container-high transition-all"></button>
+<button class="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-900 to-purple-900 hover:ring-2 ring-white/20 ring-offset-2 ring-offset-surface-container-high transition-all"></button>
+<button class="w-6 h-6 rounded-full bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjY2NjIi8+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNjY2MiLz4KPC9zdmc+')] hover:ring-2 ring-white/20 ring-offset-2 ring-offset-surface-container-high transition-all" title="Transparent"></button>
+</div>
+</div>
+<!-- BG Opacity Slider -->
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<label class="font-body-md text-body-md text-on-surface text-sm">Opaklık</label>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-white/5 px-2 py-0.5 rounded">100%</span>
+</div>
+<input max="100" min="0" type="range" value="100"/>
+</div>
+</div>
+</section>
+</div>
+</aside>
+</div>
+<!-- Bottom Timeline Area -->
+<div class="h-[250px] bg-surface-container-low border-t border-white/10 flex flex-col z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]">
+<!-- Timeline Header / Toolbar -->
+<div class="h-10 border-b border-white/5 flex items-center justify-between px-4 bg-surface-container/50 backdrop-blur-md">
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 text-on-surface-variant transition-colors" title="Undo">
+<span class="material-symbols-outlined text-[18px]">undo</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 text-on-surface-variant transition-colors" title="Redo">
+<span class="material-symbols-outlined text-[18px]">redo</span>
+</button>
+<div class="w-[1px] h-4 bg-white/10 mx-1"></div>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 text-on-surface transition-colors" title="Split (S)">
+<span class="material-symbols-outlined text-[18px]">content_cut</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-error/20 text-error transition-colors" title="Delete (Del)">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+<!-- Timecode & Playback -->
+<div class="flex items-center gap-4">
+<div class="font-label-md text-label-md tracking-wider flex items-center gap-1 bg-black/40 px-3 py-1 rounded-md border border-white/5">
+<span class="text-primary">00:01:23</span>
+<span class="text-on-surface-variant">/</span>
+<span class="text-on-surface-variant">00:05:00</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-container-high rounded-lg p-0.5 border border-white/5">
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]">skip_previous</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded bg-primary text-on-primary hover:bg-primary/90 transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[20px] fill">play_arrow</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]">skip_next</span>
+</button>
+</div>
+</div>
+<!-- Zoom Slider for Timeline -->
+<div class="flex items-center gap-2 w-32">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">zoom_out</span>
+<input class="flex-1" max="100" min="1" type="range" value="50"/>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">zoom_in</span>
+</div>
+</div>
+<!-- Timeline Tracks Area -->
+<div class="flex-1 flex overflow-hidden relative">
+<!-- Track Headers (Left Sidebar of Timeline) -->
+<div class="w-[200px] bg-surface-container border-r border-white/5 flex flex-col shrink-0 z-10 shadow-[5px_0_15px_rgba(0,0,0,0.1)]">
+<!-- Time Ruler Header Space -->
+<div class="h-6 border-b border-white/5 bg-surface-container-lowest"></div>
+<!-- Track 1 Header -->
+<div class="h-20 border-b border-white/5 flex items-center px-4 justify-between group hover:bg-white/5 transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-primary">videocam</span>
+<span class="font-label-md text-label-md text-on-surface">Ekran Kaydı</span>
+</div>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">visibility</span></button>
+<button class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">lock_open</span></button>
+</div>
+</div>
+<!-- Track 2 Header -->
+<div class="h-16 border-b border-white/5 flex items-center px-4 justify-between group hover:bg-white/5 transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-tertiary">zoom_in_map</span>
+<span class="font-label-md text-label-md text-on-surface">Yakınlaştırma Efektleri</span>
+</div>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">visibility</span></button>
+<button class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">lock_open</span></button>
+</div>
+</div>
+</div>
+<!-- Tracks Content (Scrollable Timeline) -->
+<div class="flex-1 overflow-x-auto relative timeline-grid bg-surface-container-lowest">
+<!-- Playhead Line -->
+<div class="absolute top-0 bottom-0 left-[250px] w-[1px] bg-secondary z-30 pointer-events-none">
+<div class="absolute -top-1 -left-2 w-4 h-4 bg-secondary rounded-sm rotate-45 flex items-center justify-center shadow-[0_0_10px_rgba(255,178,183,0.5)]"></div>
+</div>
+<!-- Time Ruler -->
+<div class="h-6 border-b border-white/5 flex items-end sticky top-0 bg-surface-container-lowest/90 backdrop-blur z-20 text-[10px] text-on-surface-variant select-none">
+<div class="w-[100px] border-l border-white/20 pl-1 pb-0.5 h-3">00:00</div>
+<div class="w-[100px] border-l border-white/20 pl-1 pb-0.5 h-3">00:10</div>
+<div class="w-[100px] border-l border-white/20 pl-1 pb-0.5 h-3">00:20</div>
+<div class="w-[100px] border-l border-white/20 pl-1 pb-0.5 h-3">00:30</div>
+<div class="w-[100px] border-l border-white/20 pl-1 pb-0.5 h-3 text-primary font-bold">00:40</div>
+<div class="w-[100px] border-l border-white/20 pl-1 pb-0.5 h-3">00:50</div>
+<div class="w-[100px] border-l border-white/20 pl-1 pb-0.5 h-3">01:00</div>
+<div class="w-[100px] border-l border-white/20 pl-1 pb-0.5 h-3">01:10</div>
+</div>
+<!-- Track 1 Content (Video) -->
+<div class="h-20 border-b border-white/5 relative flex items-center px-2">
+<!-- Video Clip Element -->
+<div class="absolute left-[50px] w-[600px] h-[56px] bg-primary-container/20 border border-primary/50 rounded-md flex items-center overflow-hidden cursor-pointer hover:border-primary transition-colors group">
+<!-- Thumbnails simulating video content -->
+<div class="w-full h-full flex opacity-40 mix-blend-screen pointer-events-none">
+<img alt="thumb" class="h-full w-24 object-cover" data-alt="A small horizontal strip showing a blurred dark mode interface, simulating a video timeline thumbnail." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBEb_eQG-zVVPbxcuv7ei74kxJfNi2m9SVmIHBk6NGfAZTWnZh4ijgs9k9qPxvio4HABwyol_tGHULRaF4K-4ToeGEtKJqkidFjDE1O3xhaWz2PEy2c2Svltrhd_Ome7RI5Tbna-8YuKJuvdQfoAG2sJrOr4m-62H5sPaq2vycDxEtaXoVghaZVoXpWt7jabbSOb-e9fI12A6VOkQLzycKjzo6NL_QHvwTIByb4KOUWRlA4kDx0LpUTPVhaA0zH3RI1LFePzAm5xR8"/>
+<img alt="thumb" class="h-full w-24 object-cover" data-alt="A small horizontal strip showing a blurred dark mode interface, simulating a video timeline thumbnail." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBzrGMRKPoYmCWIFm6PPDopEim9J3N9n0KaQ_jCCymDkyFYAEn83l5INoW7fGiRUts6LEGef1K4jZ9Mvtjo5GBW65M9DD_adVk-JULNXPzPPMtxvbu2eKLaYW-YEVtoFdZtjo3RKCZfnaef1U34MoOqYvdtygAFUTPfGy7eetq2R8LCUeywkbu3Vni3zCaY_UUJkqzVbD62ylv8eondscc1zR_Mi3Q-G11Scwgzr03vWUmuqzRqFhRbkobR4Pmh7vKe8xBoOO1Veiw"/>
+<img alt="thumb" class="h-full w-24 object-cover" data-alt="A small horizontal strip showing a blurred dark mode interface, simulating a video timeline thumbnail." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmFqATMzKtE8p-LJurXQP29GwZ7T9ZvJ_PURiGO0QCo-s3e20Z9KMDjj2tgvQ57L9UFgMkZMoCF1jClz7yHsOCDNEHfHNKUSXbm_Vf5bhgbeirFk4JOFVcg9JGsJzKjGwtC-dRKryDy6YypN-pmpi0u9XuNNM0fl40lYgLhPwnBACfHba0fLjs1jAOVxykvsnHIlSeaj5QL09ialSxbmz34j9HsnKvOXYZvEtyjHNVFSTPsnHV0BBW76cMIuZ5GN6K9-usnbzStK4"/>
+</div>
+<!-- Clip Label -->
+<div class="absolute left-2 top-1 text-[11px] font-medium text-primary bg-black/40 px-1 rounded backdrop-blur-sm">recording_1.mp4</div>
+<!-- Trim Handles -->
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-primary/40 cursor-ew-resize opacity-0 group-hover:opacity-100"></div>
+<div class="absolute right-0 top-0 bottom-0 w-2 bg-primary/40 cursor-ew-resize opacity-0 group-hover:opacity-100"></div>
+</div>
+</div>
+<!-- Track 2 Content (Zoom Effects) -->
+<div class="h-16 border-b border-white/5 relative flex items-center px-2">
+<!-- Zoom Pill 1 -->
+<div class="absolute left-[150px] w-[80px] h-[32px] bg-tertiary-container/30 border border-tertiary/50 rounded-full flex items-center justify-center cursor-pointer hover:border-tertiary hover:bg-tertiary-container/40 transition-colors shadow-[0_0_10px_rgba(160,120,255,0.1)]">
+<span class="text-[11px] font-medium text-tertiary">Yakınlaştırma 1</span>
+<!-- Handles -->
+<div class="absolute left-0 w-3 h-full cursor-ew-resize"></div>
+<div class="absolute right-0 w-3 h-full cursor-ew-resize"></div>
+</div>
+<!-- Zoom Pill 2 (Active State) -->
+<div class="absolute left-[350px] w-[120px] h-[32px] bg-tertiary/20 border-2 border-tertiary rounded-full flex items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(208,188,255,0.2)]">
+<span class="text-[11px] font-bold text-tertiary">Yakınlaştırma 2</span>
+<div class="absolute -top-2 -right-2 w-4 h-4 bg-tertiary rounded-full border-2 border-surface flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px] text-on-tertiary font-bold">close</span>
+</div>
+<!-- Handles -->
+<div class="absolute left-0 w-3 h-full cursor-ew-resize flex items-center justify-center"><div class="w-1 h-3 bg-tertiary rounded-full"></div></div>
+<div class="absolute right-0 w-3 h-full cursor-ew-resize flex items-center justify-center"><div class="w-1 h-3 bg-tertiary rounded-full"></div></div>
+</div>
+</div>
+<!-- Empty space at bottom of timeline -->
+<div class="h-20"></div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

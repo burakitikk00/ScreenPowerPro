@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CapturePro Ayarlar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Geist:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#ffb2b7",
+                        "on-primary": "#1000a9",
+                        "surface-variant": "#34343c",
+                        "error": "#ffb4ab",
+                        "outline": "#908fa0",
+                        "on-surface": "#e3e1ec",
+                        "on-background": "#e3e1ec",
+                        "on-secondary-container": "#ffc2c4",
+                        "on-tertiary-fixed-variant": "#5516be",
+                        "on-error-container": "#ffdad6",
+                        "inverse-surface": "#e3e1ec",
+                        "tertiary-fixed": "#e9ddff",
+                        "outline-variant": "#464554",
+                        "background": "#12131a",
+                        "primary": "#c0c1ff",
+                        "surface": "#12131a",
+                        "on-primary-fixed": "#07006c",
+                        "on-secondary-fixed": "#40000d",
+                        "secondary-fixed-dim": "#ffb2b7",
+                        "on-secondary-fixed-variant": "#92002a",
+                        "on-tertiary-container": "#340080",
+                        "secondary-fixed": "#ffdadb",
+                        "tertiary-container": "#a078ff",
+                        "on-secondary": "#67001b",
+                        "on-tertiary": "#3c0091",
+                        "surface-container": "#1e1f27",
+                        "surface-container-lowest": "#0d0e15",
+                        "on-tertiary-fixed": "#23005c",
+                        "surface-dim": "#12131a",
+                        "surface-container-low": "#1a1b22",
+                        "primary-fixed": "#e1e0ff",
+                        "tertiary": "#d0bcff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "surface-bright": "#383941",
+                        "on-primary-container": "#0d0096",
+                        "secondary-container": "#b50036",
+                        "surface-container-high": "#292931",
+                        "surface-tint": "#c0c1ff",
+                        "error-container": "#93000a",
+                        "on-surface-variant": "#c7c4d7",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "surface-container-highest": "#34343c",
+                        "tertiary-fixed-dim": "#d0bcff",
+                        "on-error": "#690005",
+                        "inverse-primary": "#494bd6",
+                        "inverse-on-surface": "#2f3038",
+                        "primary-container": "#8083ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "toolbar-height": "48px",
+                        "control-stack": "8px",
+                        "sidebar-width": "260px",
+                        "panel-gap": "16px",
+                        "container-margin": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "display-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-md": ["Geist"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Geist"],
+                        "label-sm": ["Geist"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-image: radial-gradient(circle at 50% 50%, #1a1b22 0%, #12131a 100%);
+            min-height: 100vh;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-input {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-input:focus {
+            border-color: #c0c1ff;
+            outline: none;
+            box-shadow: 0 0 15px rgba(192, 193, 255, 0.2);
+        }
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #c0c1ff;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #c0c1ff;
+        }
+        .toggle-checkbox:checked + .toggle-label:after {
+            transform: translateX(100%);
+            border-color: white;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface flex items-center justify-center p-6">
+<!-- Modal Overlay / Backdrop -->
+<div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+<!-- Settings Modal Container -->
+<div class="glass-panel w-full max-w-2xl rounded-xl shadow-2xl shadow-black/50 overflow-hidden flex flex-col max-h-[921px]">
+<!-- Header -->
+<div class="px-container-margin py-4 border-b border-white/10 flex justify-between items-center bg-white/[0.02]">
+<h2 class="font-headline-md text-headline-md text-on-surface tracking-tight flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">settings</span>
+                    Ayarlar
+                </h2>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded-md hover:bg-white/10">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Content Area -->
+<div class="flex-1 overflow-y-auto p-container-margin grid grid-cols-1 md:grid-cols-[200px_1fr] gap-8">
+<!-- Sidebar Tabs -->
+<div class="flex flex-col gap-2">
+<button class="text-left px-4 py-2.5 rounded-lg font-body-md text-body-md text-on-surface-variant hover:bg-white/5 transition-colors flex items-center gap-3">
+<span class="material-symbols-outlined text-[18px]">display_settings</span>
+                        Genel
+                    </button>
+<button class="text-left px-4 py-2.5 rounded-lg font-body-md text-body-md bg-primary/10 text-primary border border-primary/20 flex items-center gap-3 relative shadow-[0_0_15px_rgba(192,193,255,0.1)]">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">videocam</span>
+                        Kayıt
+                    </button>
+<button class="text-left px-4 py-2.5 rounded-lg font-body-md text-body-md text-on-surface-variant hover:bg-white/5 transition-colors flex items-center gap-3">
+<span class="material-symbols-outlined text-[18px]">keyboard</span>
+                        Kısayol Tuşları
+                    </button>
+<button class="text-left px-4 py-2.5 rounded-lg font-body-md text-body-md text-on-surface-variant hover:bg-white/5 transition-colors flex items-center gap-3">
+<span class="material-symbols-outlined text-[18px]">output</span>
+                        Dışa Aktar
+                    </button>
+</div>
+<!-- Tab Panels -->
+<div class="flex flex-col gap-8">
+<!-- Record Tab Content (Active) -->
+<div class="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
+<h3 class="font-headline-md text-[18px] text-on-surface border-b border-white/10 pb-2">Kayıt Tercihleri</h3>
+<!-- Auto-Add Zoom Effect Dropdown -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Otomatik Yakınlaştırma Efekti Ekle</label>
+<div class="relative">
+<select class="w-full glass-input text-on-surface font-body-md text-body-md rounded-lg py-2.5 px-4 appearance-none focus:ring-1 focus:ring-primary cursor-pointer">
+<option class="bg-surface text-on-surface" value="none">Yok</option>
+<option class="bg-surface text-on-surface" selected="" value="smooth">Yumuşak Yakınlaştırma (Önerilen)</option>
+<option class="bg-surface text-on-surface" value="instant">Anında Geçiş</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">arrow_drop_down</span>
+</div>
+<p class="font-label-md text-label-md text-on-surface-variant/70 mt-1">Kayıt sırasında imleç tıklamalarında otomatik olarak yakınlaştır.</p>
+</div>
+<!-- Toggles -->
+<div class="flex flex-col gap-4 py-4 border-y border-white/5">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface">Masaüstü Simgelerini Gizle</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Ekran yakalamaları için temiz arka plan</span>
+</div>
+<div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 top-0 left-0 transition-transform duration-200 border-surface-variant" id="toggle1" name="toggle" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-5 rounded-full bg-surface-variant cursor-pointer" for="toggle1"></label>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface">Görev Çubuğunu Gizle</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Kayıt sırasında işletim sistemi görev çubuğunu otomatik gizle</span>
+</div>
+<div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+<input class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 top-0 left-0 transition-transform duration-200 border-surface-variant" id="toggle2" name="toggle" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-5 rounded-full bg-surface-variant cursor-pointer" for="toggle2"></label>
+</div>
+</div>
+</div>
+<!-- Split Row -->
+<div class="grid grid-cols-2 gap-4">
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Kayıt Kalitesi</label>
+<div class="relative">
+<select class="w-full glass-input text-on-surface font-body-md text-body-md rounded-lg py-2.5 px-4 appearance-none focus:ring-1 focus:ring-primary cursor-pointer">
+<option class="bg-surface" value="high">Yüksek (Büyük Dosya)</option>
+<option class="bg-surface" selected="" value="standard">Standart</option>
+<option class="bg-surface" value="low">Düşük (Küçük Dosya)</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">arrow_drop_down</span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Geri Sayım</label>
+<div class="relative">
+<select class="w-full glass-input text-on-surface font-body-md text-body-md rounded-lg py-2.5 px-4 appearance-none focus:ring-1 focus:ring-primary cursor-pointer">
+<option class="bg-surface" value="0">Yok</option>
+<option class="bg-surface" selected="" value="3">3 Saniye</option>
+<option class="bg-surface" value="5">5 Saniye</option>
+<option class="bg-surface" value="10">10 Saniye</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">arrow_drop_down</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Export Tab Content (Visual Preview - Muted/Disabled appearance for context) -->
+<div class="flex flex-col gap-6 opacity-40 pointer-events-none hidden md:flex border-t border-white/5 pt-8 mt-4 relative">
+<div class="absolute inset-0 bg-surface/50 backdrop-blur-[2px] z-10 flex items-center justify-center">
+<span class="bg-surface-container px-4 py-2 rounded-full font-label-md text-label-md text-on-surface">Dışa Aktarma Ayarları Önizlemesi</span>
+</div>
+<h3 class="font-headline-md text-[18px] text-on-surface border-b border-white/10 pb-2">Varsayılan Dışa Aktarma</h3>
+<div class="grid grid-cols-2 gap-8">
+<div class="flex flex-col gap-4">
+<div>
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider block mb-1">Format</label>
+<div class="font-body-md text-body-md bg-white/5 rounded px-3 py-2 border border-white/10">MP4</div>
+</div>
+<div>
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider block mb-1">Kare Hızı</label>
+<div class="font-body-md text-body-md bg-white/5 rounded px-3 py-2 border border-white/10">30 FPS</div>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<div>
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider block mb-1">Çözünürlük</label>
+<div class="font-body-md text-body-md bg-white/5 rounded px-3 py-2 border border-white/10">1080P</div>
+</div>
+<div>
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider block mb-1">Kalite</label>
+<div class="font-body-md text-body-md bg-white/5 rounded px-3 py-2 border border-white/10 text-primary">Önerilen</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="px-container-margin py-4 border-t border-white/10 bg-white/[0.02] flex justify-end gap-3">
+<button class="px-6 py-2 rounded-lg font-body-md text-body-md font-medium text-on-surface border border-white/10 hover:bg-white/5 transition-colors">
+                    İptal
+                </button>
+<button class="px-6 py-2 rounded-lg font-body-md text-body-md font-medium bg-primary text-on-primary hover:bg-primary-container transition-colors shadow-[0_0_15px_rgba(192,193,255,0.3)]">
+                    Değişiklikleri Kaydet
+                </button>
+</div>
+</div>
+</div>
+</body></html>

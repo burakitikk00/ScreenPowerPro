@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Video Dışa Aktarılıyor - CapturePro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Geist:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#ffb2b7",
+                        "on-primary": "#1000a9",
+                        "surface-variant": "#34343c",
+                        "error": "#ffb4ab",
+                        "outline": "#908fa0",
+                        "on-surface": "#e3e1ec",
+                        "on-background": "#e3e1ec",
+                        "on-secondary-container": "#ffc2c4",
+                        "on-tertiary-fixed-variant": "#5516be",
+                        "on-error-container": "#ffdad6",
+                        "inverse-surface": "#e3e1ec",
+                        "tertiary-fixed": "#e9ddff",
+                        "outline-variant": "#464554",
+                        "background": "#12131a",
+                        "primary": "#c0c1ff",
+                        "surface": "#12131a",
+                        "on-primary-fixed": "#07006c",
+                        "on-secondary-fixed": "#40000d",
+                        "secondary-fixed-dim": "#ffb2b7",
+                        "on-secondary-fixed-variant": "#92002a",
+                        "on-tertiary-container": "#340080",
+                        "secondary-fixed": "#ffdadb",
+                        "tertiary-container": "#a078ff",
+                        "on-secondary": "#67001b",
+                        "on-tertiary": "#3c0091",
+                        "surface-container": "#1e1f27",
+                        "surface-container-lowest": "#0d0e15",
+                        "on-tertiary-fixed": "#23005c",
+                        "surface-dim": "#12131a",
+                        "surface-container-low": "#1a1b22",
+                        "primary-fixed": "#e1e0ff",
+                        "tertiary": "#d0bcff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "surface-bright": "#383941",
+                        "on-primary-container": "#0d0096",
+                        "secondary-container": "#b50036",
+                        "surface-container-high": "#292931",
+                        "surface-tint": "#c0c1ff",
+                        "error-container": "#93000a",
+                        "on-surface-variant": "#c7c4d7",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "surface-container-highest": "#34343c",
+                        "tertiary-fixed-dim": "#d0bcff",
+                        "on-error": "#690005",
+                        "inverse-primary": "#494bd6",
+                        "inverse-on-surface": "#2f3038",
+                        "primary-container": "#8083ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "toolbar-height": "48px",
+                        "control-stack": "8px",
+                        "sidebar-width": "260px",
+                        "panel-gap": "16px",
+                        "container-margin": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "display-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-md": ["Geist"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Geist"],
+                        "label-sm": ["Geist"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        
+        .glow {
+            box-shadow: 0 0 40px rgba(192, 193, 255, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface min-h-screen flex flex-col justify-center items-center overflow-hidden antialiased selection:bg-primary/30">
+<!-- Atmospheric Background Effects -->
+<div class="fixed inset-0 z-0 pointer-events-none">
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px]"></div>
+</div>
+<!-- Main Content Canvas -->
+<main class="relative z-10 flex flex-col items-center justify-center w-full max-w-2xl px-container-margin text-center">
+<!-- Progress Ring Container -->
+<div class="relative w-64 h-64 mb-12 flex items-center justify-center glow rounded-full bg-surface-container-lowest border border-white/5 shadow-2xl shadow-black/50">
+<!-- SVG Ring -->
+<svg class="absolute inset-0 w-full h-full" height="256" viewbox="0 0 256 256" width="256">
+<!-- Background Track -->
+<circle class="text-surface-container-high stroke-current" cx="128" cy="128" fill="transparent" r="120" stroke-width="8"></circle>
+<!-- Active Progress Ring (45%) -->
+<!-- Circumference = 2 * pi * r = 2 * 3.14159 * 120 = 753.98 -->
+<!-- Dashoffset for 45%: 753.98 * (1 - 0.45) = 414.69 -->
+<circle class="progress-ring__circle text-primary stroke-current" cx="128" cy="128" fill="transparent" r="120" stroke-dasharray="753.98" stroke-dashoffset="414.69" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<!-- Percentage Text -->
+<div class="flex flex-col items-center">
+<span class="font-display-lg text-display-lg text-on-surface">45%</span>
+</div>
+</div>
+<!-- Status Text -->
+<div class="flex flex-col gap-unit items-center mb-16">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Videonuz dışa aktarılıyor...</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-md">
+                Lütfen uygulamayı kapatmayın. Tahmini kalan süre: <span class="text-primary font-medium">1dk 20sn</span>
+</p>
+</div>
+</main>
+<!-- Footer Actions -->
+<footer class="fixed bottom-12 w-full flex justify-center z-10">
+<button class="font-label-md text-label-md text-on-surface-variant hover:text-error transition-colors duration-200 px-6 py-3 rounded-full border border-white/10 hover:border-error/50 bg-white/5 hover:bg-error/10 backdrop-blur-md flex items-center gap-2 group">
+<span class="material-symbols-outlined text-[18px] group-hover:scale-110 transition-transform">cancel</span>
+            Dışa Aktarmayı İptal Et
+        </button>
+</footer>
+<script>
+        // Optional: Simple script to animate the percentage text slightly to show it's "alive"
+        // In a real app, this would be driven by actual export progress.
+        document.addEventListener('DOMContentLoaded', () => {
+            const circle = document.querySelector('.progress-ring__circle');
+            const radius = circle.r.baseVal.value;
+            const circumference = radius * 2 * Math.PI;
+            
+            // Initialization is handled in HTML/CSS for the static 45% requirement, 
+            // but setting up the variables shows intent for a functional component.
+            circle.style.strokeDasharray = `${circumference} ${circumference}`;
+            
+            // A tiny pulsing effect on the glow to indicate processing
+            const ringContainer = document.querySelector('.glow');
+            setInterval(() => {
+                ringContainer.style.boxShadow = '0 0 45px rgba(192, 193, 255, 0.2)';
+                setTimeout(() => {
+                    ringContainer.style.boxShadow = '0 0 40px rgba(192, 193, 255, 0.15)';
+                }, 1000);
+            }, 2000);
+        });
+    </script>
+</body></html>

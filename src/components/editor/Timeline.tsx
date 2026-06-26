@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
-import { formatTimecode } from '../../lib/zoomEngine';
+import { formatTimecode, normalizeDuration } from '../../lib/zoomEngine';
+import { videoLog } from '../../lib/videoDebug';
 
 const PIXELS_PER_SECOND = 50;
 
@@ -22,9 +23,10 @@ export default function Timeline() {
 
   const dragRef = useRef<{ id: string; type: 'move' | 'resize-left' | 'resize-right'; startX: number; origStart: number; origDuration: number } | null>(null);
 
+  const safeDuration = normalizeDuration(duration, 60);
   const scale = timelineZoom / 50;
   const pps = PIXELS_PER_SECOND * scale;
-  const totalWidth = Math.max(duration * pps + 200, 800);
+  const totalWidth = Math.max(safeDuration * pps + 200, 800);
   const playheadX = currentTime * pps;
 
   const handleMouseDown = (
@@ -79,8 +81,9 @@ export default function Timeline() {
     };
   }, [handleMouseMove, handleMouseUp]);
 
-  const rulerMarks = [];
-  for (let t = 0; t <= duration + 10; t += 10) {
+  const rulerMarks: number[] = [];
+  const maxMarks = 60;
+  for (let t = 0; t <= safeDuration + 10 && rulerMarks.length < maxMarks; t += 10) {
     rulerMarks.push(t);
   }
 
@@ -100,11 +103,14 @@ export default function Timeline() {
           <div className="font-label-md text-label-md tracking-wider flex items-center gap-1 bg-black/40 px-3 py-1 rounded-md border border-white/5">
             <span className="text-primary">{formatTimecode(currentTime)}</span>
             <span className="text-on-surface-variant">/</span>
-            <span className="text-on-surface-variant">{formatTimecode(duration)}</span>
+            <span className="text-on-surface-variant">{formatTimecode(safeDuration)}</span>
           </div>
           <div className="flex items-center gap-1 bg-surface-container-high rounded-lg p-0.5 border border-white/5">
             <button
-              onClick={() => setIsPlaying(!isPlaying)}
+              onClick={() => {
+                videoLog('Timeline', 'Timeline oynat butonu', { wasPlaying: isPlaying });
+                setIsPlaying(!isPlaying);
+              }}
               className="w-8 h-8 flex items-center justify-center rounded bg-primary text-on-primary hover:bg-primary/90 transition-colors"
             >
               <span className="material-symbols-outlined text-[20px] fill">
@@ -145,7 +151,7 @@ export default function Timeline() {
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
-            setCurrentTime(Math.max(0, Math.min(duration, x / pps)));
+            setCurrentTime(Math.max(0, Math.min(safeDuration, x / pps)));
           }}
         >
           <div
@@ -170,7 +176,7 @@ export default function Timeline() {
           <div className="h-20 border-b border-white/5 relative flex items-center px-2">
             <div
               className="absolute left-0 h-[56px] bg-primary-container/20 border border-primary/50 rounded-md"
-              style={{ width: duration * pps }}
+              style={{ width: safeDuration * pps }}
             >
               <div className="absolute left-2 top-1 text-[11px] font-medium text-primary bg-black/40 px-1 rounded">
                 display-0.webm

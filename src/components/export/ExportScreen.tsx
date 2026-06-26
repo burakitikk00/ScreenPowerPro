@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useEditorStore } from '../../stores/editorStore';
-import type { RecordingMetadata } from '../../types';
 
 export default function ExportScreen() {
   const {
@@ -27,14 +26,7 @@ export default function ExportScreen() {
       });
 
       try {
-        const metadata: RecordingMetadata = {
-          width: settings.exportResolution === '4k' ? 3840 : 1920,
-          height: settings.exportResolution === '4k' ? 2160 : 1080,
-          fps: settings.exportFps,
-          duration: 0,
-          recordedAt: new Date().toISOString(),
-          mode: 'fullscreen',
-        };
+        const metadata = await window.electronAPI.loadProjectMetadata(currentProjectPath);
 
         const manifest = {
           ...currentProject,

@@ -80,6 +80,8 @@ export interface AppSettings {
   exportFormat: 'mp4';
   exportFps: ExportFps;
   exportResolution: Resolution;
+  microphoneEnabled: boolean;
+  systemAudioEnabled: boolean;
 }
 
 export interface ScreenSource {
@@ -99,7 +101,16 @@ export interface RecordingSession {
   startTime: number;
 }
 
-export type AppScreen = 'dashboard' | 'recording' | 'editor' | 'export';
+export type AppScreen = 'dashboard' | 'library' | 'recording' | 'editor' | 'export';
+
+export interface ProjectSummary {
+  path: string;
+  name: string;
+  recordedAt: string;
+  duration: number;
+  mode: RecordingMode;
+  hasVideo: boolean;
+}
 
 export interface ExportProgress {
   percent: number;

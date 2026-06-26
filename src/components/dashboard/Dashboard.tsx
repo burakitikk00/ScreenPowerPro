@@ -4,6 +4,7 @@ import { useRecording } from '../../hooks/useRecording';
 import type { RecordingMode } from '../../types';
 import TopNav from '../layout/TopNav';
 import SideNav from '../layout/SideNav';
+import WindowPickerModal from '../recording/WindowPickerModal';
 
 const modes: { id: RecordingMode; icon: string; label: string }[] = [
   { id: 'fullscreen', icon: 'fullscreen', label: 'Tam Ekran' },
@@ -13,15 +14,46 @@ const modes: { id: RecordingMode; icon: string; label: string }[] = [
 ];
 
 export default function Dashboard() {
-  const { recordingMode, setRecordingMode, countdown, settings } = useAppStore();
+  const {
+    recordingMode,
+    setRecordingMode,
+    countdown,
+    settings,
+    updateSettings,
+    windowPickerOpen,
+    setWindowPickerOpen,
+    selectedSourceName,
+    setSelectedSource,
+  } = useAppStore();
   const { startRecording, isPreparing } = useRecording();
-  const [micLabel] = useState('Varsayılan Mikrofon');
-  const [cameraLabel] = useState('Kapalı');
+
+  const handleStart = async () => {
+    if (recordingMode === 'window' || recordingMode === 'custom') {
+      setWindowPickerOpen(true);
+      return;
+    }
+    await startRecording();
+  };
+
+  const handleSourceSelected = async (sourceId: string) => {
+    setWindowPickerOpen(false);
+    const sources = await window.electronAPI.getScreenSources();
+    const src = sources.find((s) => s.id === sourceId);
+    setSelectedSource(sourceId, src?.name || null);
+    await startRecording(sourceId);
+  };
 
   return (
     <div className="min-h-screen relative flex flex-col">
       <TopNav />
       <SideNav active="dashboard" />
+
+      {windowPickerOpen && (
+        <WindowPickerModal
+          onSelect={handleSourceSelected}
+          onClose={() => setWindowPickerOpen(false)}
+        />
+      )}
 
       <main className="flex-1 ml-0 md:ml-sidebar-width mt-toolbar-height h-[calc(100vh-48px)] flex items-center justify-center p-4 relative z-10">
         {countdown !== null && (
@@ -63,35 +95,47 @@ export default function Dashboard() {
             ))}
           </div>
 
-          <div className="bg-surface-container-high rounded-full border border-white/10 p-2 flex items-center justify-between gap-4 w-full relative z-10 shadow-inner">
-            <div className="flex-1 flex items-center gap-3 px-4 py-2 rounded-full">
-              <span className="material-symbols-outlined text-on-surface-variant text-[20px]">videocam</span>
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Kamera</span>
-                <span className="font-body-md text-[13px] text-on-surface truncate">{cameraLabel}</span>
-              </div>
-            </div>
-            <div className="w-px h-8 bg-white/10" />
-            <div className="flex-1 flex items-center gap-3 px-4 py-2 rounded-full">
-              <span className="material-symbols-outlined text-on-surface-variant text-[20px]">mic</span>
-              <div className="flex flex-col">
+          {(recordingMode === 'window' || recordingMode === 'custom') && selectedSourceName && (
+            <p className="text-center text-primary font-label-md text-label-md relative z-10">
+              Seçili: {selectedSourceName}
+            </p>
+          )}
+
+          <div className="bg-surface-container-high rounded-full border border-white/10 p-2 flex items-center justify-between gap-2 w-full relative z-10 shadow-inner flex-wrap">
+            <button
+              onClick={() => updateSettings({ microphoneEnabled: !settings.microphoneEnabled })}
+              className={`flex-1 min-w-[140px] flex items-center gap-3 px-4 py-2 rounded-full transition-colors ${
+                settings.microphoneEnabled ? 'bg-primary/10' : 'opacity-50'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px]">mic</span>
+              <div className="flex flex-col text-left">
                 <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Mikrofon</span>
-                <span className="font-body-md text-[13px] text-on-surface truncate">{micLabel}</span>
+                <span className="font-body-md text-[13px] text-on-surface">
+                  {settings.microphoneEnabled ? 'Açık' : 'Kapalı'}
+                </span>
               </div>
-            </div>
-            <div className="w-px h-8 bg-white/10" />
-            <div className="flex-1 flex items-center gap-3 px-4 py-2 rounded-full">
-              <span className="material-symbols-outlined text-on-surface-variant text-[20px]">volume_up</span>
-              <div className="flex flex-col">
+            </button>
+            <div className="w-px h-8 bg-white/10 hidden sm:block" />
+            <button
+              onClick={() => updateSettings({ systemAudioEnabled: !settings.systemAudioEnabled })}
+              className={`flex-1 min-w-[140px] flex items-center gap-3 px-4 py-2 rounded-full transition-colors ${
+                settings.systemAudioEnabled ? 'bg-primary/10' : 'opacity-50'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px]">volume_up</span>
+              <div className="flex flex-col text-left">
                 <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Sistem Sesi</span>
-                <span className="font-body-md text-[13px] text-on-surface">Açık</span>
+                <span className="font-body-md text-[13px] text-on-surface">
+                  {settings.systemAudioEnabled ? 'Açık' : 'Kapalı'}
+                </span>
               </div>
-            </div>
+            </button>
           </div>
 
           <div className="flex justify-center mt-4 relative z-10">
             <button
-              onClick={startRecording}
+              onClick={handleStart}
               disabled={isPreparing}
               className="relative group h-14 px-12 rounded-full font-headline-md text-white bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 border border-white/20 recording-pulse transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
             >

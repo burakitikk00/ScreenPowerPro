@@ -62,7 +62,39 @@ export function getActiveZoomAtTime(
   return { scale, translateX, translateY };
 }
 
+export function normalizeDuration(value: number, fallback = 0): number {
+  if (Number.isFinite(value) && value > 0) return value;
+  if (Number.isFinite(fallback) && fallback > 0) return fallback;
+  return 0;
+}
+
+export async function resolveVideoDuration(
+  video: HTMLVideoElement,
+  projectPath: string
+): Promise<number> {
+  if (Number.isFinite(video.duration) && video.duration > 0 && video.duration !== Infinity) {
+    return video.duration;
+  }
+
+  if (video.seekable.length > 0) {
+    const end = video.seekable.end(video.seekable.length - 1);
+    if (Number.isFinite(end) && end > 0) {
+      return end;
+    }
+  }
+
+  try {
+    const meta = await window.electronAPI.loadProjectMetadata(projectPath);
+    if (meta.duration > 0) return meta.duration;
+  } catch {
+    /* metadata yok */
+  }
+
+  return 0;
+}
+
 export function formatTimecode(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);

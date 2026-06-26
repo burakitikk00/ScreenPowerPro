@@ -1,6 +1,6 @@
-import { ipcMain, desktopCapturer, dialog, shell, app, BrowserWindow } from 'electron';
+import { ipcMain, desktopCapturer, dialog, shell, app } from 'electron';
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import * as fs from 'fs';
 import {
   loadSettings,
   saveSettings,
@@ -10,12 +10,36 @@ import {
   saveProjectManifest,
   loadProjectManifest,
   loadMetadata,
+  listProjects,
+  resolveMediaPath,
 } from './services/projectService';
 import { startInputTracking, stopInputTracking } from './services/inputTracker';
 import { startExport, cancelExport } from './services/exportService';
+import {
+  setCaptureOptions,
+  minimizeForRecording,
+  restoreAfterRecording,
+  getMainWindow,
+  getRecordingWindow,
+} from './windowManager';
 import type { AppSettings, ProjectManifest, RecordingMetadata } from '../shared/types';
 
-export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
+export function resolveMediaFilePath(requestUrl: string): string | null {
+  try {
+    const url = new URL(requestUrl);
+    const file = url.searchParams.get('file');
+    if (!file) return null;
+    return decodeURIComponent(file);
+  } catch {
+    return null;
+  }
+}
+
+export function buildMediaUrl(fullPath: string): string {
+  return `media://playback?file=${encodeURIComponent(fullPath)}`;
+}
+
+export function registerIpcHandlers() {
   ipcMain.handle('get-screen-sources', async () => {
     const sources = await desktopCapturer.getSources({
       types: ['screen', 'window'],
@@ -26,10 +50,6 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
       name: s.name,
       thumbnail: s.thumbnail.toDataURL(),
     }));
-  });
-
-  ipcMain.handle('get-audio-devices', async () => {
-    return [{ deviceId: 'default', label: 'Varsayılan Mikrofon' }];
   });
 
   ipcMain.handle('get-settings', () => loadSettings());
@@ -50,17 +70,28 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('create-project', (_e, name: string) => {
     const settings = loadSettings();
-    const basePath = settings.projectLocation || path.join(app.getPath('documents'), 'ScreenPowerPro Projects');
+    const basePath =
+      settings.projectLocation || path.join(app.getPath('documents'), 'ScreenPowerPro Projects');
     return createProjectFolder(basePath, name);
   });
+
+  ipcMain.handle(
+    'prepare-capture',
+    (_e, opts: { sourceId: string; includeSystemAudio: boolean }) => {
+      setCaptureOptions(opts);
+    }
+  );
+
+  ipcMain.handle('minimize-for-recording', () => minimizeForRecording());
+  ipcMain.handle('restore-after-recording', () => restoreAfterRecording());
 
   ipcMain.handle('start-input-tracking', () => startInputTracking());
   ipcMain.handle('stop-input-tracking', () => stopInputTracking());
 
   ipcMain.handle(
     'save-recording-file',
-    (_e, projectPath: string, filename: string, buffer: Buffer) =>
-      saveRecordingBuffer(projectPath, filename, buffer)
+    (_e, projectPath: string, filename: string, data: Uint8Array) =>
+      saveRecordingBuffer(projectPath, filename, Buffer.from(data))
   );
 
   ipcMain.handle(
@@ -87,9 +118,38 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     saveProjectManifest(projectPath, manifest)
   );
 
-  ipcMain.handle('load-project', (_e, projectPath: string) =>
-    loadProjectManifest(projectPath)
+  ipcMain.handle('load-project', (_e, projectPath: string) => loadProjectManifest(projectPath));
+
+  ipcMain.handle('load-project-metadata', (_e, projectPath: string) =>
+    loadMetadata(projectPath)
   );
+
+  ipcMain.handle('list-projects', () => {
+    const settings = loadSettings();
+    const basePath =
+      settings.projectLocation || path.join(app.getPath('documents'), 'ScreenPowerPro Projects');
+    return listProjects(basePath);
+  });
+
+  ipcMain.handle('get-media-url', (_e, projectPath: string, relativePath: string) => {
+    const fullPath = resolveMediaPath(projectPath, relativePath);
+    if (!fs.existsSync(fullPath)) {
+      console.error('[MediaProtocol] Dosya bulunamadı:', fullPath);
+      return null;
+    }
+    const url = buildMediaUrl(fullPath);
+    console.log('[MediaProtocol] URL oluşturuldu:', { fullPath, size: fs.statSync(fullPath).size, url });
+    return url;
+  });
+
+  ipcMain.handle('get-media-debug-info', (_e, projectPath: string, relativePath: string) => {
+    const fullPath = resolveMediaPath(projectPath, relativePath);
+    const exists = fs.existsSync(fullPath);
+    const size = exists ? fs.statSync(fullPath).size : 0;
+    const url = exists ? buildMediaUrl(fullPath) : null;
+    console.log('[MediaProtocol] Debug info:', { fullPath, exists, size, url });
+    return { fullPath, exists, size, url };
+  });
 
   ipcMain.handle('open-project-dialog', async () => {
     const result = await dialog.showOpenDialog({
@@ -110,7 +170,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     'start-export',
     async (_e, projectPath: string, manifest: ProjectManifest, metadata: RecordingMetadata) => {
       const settings = loadSettings();
-      const win = getWindow();
+      const win = getMainWindow();
       const outputPath = await startExport(
         projectPath,
         manifest,
@@ -126,4 +186,9 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('cancel-export', () => cancelExport());
   ipcMain.handle('reveal-in-folder', (_e, filePath: string) => shell.showItemInFolder(filePath));
+
+  ipcMain.handle('trigger-stop-recording', () => {
+    const main = getMainWindow();
+    main?.webContents.send('stop-recording-request');
+  });
 }

@@ -43,7 +43,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   settings: defaultTimelineSettings,
 
   setCurrentTime: (t) => set({ currentTime: t }),
-  setDuration: (d) => set({ duration: d }),
+  setDuration: (d) =>
+    set((s) => ({
+      duration: Number.isFinite(d) && d > 0 && d !== Infinity ? d : s.duration,
+    })),
   setIsPlaying: (p) => set({ isPlaying: p }),
   setSelectedZoomId: (id) => set({ selectedZoomId: id }),
   setTimelineZoom: (z) => set({ timelineZoom: z }),
@@ -60,5 +63,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   updateSettings: (partial) =>
     set((s) => ({ settings: { ...s.settings, ...partial } })),
   loadFromProject: (effects, settings, duration) =>
-    set({ zoomEffects: effects, settings, duration, currentTime: 0, isPlaying: false }),
+    set({
+      zoomEffects: effects,
+      settings,
+      duration: Number.isFinite(duration) && duration > 0 ? duration : 0,
+      currentTime: 0,
+      isPlaying: false,
+    }),
 }));

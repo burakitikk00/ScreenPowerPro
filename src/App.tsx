@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from './stores/appStore';
 import Dashboard from './components/dashboard/Dashboard';
 import Library from './components/library/Library';
@@ -19,10 +19,11 @@ const isMaskOverlay = window.location.hash.startsWith('#/mask-overlay');
 const isCountdownOverlay = window.location.hash.startsWith('#/countdown-overlay');
 
 export default function App() {
-  const { screen, updateSettings, preRecordingBarOpen } = useAppStore();
+  const { screen, updateSettings, preRecordingBarOpen, settings } = useAppStore();
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (isRecordingBarOnly || isCropperOverlay || isMaskOverlay || (screen === 'dashboard' && preRecordingBarOpen)) {
+    if (isRecordingBarOnly || isCameraOverlay || isCropperOverlay || isMaskOverlay || isCountdownOverlay || (screen === 'dashboard' && preRecordingBarOpen)) {
       document.documentElement.classList.add('recording-overlay');
       document.body.classList.add('recording-overlay');
       document.body.style.backgroundColor = 'transparent';
@@ -32,19 +33,41 @@ export default function App() {
         document.body.style.backgroundColor = '';
       };
     }
+  }, [isRecordingBarOnly, isCameraOverlay, isCropperOverlay, isMaskOverlay, isCountdownOverlay, preRecordingBarOpen, screen]);
+
+  useEffect(() => {
     const init = async () => {
-      const settings = await window.electronAPI.getSettings();
+      const savedSettings = await window.electronAPI.getSettings();
       const paths = await window.electronAPI.getDefaultPaths();
       updateSettings({
-        ...settings,
-        projectLocation: settings.projectLocation || paths.projects,
-        exportLocation: settings.exportLocation || paths.exports,
-        microphoneEnabled: settings.microphoneEnabled ?? true,
-        systemAudioEnabled: settings.systemAudioEnabled ?? true,
+        ...savedSettings,
+        projectLocation: savedSettings.projectLocation || paths.projects,
+        exportLocation: savedSettings.exportLocation || paths.exports,
+        microphoneEnabled: savedSettings.microphoneEnabled ?? true,
+        systemAudioEnabled: savedSettings.systemAudioEnabled ?? true,
+        cameraEnabled: false,
       });
+      setIsLoaded(true);
     };
     init();
-  }, [updateSettings, isRecordingBarOnly, isCropperOverlay, preRecordingBarOpen, screen]);
+  }, [updateSettings]);
+
+  // Sync camera overlay with settings
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isRecordingBarOnly && !isCameraOverlay && !isCropperOverlay && !isMaskOverlay && !isCountdownOverlay) {
+      if (settings.cameraEnabled) {
+        window.electronAPI.closeCameraOverlay();
+        setTimeout(() => {
+          window.electronAPI.createCameraOverlay();
+        }, 50);
+      } else {
+        window.electronAPI.closeCameraOverlay();
+      }
+    }
+  }, [settings.cameraEnabled, settings.selectedCameraId, isLoaded]);
+
+  if (!isLoaded) return null;
 
   if (isRecordingBarOnly) {
     return (

@@ -66,6 +66,9 @@ const api = {
   loadProjectMetadata: (projectPath: string): Promise<RecordingMetadata> =>
     ipcRenderer.invoke('load-project-metadata', projectPath),
 
+  loadProjectInputData: (projectPath: string): Promise<{ moves: MouseMoveEvent[], clicks: MouseClickEvent[] }> =>
+    ipcRenderer.invoke('load-project-input-data', projectPath),
+
   listProjects: (): Promise<ProjectSummary[]> => ipcRenderer.invoke('list-projects'),
 
   getMediaUrl: (projectPath: string, relativePath: string): Promise<string | null> =>
@@ -108,9 +111,12 @@ const api = {
 
   requestStopRecording: (): Promise<void> => ipcRenderer.invoke('trigger-stop-recording'),
   
+  showRecordingBar: (): Promise<void> => ipcRenderer.invoke('show-recording-bar'),
   resizeForEditor: (): Promise<void> => ipcRenderer.invoke('resize-for-editor'),
   createCameraOverlay: (): Promise<void> => ipcRenderer.invoke('create-camera-overlay'),
   closeCameraOverlay: (): Promise<void> => ipcRenderer.invoke('close-camera-overlay'),
+  startCameraDrag: (offsetX: number, offsetY: number): Promise<void> => ipcRenderer.invoke('start-camera-drag', offsetX, offsetY),
+  stopCameraDrag: (): Promise<void> => ipcRenderer.invoke('stop-camera-drag'),
 
   openCropper: (): Promise<void> => ipcRenderer.invoke('open-cropper'),
   closeCropper: (): Promise<void> => ipcRenderer.invoke('close-cropper'),

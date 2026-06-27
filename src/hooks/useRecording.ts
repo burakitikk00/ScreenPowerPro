@@ -48,7 +48,6 @@ export function useRecording() {
     recordingMode,
     settings,
     selectedSourceId,
-    setCountdown,
     setIsRecording,
     setScreen,
     setCurrentProject,
@@ -122,7 +121,7 @@ export function useRecording() {
         fps: 30,
         duration,
         recordedAt: new Date().toISOString(),
-        mode: recordingMode,
+        mode: recordingMode || 'fullscreen',
         ...(recordingMode === 'custom' && settings.customCropBounds ? { customCropBounds: settings.customCropBounds } : {})
       };
 
@@ -157,6 +156,19 @@ export function useRecording() {
             backgroundOpacity: 100,
             defaultZoomScale: 1.5,
             motionBlurAmount: 30,
+            videoSpeed: 1,
+            cursorSize: 100,
+            cursorVisible: true,
+            cameraVisible: true,
+            cameraShape: 'circle',
+            cameraSize: 100,
+            micVolume: 100,
+            sysVolume: 100,
+            watermarkText: 'ScreenPowerPro',
+            cursorStyle: 'default',
+            clickEffect: 'ripple',
+            cursorClickSound: false,
+            hideCursorWhenIdle: false,
           },
         },
       };
@@ -186,7 +198,7 @@ export function useRecording() {
       stopRecording();
     });
     (window as unknown as { __stopRecording?: () => void }).__stopRecording = stopRecording;
-    return unsub;
+    return () => { unsub(); };
   }, [stopRecording]);
 
   const startRecording = useCallback(
@@ -201,8 +213,8 @@ export function useRecording() {
         }
 
         const sourceId = await pickDefaultSource(
-          recordingMode,
-          sourceIdOverride || selectedSourceId
+          recordingMode || 'fullscreen',
+          sourceIdOverride || selectedSourceId || null
         );
 
         if (recordingMode === 'window' && !sourceIdOverride && !selectedSourceId) {
@@ -215,13 +227,6 @@ export function useRecording() {
         projectPathRef.current = projectPath;
 
         const runCountdown = settings.countdown;
-        if (runCountdown > 0) {
-          for (let i = runCountdown; i > 0; i--) {
-            setCountdown(i);
-            await new Promise((r) => setTimeout(r, 1000));
-          }
-          setCountdown(null);
-        }
 
         if (recordingMode === 'custom' && settings.customCropBounds) {
           await window.electronAPI.openMask(settings.customCropBounds);
@@ -229,17 +234,26 @@ export function useRecording() {
 
         await window.electronAPI.prepareCapture({
           sourceId,
-          includeSystemAudio: settings.systemAudioEnabled,
+          includeSystemAudio: settings.systemAudioEnabled ?? true,
         });
 
         await window.electronAPI.minimizeForRecording();
-        await new Promise((r) => setTimeout(r, 400));
+        await new Promise((r) => setTimeout(r, 100));
+
+        if (runCountdown > 0) {
+          await window.electronAPI.openCountdown(runCountdown);
+          await new Promise((r) => setTimeout(r, (runCountdown * 1000) + 500));
+        }
+
+        await window.electronAPI.showRecordingBar();
 
         await window.electronAPI.startInputTracking();
         startTimeRef.current = Date.now();
 
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
+          video: {
+            cursor: 'never'
+          } as any,
           audio: settings.systemAudioEnabled,
         });
 
@@ -301,7 +315,6 @@ export function useRecording() {
       } catch (err) {
         console.error('Kayıt başlatma hatası:', err);
         await window.electronAPI.restoreAfterRecording();
-        setCountdown(null);
         setIsRecording(false);
         alert(err instanceof Error ? err.message : 'Kayıt başlatılamadı');
         return { needsWindowPicker: false as const };
@@ -314,7 +327,6 @@ export function useRecording() {
       recordingMode,
       selectedSourceId,
       settings,
-      setCountdown,
       setIsRecording,
       updateSettings,
     ]

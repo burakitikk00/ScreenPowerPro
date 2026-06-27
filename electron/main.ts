@@ -86,7 +86,7 @@ function createWindow() {
     minHeight: 350,
     resizable: false,
     frame: false, // We'll need a custom title bar or just a plain borderless window
-    transparent: true, // FocuSee often has rounded corners, transparent helps
+    transparent: true, // ScreenPowerPro often has rounded corners, transparent helps
     backgroundColor: '#00000000',
     titleBarStyle: 'hidden',
     webPreferences: {

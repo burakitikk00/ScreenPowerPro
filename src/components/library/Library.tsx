@@ -4,7 +4,6 @@ import { useEditorStore } from '../../stores/editorStore';
 import { formatTimecode } from '../../lib/zoomEngine';
 import type { ProjectSummary } from '../../types';
 import TopNav from '../layout/TopNav';
-import SideNav from '../layout/SideNav';
 
 export default function Library() {
   const { setScreen, setCurrentProject } = useAppStore();
@@ -32,15 +31,14 @@ export default function Library() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <TopNav title="Kütüphane" />
-      <SideNav active="library" />
+    <div className="h-screen flex flex-col bg-[#0f1015] overflow-hidden">
+      <TopNav title="Kütüphane" onBack={() => setScreen('dashboard')} />
 
-      <main className="flex-1 ml-0 md:ml-sidebar-width mt-toolbar-height h-[calc(100vh-48px)] overflow-y-auto p-container-margin">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-8">
-            <h1 className="font-headline-lg text-headline-lg text-on-surface mb-2">Kütüphane</h1>
-            <p className="text-on-surface-variant font-body-lg">
+      <main className="flex-1 mt-[48px] overflow-y-auto p-4 md:p-6 scrollbar-thin scrollbar-thumb-white/10">
+        <div className="max-w-6xl mx-auto pb-16">
+          <div className="mb-4">
+            <h1 className="text-2xl font-semibold text-white mb-1">Kütüphane</h1>
+            <p className="text-white/50 text-[13px]">
               Kayıtlı projelerinizi görüntüleyin ve düzenleyin.
             </p>
           </div>
@@ -64,10 +62,9 @@ export default function Library() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((project) => (
-              <button
+              <div
                 key={project.path}
-                onClick={() => openProject(project.path)}
-                className="group glass-panel rounded-xl overflow-hidden text-left hover:border-primary/30 transition-all hover:shadow-[0_0_20px_rgba(192,193,255,0.1)]"
+                className="group relative glass-panel rounded-xl overflow-hidden text-left hover:border-primary/30 transition-all hover:shadow-[0_0_20px_rgba(192,193,255,0.1)]"
               >
                 <div className="aspect-video bg-surface-container-high flex items-center justify-center border-b border-white/5 overflow-hidden">
                   {project.videoUrl ? (
@@ -97,7 +94,28 @@ export default function Library() {
                     </span>
                   )}
                 </div>
-              </button>
+                
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-3 backdrop-blur-sm z-10 pointer-events-none group-hover:pointer-events-auto">
+                  <button
+                    onClick={() => openProject(project.path)}
+                    className="bg-indigo-500 text-white px-6 py-2 rounded-lg font-body-md hover:bg-indigo-600 shadow-lg flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                    Düzenle
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.electronAPI.revealInFolder(project.path);
+                    }}
+                    className="bg-white/10 text-white border border-white/20 px-6 py-2 rounded-lg font-body-md hover:bg-white/20 shadow-lg flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-75"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">folder_open</span>
+                    Dosya Konumuna Git
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </div>

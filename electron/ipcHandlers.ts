@@ -87,6 +87,10 @@ export function registerIpcHandlers() {
   );
 
   ipcMain.handle('minimize-for-recording', () => minimizeForRecording());
+  ipcMain.handle('show-recording-bar', () => {
+    const { showRecordingWindow } = require('./windowManager');
+    showRecordingWindow();
+  });
   ipcMain.handle('restore-after-recording', () => restoreAfterRecording());
 
   ipcMain.handle('start-input-tracking', () => startInputTracking());
@@ -127,6 +131,19 @@ export function registerIpcHandlers() {
   ipcMain.handle('load-project-metadata', (_e, projectPath: string) =>
     loadMetadata(projectPath)
   );
+
+  ipcMain.handle('load-project-input-data', (_e, projectPath: string) => {
+    try {
+      const movesPath = path.join(projectPath, 'recording', 'mousemoves-0.json');
+      const clicksPath = path.join(projectPath, 'recording', 'mouseclicks-0.json');
+      const moves = fs.existsSync(movesPath) ? JSON.parse(fs.readFileSync(movesPath, 'utf8')) : [];
+      const clicks = fs.existsSync(clicksPath) ? JSON.parse(fs.readFileSync(clicksPath, 'utf8')) : [];
+      return { moves, clicks };
+    } catch (e) {
+      console.error('Error loading input data:', e);
+      return { moves: [], clicks: [] };
+    }
+  });
 
   ipcMain.handle('list-projects', () => {
     const settings = loadSettings();
@@ -211,6 +228,26 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('close-camera-overlay', () => {
     closeCameraOverlay();
+  });
+
+  let cameraDragInterval: NodeJS.Timeout | null = null;
+  ipcMain.handle('start-camera-drag', (_e, offsetX: number, offsetY: number) => {
+    const { getCameraWindow } = require('./windowManager');
+    const win = getCameraWindow();
+    if (!win) return;
+    if (cameraDragInterval) clearInterval(cameraDragInterval);
+    const { screen } = require('electron');
+    cameraDragInterval = setInterval(() => {
+      const point = screen.getCursorScreenPoint();
+      win.setPosition(point.x - offsetX, point.y - offsetY);
+    }, 16); // ~60fps smooth dragging
+  });
+
+  ipcMain.handle('stop-camera-drag', () => {
+    if (cameraDragInterval) {
+      clearInterval(cameraDragInterval);
+      cameraDragInterval = null;
+    }
   });
 
   ipcMain.handle('open-cropper', () => {

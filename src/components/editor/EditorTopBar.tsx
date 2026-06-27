@@ -15,7 +15,7 @@ export default function EditorTopBar() {
       <div className="flex items-center gap-4" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <div className="flex items-center gap-2 text-white/90">
           <span className="material-symbols-outlined text-[18px] text-indigo-500">video_camera_front</span>
-          <span className="font-semibold text-sm tracking-wide">FocuSee</span>
+          <span className="font-semibold text-sm tracking-wide">ScreenPowerPro</span>
         </div>
         <div className="w-px h-4 bg-white/10" />
         <button className="text-[13px] text-white/70 hover:text-white transition-colors flex items-center gap-1">

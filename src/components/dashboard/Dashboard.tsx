@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useRecording } from '../../hooks/useRecording';
 import { useMediaDevices } from '../../hooks/useMediaDevices';
@@ -6,7 +6,8 @@ import { useAudioLevel } from '../../hooks/useAudioLevel';
 import { useSystemAudioLevel } from '../../hooks/useSystemAudioLevel';
 import type { RecordingMode } from '../../types';
 import WindowPickerModal from '../recording/WindowPickerModal';
-import type { ScreenSource } from '../../shared/types';
+import type { ScreenSource } from '../../../shared/types';
+import ReactDOM from 'react-dom';
 
 const modes: { id: RecordingMode; icon: string; label: string }[] = [
   { id: 'fullscreen', icon: 'fullscreen', label: 'Full Screen' },
@@ -18,7 +19,6 @@ export default function Dashboard() {
   const {
     recordingMode,
     setRecordingMode,
-    countdown,
     settings,
     updateSettings,
     windowPickerOpen,
@@ -29,10 +29,51 @@ export default function Dashboard() {
     setPreRecordingBarOpen,
     setScreen,
   } = useAppStore();
-  const { startRecording, isPreparing, isRecording } = useRecording();
+  const { startRecording, isPreparing } = useRecording();
   const { mics, speakers, cameras } = useMediaDevices();
   const [openDropdown, setOpenDropdown] = useState<'mic' | 'speaker' | 'camera' | null>(null);
+  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [windowSources, setWindowSources] = useState<ScreenSource[]>([]);
+  const [dropdownPos, setDropdownPos] = useState<{ top?: number; bottom?: number; right: number; left?: number; isUp: boolean; maxHeight?: number }>({ right: 0, isUp: false });
+  const [subMenuPos, setSubMenuPos] = useState<{ top?: number; bottom?: number; right: number; maxHeight?: number }>({ right: 0 });
+  const micBtnRef = useRef<HTMLButtonElement>(null);
+  const speakerBtnRef = useRef<HTMLButtonElement>(null);
+  const cameraBtnRef = useRef<HTMLButtonElement>(null);
+  const appAudioRef = useRef<HTMLDivElement>(null);
+
+  const openDropdownAt = useCallback((type: 'mic' | 'speaker' | 'camera', ref: React.RefObject<HTMLButtonElement | null>) => {
+    if (openDropdown === type) { setOpenDropdown(null); return; }
+    const rect = ref.current?.getBoundingClientRect();
+    if (rect) {
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top - 16; // 16px safe margin to allow dropdowns to stretch further up
+      
+      let isUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+      if (type === 'speaker') isUp = true;
+
+      const right = window.innerWidth - rect.right;
+      
+      let maxHeight = 192;
+      if (isUp) {
+        maxHeight = Math.max(150, spaceAbove);
+        const bottom = window.innerHeight - rect.top + 4;
+        setDropdownPos({ bottom, right, isUp: true, maxHeight });
+      } else {
+        maxHeight = Math.max(150, spaceBelow - 8);
+        setDropdownPos({ top: rect.bottom + 4, right, isUp: false, maxHeight });
+      }
+    }
+    setOpenDropdown(type);
+  }, [openDropdown]);
+
+  const openSubMenuAt = (ref: React.RefObject<HTMLDivElement | null>) => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (rect) {
+      const spaceBelow = window.innerHeight - rect.top - 8;
+      setSubMenuPos({ top: rect.top, right: window.innerWidth - rect.left + 4, maxHeight: Math.max(100, spaceBelow) });
+    }
+    setOpenSubMenu('appAudio');
+  };
 
   const selectedMicId = settings.selectedMicId || mics[0]?.deviceId;
   const micVolume = useAudioLevel(selectedMicId, settings.microphoneEnabled);
@@ -60,7 +101,7 @@ export default function Dashboard() {
   };
 
   React.useEffect(() => {
-    const handleClickOutside = () => setOpenDropdown(null);
+    const handleClickOutside = () => { setOpenDropdown(null); setOpenSubMenu(null); };
     document.addEventListener('click', handleClickOutside);
     window.electronAPI.getScreenSources().then(s => setWindowSources(s.filter(x => x.id.startsWith('window:'))));
     return () => document.removeEventListener('click', handleClickOutside);
@@ -70,7 +111,7 @@ export default function Dashboard() {
 
   return (
     <div 
-      className="h-screen w-screen relative flex flex-col bg-[#0f1015] text-white overflow-hidden"
+      className="min-h-screen w-screen relative flex flex-col bg-[#0f1015] text-white"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Custom Title Bar for Launcher */}
@@ -80,22 +121,19 @@ export default function Dashboard() {
             <div className="w-6 h-6 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
               <span className="material-symbols-outlined text-[14px] text-white">videocam</span>
             </div>
-            <span className="font-headline-sm text-sm font-semibold tracking-wide">FocuSee</span>
+            <span className="font-headline-sm text-sm font-semibold tracking-wide">ScreenPowerPro</span>
           </div>
           <div className="w-px h-4 bg-white/10" />
           <button onClick={() => setScreen('library')} className="text-[13px] text-white/70 hover:text-white transition-colors flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <span className="material-symbols-outlined text-[16px]">video_library</span> Library
           </button>
         </div>
-        <div className="flex items-center gap-2 text-white/50" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <button onClick={() => window.electronAPI.windowMinimize()} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
-            <span className="material-symbols-outlined text-[16px]">remove</span>
+        <div className="flex items-center gap-1 text-white/40" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <button onClick={() => window.electronAPI.windowMinimize()} className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors">
+            <span className="material-symbols-outlined text-[14px]">remove</span>
           </button>
-          <button onClick={() => window.electronAPI.windowMaximize()} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
-            <span className="material-symbols-outlined text-[14px]">crop_square</span>
-          </button>
-          <button onClick={() => window.electronAPI.windowClose()} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-500 hover:text-white transition-colors">
-            <span className="material-symbols-outlined text-[16px]">close</span>
+          <button onClick={() => window.electronAPI.windowClose()} className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 hover:text-red-400 transition-colors">
+            <span className="material-symbols-outlined text-[14px]">close</span>
           </button>
         </div>
       </div>
@@ -140,7 +178,7 @@ export default function Dashboard() {
         </div>
 
         {/* Right Side: Device & Tool */}
-        <div className="w-[280px] flex flex-col gap-4">
+        <div className="w-[220px] flex flex-col gap-4">
           <h2 className="text-on-surface-variant font-body-lg text-[15px]">Device & Tool</h2>
           <div className="flex flex-col gap-2">
             
@@ -148,7 +186,8 @@ export default function Dashboard() {
               {/* Microphone */}
               <div className="relative group" onClick={(e) => e.stopPropagation()}>
                 <button 
-                  onClick={() => setOpenDropdown(openDropdown === 'mic' ? null : 'mic')}
+                  ref={micBtnRef}
+                  onClick={() => openDropdownAt('mic', micBtnRef)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${settings.microphoneEnabled ? 'bg-indigo-500/10' : 'hover:bg-white/5'}`}
                 >
                   <div 
@@ -159,18 +198,25 @@ export default function Dashboard() {
                       {settings.microphoneEnabled ? 'mic' : 'mic_off'}
                     </span>
                   </div>
-                  <span className="flex-1 text-left text-[13px] text-white/90 truncate pr-4">
+                  <span className="flex-1 text-left text-[12px] text-white/90 truncate pr-4">
                     {settings.microphoneEnabled ? (mics.find(m => m.deviceId === settings.selectedMicId)?.label || mics[0]?.label || 'Microphone') : 'None'}
                   </span>
                   <span className="material-symbols-outlined text-white/30 text-[18px]">expand_more</span>
                 </button>
 
-                {openDropdown === 'mic' && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+                {openDropdown === 'mic' && ReactDOM.createPortal(
+                  <div 
+                    className="fixed w-max min-w-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 bg-[#1e1f2e] border border-white/10 rounded-xl shadow-2xl z-[9999] py-1 whitespace-nowrap"
+                    style={{ ...(dropdownPos.isUp ? { bottom: dropdownPos.bottom } : { top: dropdownPos.top }), right: dropdownPos.right, maxHeight: dropdownPos.maxHeight || 192, WebkitAppRegion: 'no-drag' } as unknown as React.CSSProperties}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button 
                       onClick={() => { updateSettings({ microphoneEnabled: false }); setOpenDropdown(null); }}
-                      className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-[12px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
                     >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {!settings.microphoneEnabled ? 'check' : ''}
+                      </span>
                       <span className="material-symbols-outlined text-[16px]">mic_off</span> None
                     </button>
                     <div className="h-px bg-white/10 my-1" />
@@ -178,12 +224,16 @@ export default function Dashboard() {
                       <button 
                         key={mic.deviceId}
                         onClick={() => { updateSettings({ microphoneEnabled: true, selectedMicId: mic.deviceId }); setOpenDropdown(null); }}
-                        className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
+                        className="w-full text-left px-4 py-2 text-[12px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
                       >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {settings.microphoneEnabled && settings.selectedMicId === mic.deviceId ? 'check' : ''}
+                        </span>
                         {mic.label || 'Microphone'}
                       </button>
                     ))}
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
 
@@ -192,8 +242,9 @@ export default function Dashboard() {
               {/* Speaker */}
               <div className="relative group" onClick={(e) => e.stopPropagation()}>
                 <button 
+                  ref={speakerBtnRef}
                   onClick={() => {
-                    setOpenDropdown(openDropdown === 'speaker' ? null : 'speaker');
+                    openDropdownAt('speaker', speakerBtnRef);
                     if (openDropdown !== 'speaker') {
                       window.electronAPI.getScreenSources().then(s => setWindowSources(s.filter(x => x.id.startsWith('window:'))));
                     }
@@ -208,46 +259,83 @@ export default function Dashboard() {
                       {settings.systemAudioEnabled ? 'volume_up' : 'volume_off'}
                     </span>
                   </div>
-                  <span className="flex-1 text-left text-[13px] text-white/90 truncate pr-4">
+                  <span className="flex-1 text-left text-[12px] text-white/90 truncate pr-4">
                     {settings.systemAudioEnabled ? (settings.selectedSpeakerId?.startsWith('window:') ? windowSources.find(w => w.id === settings.selectedSpeakerId)?.name : speakers.find(s => s.deviceId === settings.selectedSpeakerId)?.label) || speakers[0]?.label || 'Speaker' : 'None'}
                   </span>
                   <span className="material-symbols-outlined text-white/30 text-[18px]">expand_more</span>
                 </button>
 
-                {openDropdown === 'speaker' && (
-                  <div className="absolute bottom-full left-0 mb-2 w-full max-h-48 overflow-y-auto bg-[#252530] border border-white/10 rounded-xl shadow-xl z-50 py-1 scrollbar-thin scrollbar-thumb-white/10">
-                    <button 
-                      onClick={() => { updateSettings({ systemAudioEnabled: false }); setOpenDropdown(null); }}
-                      className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">volume_off</span> None
-                    </button>
-                    <div className="h-px bg-white/10 my-1" />
+                {openDropdown === 'speaker' && ReactDOM.createPortal(
+                  <div 
+                    className="fixed w-max min-w-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 bg-[#1e1f2e] border border-white/10 rounded-xl shadow-2xl z-[9999] py-1 whitespace-nowrap"
+                    style={{ ...(dropdownPos.isUp ? { bottom: dropdownPos.bottom } : { top: dropdownPos.top }), right: dropdownPos.right, maxHeight: dropdownPos.maxHeight || 192, WebkitAppRegion: 'no-drag' } as unknown as React.CSSProperties}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {speakers.map(speaker => (
                       <button 
                         key={speaker.deviceId}
                         onClick={() => { updateSettings({ systemAudioEnabled: true, selectedSpeakerId: speaker.deviceId }); setOpenDropdown(null); }}
-                        className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
+                        className="w-full text-left px-4 py-2 text-[12px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
                       >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {settings.systemAudioEnabled && settings.selectedSpeakerId === speaker.deviceId ? 'check' : ''}
+                        </span>
                         {speaker.label || 'Speaker'}
                       </button>
                     ))}
                     
-                    {windowSources.length > 0 && (
-                      <>
-                        <div className="px-4 pt-3 pb-1 text-[11px] font-semibold text-white/50 uppercase tracking-wider">Only app audio</div>
-                        {windowSources.map(src => (
-                          <button 
-                            key={src.id}
-                            onClick={() => { updateSettings({ systemAudioEnabled: true, selectedSpeakerId: src.id }); setOpenDropdown(null); }}
-                            className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
-                          >
-                            {src.name}
-                          </button>
-                        ))}
-                      </>
-                    )}
-                  </div>
+                    <div 
+                      ref={appAudioRef}
+                      className="relative"
+                      onMouseEnter={() => openSubMenuAt(appAudioRef)}
+                      onMouseLeave={() => setOpenSubMenu(null)}
+                    >
+                      <button className="w-full text-left px-4 py-2 text-[12px] text-white/90 hover:bg-white/10 transition-colors flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[14px]">
+                            {settings.systemAudioEnabled && settings.selectedSpeakerId?.startsWith('window:') ? 'check' : ''}
+                          </span>
+                          <span>Only App Audio ({windowSources.length})</span>
+                        </div>
+                        <span className="material-symbols-outlined text-[14px] text-white/50">chevron_right</span>
+                      </button>
+
+                      {openSubMenu === 'appAudio' && windowSources.length > 0 && ReactDOM.createPortal(
+                        <div 
+                          className="fixed w-max min-w-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 bg-[#1e1f2e] border border-white/10 rounded-xl shadow-2xl z-[9999] py-1 whitespace-nowrap"
+                          style={{ top: subMenuPos.top, right: subMenuPos.right, maxHeight: subMenuPos.maxHeight || 192, WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                          onMouseEnter={() => setOpenSubMenu('appAudio')}
+                          onMouseLeave={() => setOpenSubMenu(null)}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {windowSources.map(src => (
+                            <button 
+                              key={src.id}
+                              onClick={() => { updateSettings({ systemAudioEnabled: true, selectedSpeakerId: src.id }); setOpenDropdown(null); setOpenSubMenu(null); }}
+                              className="w-full text-left px-4 py-2 text-[12px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">
+                                {settings.systemAudioEnabled && settings.selectedSpeakerId === src.id ? 'check' : ''}
+                              </span>
+                              {src.name}
+                            </button>
+                          ))}
+                        </div>,
+                        document.body
+                      )}
+                    </div>
+
+                    <button 
+                      onClick={() => { updateSettings({ systemAudioEnabled: false }); setOpenDropdown(null); }}
+                      className="w-full text-left px-4 py-2 text-[12px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {!settings.systemAudioEnabled ? 'check' : ''}
+                      </span>
+                      <span className="material-symbols-outlined text-[16px]">volume_off</span> None
+                    </button>
+                  </div>,
+                  document.body
                 )}
               </div>
 
@@ -256,7 +344,8 @@ export default function Dashboard() {
               {/* Camera */}
               <div className="relative group" onClick={(e) => e.stopPropagation()}>
                 <button 
-                  onClick={() => setOpenDropdown(openDropdown === 'camera' ? null : 'camera')}
+                  ref={cameraBtnRef}
+                  onClick={() => openDropdownAt('camera', cameraBtnRef)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${settings.cameraEnabled ? 'bg-indigo-500/10' : 'hover:bg-white/5'}`}
                 >
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center ${settings.cameraEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/5 text-white/50'}`}>
@@ -264,18 +353,25 @@ export default function Dashboard() {
                       {settings.cameraEnabled ? 'videocam' : 'videocam_off'}
                     </span>
                   </div>
-                  <span className="flex-1 text-left text-[13px] text-white/90 truncate pr-4">
+                  <span className="flex-1 text-left text-[12px] text-white/90 truncate pr-4">
                     {settings.cameraEnabled ? (cameras.find(c => c.deviceId === settings.selectedCameraId)?.label || cameras[0]?.label || 'Camera') : 'None'}
                   </span>
                   <span className="material-symbols-outlined text-white/30 text-[18px]">expand_more</span>
                 </button>
 
-                {openDropdown === 'camera' && (
-                  <div className="absolute bottom-full left-0 mb-2 w-full bg-[#252530] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
+                {openDropdown === 'camera' && ReactDOM.createPortal(
+                  <div 
+                    className="fixed w-max min-w-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 bg-[#1e1f2e] border border-white/10 rounded-xl shadow-2xl z-[9999] py-1 whitespace-nowrap"
+                    style={{ ...(dropdownPos.isUp ? { bottom: dropdownPos.bottom } : { top: dropdownPos.top }), right: dropdownPos.right, maxHeight: dropdownPos.maxHeight || 192, WebkitAppRegion: 'no-drag' } as unknown as React.CSSProperties}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button 
                       onClick={() => { updateSettings({ cameraEnabled: false }); setOpenDropdown(null); }}
-                      className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-[12px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
                     >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {!settings.cameraEnabled ? 'check' : ''}
+                      </span>
                       <span className="material-symbols-outlined text-[16px]">videocam_off</span> None
                     </button>
                     <div className="h-px bg-white/10 my-1" />
@@ -283,12 +379,16 @@ export default function Dashboard() {
                       <button 
                         key={camera.deviceId}
                         onClick={() => { updateSettings({ cameraEnabled: true, selectedCameraId: camera.deviceId }); setOpenDropdown(null); }}
-                        className="w-full text-left px-4 py-2 text-[13px] text-white/90 hover:bg-white/10 transition-colors truncate"
+                        className="w-full text-left px-4 py-2 text-[12px] text-white/90 hover:bg-white/10 transition-colors flex items-center gap-2"
                       >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {settings.cameraEnabled && settings.selectedCameraId === camera.deviceId ? 'check' : ''}
+                        </span>
                         {camera.label || 'Camera'}
                       </button>
                     ))}
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
             </div>

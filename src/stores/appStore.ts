@@ -20,6 +20,7 @@ interface AppState {
   exportProgress: ExportProgress | null;
   settingsOpen: boolean;
   windowPickerOpen: boolean;
+  preRecordingBarOpen: boolean;
 
   setScreen: (screen: AppScreen) => void;
   setRecordingMode: (mode: RecordingMode | null) => void;
@@ -73,7 +74,14 @@ export const useAppStore = create<AppState>((set) => ({
   setCurrentProject: (project, path) =>
     set({ currentProject: project, currentProjectPath: path }),
   updateSettings: (partial) =>
-    set((s) => ({ settings: { ...s.settings, ...partial } })),
+    set((s) => {
+      const newSettings = { ...s.settings, ...partial };
+      // Ana pencere veya store değiştirildiğinde arka plana kaydet
+      if (window.electronAPI && window.electronAPI.saveSettings) {
+        window.electronAPI.saveSettings(newSettings).catch(console.error);
+      }
+      return { settings: newSettings };
+    }),
   setExportProgress: (progress) => set({ exportProgress: progress }),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   setWindowPickerOpen: (open) => set({ windowPickerOpen: open }),

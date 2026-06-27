@@ -40,8 +40,8 @@ export function createRecordingWindow() {
     width: 220,
     height: 48,
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
+    transparent: false,
+    backgroundColor: '#1a1a1a',
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: true,
@@ -52,6 +52,8 @@ export function createRecordingWindow() {
       nodeIntegration: false,
     },
   });
+
+  recordingWindow.setContentProtection(true);
 
   if (isDev) {
     recordingWindow.loadURL('http://localhost:5173/#/recording-bar');
@@ -81,13 +83,12 @@ export function closeRecordingWindow() {
 }
 
 export function minimizeForRecording() {
-  mainWindow?.minimize();
-  showRecordingWindow();
+  mainWindow?.hide();
 }
 
 export function restoreAfterRecording() {
   closeRecordingWindow();
-  mainWindow?.restore();
+  mainWindow?.show();
   mainWindow?.focus();
 }
 
@@ -97,8 +98,10 @@ export function createCameraOverlay() {
   if (cameraWindow) return cameraWindow;
 
   cameraWindow = new BrowserWindow({
-    width: 200,
-    height: 200,
+    width: 240,
+    height: 240,
+    x: 20,
+    y: screen.getPrimaryDisplay().workAreaSize.height - 240 - 20,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -130,9 +133,13 @@ export function createCameraOverlay() {
   return cameraWindow;
 }
 
+export function getCameraWindow() {
+  return cameraWindow;
+}
+
 export function closeCameraOverlay() {
   if (cameraWindow) {
-    cameraWindow.close();
+    cameraWindow.destroy();
     cameraWindow = null;
   }
 }

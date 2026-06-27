@@ -21,7 +21,10 @@ export default function VideoDebugPanel({ videoState, fileInfo }: VideoDebugPane
   const [, tick] = useState(0);
 
   useEffect(() => {
-    return subscribeVideoLogs(() => tick((n) => n + 1));
+    const unsubscribe = subscribeVideoLogs(() => tick((n) => n + 1));
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const logs = getVideoLogs();

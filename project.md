@@ -16,7 +16,7 @@ Sistem Dinleyicileri: uiohook-napi (Global mouse ve klavye takibi)
 
 Ekran Kaydı: Electron desktopCapturer & WebRTC MediaRecorder API
 
-3. Klasör ve Proje Yapısı (FocuSee Referanslı)
+3. Klasör ve Proje Yapısı (ScreenPowerPro Referanslı)
 
 Bir kayıt alındığında uygulama diske özel bir proje dosyası (Örn: .myproj) ve bir kaynak klasörü oluşturur.
 

@@ -52,11 +52,22 @@ export interface ZoomEffect {
   easing: 'ease-in-out' | 'linear' | 'instant';
 }
 
-export interface TrackState {
-  offset: number;     // Başlangıçtan ötelenme miktarı (timeline pozisyonu)
-  trimStart: number;  // Başlangıçtan kırpma miktarı
-  trimEnd: number;    // Sondan kırpma miktarı (veya orijinal uzunluk)
+export interface ClipSegment {
+  id: string;
+  sourceStart: number;  // Kaynak medyadaki başlangıç zamanı (saniye)
+  sourceEnd: number;    // Kaynak medyadaki bitiş zamanı (saniye)
+  trackOffset: number;  // Timeline'daki pozisyon (saniye)
 }
+
+export interface TrackState {
+  offset: number;
+  trimStart: number;
+  trimEnd: number;
+  clips: ClipSegment[];
+  muted: boolean;
+}
+
+export type CursorStyle = string;
 
 export interface TimelineSettings {
   cursorSmoothing: CursorSmoothing;
@@ -67,10 +78,13 @@ export interface TimelineSettings {
   backgroundOpacity: number;
   defaultZoomScale: number;
   motionBlurAmount: number;
-  // Yeni özellikler
   videoSpeed: number;
   cursorSize: number;
   cursorVisible: boolean;
+  cursorStyle: CursorStyle;
+  clickEffect: string;
+  cursorClickSound: boolean;
+  hideCursorWhenIdle: boolean;
   cameraVisible: boolean;
   cameraShape: 'circle' | 'square';
   cameraSize: number;

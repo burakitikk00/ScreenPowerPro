@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ScreenPowerPro (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "ScreenPowerPro (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

@@ -76,81 +76,84 @@ public class ScreenRecorderService : IDisposable
             Win32Helper.SetTaskbarVisible(false);
         }
 
-        // 2. Start Microphone audio recording if enabled
-        if (settings.MicAudioEnabled)
+        await Task.Run(() =>
         {
-            try
+            // 2. Start Microphone audio recording if enabled
+            if (settings.MicAudioEnabled)
             {
+                try
+                {
 #pragma warning disable CS0618
-                _micCapture = new WaveIn
-                {
-                    WaveFormat = new WaveFormat(44100, 1) // 44.1kHz mono
-                };
+                    _micCapture = new WaveIn
+                    {
+                        WaveFormat = new WaveFormat(44100, 1) // 44.1kHz mono
+                    };
 #pragma warning restore CS0618
-                _micWriter = new WaveFileWriter(_currentMicPath, _micCapture.WaveFormat);
-                _micCapture.DataAvailable += (s, e) =>
-                {
-                    _micWriter?.Write(e.Buffer, 0, e.BytesRecorded);
-                };
-                _micCapture.StartRecording();
+                    _micWriter = new WaveFileWriter(_currentMicPath, _micCapture.WaveFormat);
+                    _micCapture.DataAvailable += (s, e) =>
+                    {
+                        _micWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                    };
+                    _micCapture.StartRecording();
+                }
+                catch { }
             }
-            catch { }
-        }
 
-        // 3. Start System Audio loopback recording if enabled
-        if (settings.SystemAudioEnabled)
-        {
-            try
+            // 3. Start System Audio loopback recording if enabled
+            if (settings.SystemAudioEnabled)
             {
-                _loopbackCapture = new WasapiLoopbackCapture();
-                _loopbackWriter = new WaveFileWriter(_currentSystemAudioPath, _loopbackCapture.WaveFormat);
-                _loopbackCapture.DataAvailable += (s, e) =>
+                try
                 {
-                    _loopbackWriter?.Write(e.Buffer, 0, e.BytesRecorded);
-                };
-                _loopbackCapture.StartRecording();
+                    _loopbackCapture = new WasapiLoopbackCapture();
+                    _loopbackWriter = new WaveFileWriter(_currentSystemAudioPath, _loopbackCapture.WaveFormat);
+                    _loopbackCapture.DataAvailable += (s, e) =>
+                    {
+                        _loopbackWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                    };
+                    _loopbackCapture.StartRecording();
+                }
+                catch { }
             }
-            catch { }
-        }
 
-        // 4. Start FFmpeg Screen Grabber
-        string ffmpegExe = FFmpegHelper.FindFFmpeg();
-        int drawMouse = settings.HideMouseCursor ? 0 : 1;
-        int fps = settings.Fps > 0 ? settings.Fps : 60;
+            // 4. Start FFmpeg Screen Grabber
+            string ffmpegExe = FFmpegHelper.FindFFmpeg();
+            int drawMouse = settings.HideMouseCursor ? 0 : 1;
+            int fps = settings.Fps > 0 ? settings.Fps : 60;
 
-        string videoInputArgs;
-        if (mode == RecordingMode.Window && targetWindowHandle.HasValue && targetWindowHandle.Value != IntPtr.Zero)
-        {
-            // Capture specific window by title or gdigrab
-            var sb = new System.Text.StringBuilder(256);
-            Win32Helper.GetWindowText(targetWindowHandle.Value, sb, 256);
-            string title = sb.ToString();
-            videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -i title=\"{title}\"";
-        }
-        else if (mode == RecordingMode.Region)
-        {
-            videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -offset_x {cropX} -offset_y {cropY} -video_size {cropWidth}x{cropHeight} -i desktop";
-        }
-        else
-        {
-            // Full desktop (Direct3D Desktop Duplication if supported, or gdigrab fallback)
-            videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -i desktop";
-        }
+            string videoInputArgs;
+            if (mode == RecordingMode.Window && targetWindowHandle.HasValue && targetWindowHandle.Value != IntPtr.Zero)
+            {
+                // Capture specific window by title or gdigrab
+                var sb = new System.Text.StringBuilder(256);
+                Win32Helper.GetWindowText(targetWindowHandle.Value, sb, 256);
+                string title = sb.ToString();
+                videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -i title=\"{title}\"";
+            }
+            else if (mode == RecordingMode.Region)
+            {
+                videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -offset_x {cropX} -offset_y {cropY} -video_size {cropWidth}x{cropHeight} -i desktop";
+            }
+            else
+            {
+                // Full desktop (Direct3D Desktop Duplication if supported, or gdigrab fallback)
+                videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -i desktop";
+            }
 
-        string fullFfmpegArgs = $"-y {videoInputArgs} -c:v libx264 -preset ultrafast -tune zerolatency -crf 18 -pix_fmt yuv420p \"{_currentVideoPath}\"";
+            string fullFfmpegArgs = $"-y {videoInputArgs} -c:v libx264 -preset ultrafast -tune zerolatency -crf 18 -pix_fmt yuv420p \"{_currentVideoPath}\"";
 
-        var psi = new ProcessStartInfo
-        {
-            FileName = ffmpegExe,
-            Arguments = fullFfmpegArgs,
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
+            var psi = new ProcessStartInfo
+            {
+                FileName = ffmpegExe,
+                Arguments = fullFfmpegArgs,
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
 
-        _ffmpegProcess = new Process { StartInfo = psi };
-        _ffmpegProcess.Start();
+            _ffmpegProcess = new Process { StartInfo = psi };
+            _ffmpegProcess.Start();
+        });
 
         // 5. Start Elapsed Stopwatch & Timer
         _recordStopwatch = Stopwatch.StartNew();
@@ -164,7 +167,7 @@ public class ScreenRecorderService : IDisposable
         IsRecording = true;
         RecordingStarted?.Invoke();
 
-        return _currentVideoPath;
+        return _currentVideoPath!;
     }
 
     public async Task StopRecordingAsync()

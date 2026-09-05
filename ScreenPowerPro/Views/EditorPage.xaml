@@ -628,6 +628,12 @@
                                         <FontIcon Glyph="&#xE76C;" FontSize="18"
                                             Foreground="{StaticResource TextPrimaryBrush}"/>
                                     </Button>
+                                    <Rectangle Width="1" Height="20" Fill="{StaticResource GlassBorderBrush}" Margin="4,0"/>
+                                    <Button x:Name="BtnMuteAudio" Style="{StaticResource PlayControlStyle}"
+                                        Click="OnMuteClicked">
+                                        <FontIcon x:Name="MuteIcon" Glyph="&#xE767;" FontSize="16"
+                                            Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    </Button>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

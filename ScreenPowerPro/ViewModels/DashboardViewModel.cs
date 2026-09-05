@@ -122,6 +122,30 @@ public partial class DashboardViewModel : ObservableObject
     {
         SaveSettings();
 
+        int cropX = 0, cropY = 0, cropW = 1920, cropH = 1080;
+
+        if (SelectedMode == RecordingMode.Region)
+        {
+            var regionWindow = new Views.RegionSelectionWindow();
+            regionWindow.Activate();
+
+            var result = await regionWindow.WaitForSelectionAsync();
+            if (result == null)
+            {
+                // User cancelled region selection
+                return;
+            }
+
+            cropX = (int)result.Value.X;
+            cropY = (int)result.Value.Y;
+            cropW = (int)result.Value.Width;
+            cropH = (int)result.Value.Height;
+            
+            // Ensure even numbers for video dimensions (FFmpeg x264 requirement)
+            if (cropW % 2 != 0) cropW++;
+            if (cropH % 2 != 0) cropH++;
+        }
+
         // 1. Create project dir
         string projectDir = _projectService.CreateNewProjectDirectory();
 
@@ -130,7 +154,7 @@ public partial class DashboardViewModel : ObservableObject
 
         // 3. Start recorder
         IntPtr? winHandle = SelectedMode == RecordingMode.Window && SelectedWindow != null ? SelectedWindow.Handle : null;
-        await _recorderService.StartRecordingAsync(projectDir, SelectedMode, winHandle);
+        await _recorderService.StartRecordingAsync(projectDir, SelectedMode, winHandle, cropX, cropY, cropW, cropH);
 
         RequestStartRecording?.Invoke(projectDir);
     }

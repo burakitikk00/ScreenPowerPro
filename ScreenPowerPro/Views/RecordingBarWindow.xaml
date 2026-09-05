@@ -8,29 +8,39 @@
     mc:Ignorable="d"
     Title="Kayıt Kontrol">
 
-    <Grid Background="Transparent">
+    <Grid Background="Transparent" PointerPressed="OnPointerPressed" PointerMoved="OnPointerMoved" PointerReleased="OnPointerReleased">
+        <Grid.Resources>
+            <Storyboard x:Name="PulseStoryboard" RepeatBehavior="Forever">
+                <DoubleAnimation Storyboard.TargetName="RecIndicator" 
+                                 Storyboard.TargetProperty="Opacity" 
+                                 From="1.0" To="0.2" Duration="0:0:1" AutoReverse="True"/>
+            </Storyboard>
+        </Grid.Resources>
+        
         <!-- Floating Pill Container -->
-        <Border Background="#20212B" BorderBrush="#3A3B4C" BorderThickness="1" CornerRadius="24" Padding="16,8" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-
+        <Border Background="#E61E1F27" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="28" Padding="20,10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                Shadow="{ThemeResource SharedShadow}">
+            
+            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                 <!-- Red Pulse Recording Indicator -->
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Border Background="#EF4444" CornerRadius="5" Width="10" Height="10" />
-                    <TextBlock Text="REC" FontSize="11" FontWeight="Bold" Foreground="#EF4444" CharacterSpacing="50" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Ellipse x:Name="RecIndicator" Fill="#EF4444" Width="10" Height="10" />
+                    <TextBlock Text="Kayıt Ediliyor" FontSize="12" FontWeight="SemiBold" Foreground="#E3E1EC" VerticalAlignment="Center" />
                 </StackPanel>
 
                 <!-- Timer Display -->
-                <TextBlock x:Name="TimerTextBlock" Text="00:00:00" FontSize="14" FontWeight="SemiBold" Foreground="#E3E1EC" VerticalAlignment="Center" Margin="4,0" />
+                <TextBlock x:Name="TimerTextBlock" Text="00:00:00" FontSize="14" FontWeight="Bold" FontFamily="Consolas" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center" Margin="4,0" />
 
                 <!-- Separator -->
-                <Border Width="1" Height="18" Background="#3A3B4C" />
+                <Border Width="1" Height="20" Background="#33FFFFFF" />
 
                 <!-- Stop Recording Button -->
-                <Button Click="OnStopClicked" ToolTipService.ToolTip="Kaydı Durdur ve Düzenle" Background="#DC2626" BorderThickness="0" CornerRadius="14" Padding="12,6">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE71A;" FontSize="12" Foreground="White" />
-                        <TextBlock Text="Durdur" FontSize="12" FontWeight="Bold" Foreground="White" />
-                    </StackPanel>
+                <Button Click="OnStopClicked" ToolTipService.ToolTip="Kaydı Durdur ve Düzenle" 
+                        Background="Transparent" BorderThickness="0" CornerRadius="16" Padding="8"
+                        Foreground="#EF4444">
+                    <Button.Content>
+                        <FontIcon Glyph="&#xE71A;" FontSize="18" Foreground="#EF4444" />
+                    </Button.Content>
                 </Button>
             </StackPanel>
         </Border>

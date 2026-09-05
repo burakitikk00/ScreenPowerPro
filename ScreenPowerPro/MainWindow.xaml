@@ -15,48 +15,16 @@
 
     <Grid Background="{StaticResource AppBgBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="40" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- Custom App Title Bar -->
-        <TitleBar x:Name="AppTitleBar" Title="ScreenPowerPro">
-            <TitleBar.IconSource>
-                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
-            </TitleBar.IconSource>
-        </TitleBar>
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Background="Transparent">
+            <!-- The drag region will be set in code-behind -->
+        </Grid>
 
-        <!-- Main NavigationView Layout -->
-        <NavigationView
-            x:Name="NavView"
-            Grid.Row="1"
-            PaneDisplayMode="LeftCompact"
-            IsBackButtonVisible="Collapsed"
-            IsSettingsVisible="True"
-            SelectionChanged="OnNavSelectionChanged"
-            Background="Transparent">
-
-            <NavigationView.MenuItems>
-                <NavigationViewItem x:Name="NavDashboard" Content="Kayıt Paneli" Tag="Dashboard">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE714;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-
-                <NavigationViewItem x:Name="NavEditor" Content="Video Editör" Tag="Editor">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE70F;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-
-                <NavigationViewItem x:Name="NavExport" Content="Dışa Aktar" Tag="Export">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE71A;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-            </NavigationView.MenuItems>
-
-            <Frame x:Name="RootFrame" />
-        </NavigationView>
+        <!-- Main Content Frame -->
+        <Frame x:Name="RootFrame" Grid.Row="1" />
     </Grid>
 </Window>

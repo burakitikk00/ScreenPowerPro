@@ -58,6 +58,42 @@ public sealed partial class EditorPage : Page
 
         UpdateFromViewModel();
         RenderTimeline();
+
+        if (TimelineScrollViewer != null)
+        {
+            TimelineScrollViewer.PointerWheelChanged += OnTimelineWheelChanged;
+        }
+    }
+
+    private void OnTimelineWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        var properties = e.GetCurrentPoint(TimelineScrollViewer).Properties;
+        
+        // Check if Ctrl key is pressed
+        var ctrlState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+        bool isCtrlPressed = (ctrlState & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+
+        if (isCtrlPressed)
+        {
+            e.Handled = true;
+            int delta = properties.MouseWheelDelta;
+            
+            // Adjust slider value based on scroll direction
+            double newZoom = TimelineZoomSlider.Value + (delta > 0 ? 5 : -5);
+            TimelineZoomSlider.Value = Math.Clamp(newZoom, TimelineZoomSlider.Minimum, TimelineZoomSlider.Maximum);
+            
+            // OnTimelineZoomChanged will be called automatically by the slider, 
+            // which will update _timelineScale and call RenderTimeline()
+        }
+    }
+
+    private void OnMuteClicked(object sender, RoutedEventArgs e)
+    {
+        if (MainPlayer.MediaPlayer != null)
+        {
+            MainPlayer.MediaPlayer.IsMuted = !MainPlayer.MediaPlayer.IsMuted;
+            MuteIcon.Glyph = MainPlayer.MediaPlayer.IsMuted ? "\uE74F" : "\uE767"; // E74F is Mute, E767 is Volume
+        }
     }
 
     private void UpdateFromViewModel()
@@ -159,7 +195,7 @@ public sealed partial class EditorPage : Page
     private Border AddZoomPill(ZoomEffect zoom)
     {
         double x = 40 + zoom.StartTime * _timelineScale;
-        double width = Math.Max(zoom.Duration * _timelineScale, 48);
+        double width = Math.Max(zoom.Duration * _timelineScale, 20); // Minimum 20px width
 
         bool isSelected = _selectedZoom == zoom;
 
@@ -169,13 +205,14 @@ public sealed partial class EditorPage : Page
             Height = 34,
             CornerRadius = new CornerRadius(17),
             Background = isSelected
-                ? new SolidColorBrush(Color.FromArgb(51, 208, 188, 255))
-                : new SolidColorBrush(Color.FromArgb(77, 160, 120, 255)),
+                ? new SolidColorBrush(Color.FromArgb(100, 208, 188, 255))
+                : new SolidColorBrush(Color.FromArgb(50, 160, 120, 255)),
             BorderBrush = isSelected
-                ? new SolidColorBrush(Color.FromArgb(200, 208, 188, 255))
+                ? new SolidColorBrush(Color.FromArgb(255, 208, 188, 255))
                 : new SolidColorBrush(Color.FromArgb(128, 208, 188, 255)),
             BorderThickness = isSelected ? new Thickness(2) : new Thickness(1),
-            Tag = zoom
+            Tag = zoom,
+            IsHitTestVisible = true
         };
 
         var label = new TextBlock
@@ -187,12 +224,13 @@ public sealed partial class EditorPage : Page
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        pill.Child = label;
 
         if (isSelected)
         {
             var grid = new Grid();
             grid.Children.Add(label);
+            
+            // Delete button
             var closeBtn = new Button
             {
                 Content = new FontIcon { Glyph = "\uE711", FontSize = 10, Foreground = new SolidColorBrush(Color.FromArgb(200, 208, 188, 255)) },
@@ -208,10 +246,85 @@ public sealed partial class EditorPage : Page
             };
             closeBtn.Click += (s, e) => { if (s is Button b && b.Tag is ZoomEffect z) DeleteZoom(z); };
             grid.Children.Add(closeBtn);
-            pill.Child = grid;
-        }
 
-        pill.Tapped += (s, e) => { if (s is Border b && b.Tag is ZoomEffect z) SelectZoom(z); };
+            // Resize handle (right edge)
+            var resizeHandle = new Border
+            {
+                Width = 8,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Background = new SolidColorBrush(Colors.Transparent),
+                Cursor = new Microsoft.UI.Input.InputCursor(Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast)
+            };
+            grid.Children.Add(resizeHandle);
+            
+            pill.Child = grid;
+            
+            // Setup Drag and Resize logic
+            bool isDragging = false;
+            bool isResizing = false;
+            Point startPoint = default;
+            double initialX = 0;
+            double initialWidth = 0;
+
+            pill.PointerPressed += (s, e) =>
+            {
+                e.Handled = true;
+                SelectZoom(zoom);
+                var ptr = e.GetCurrentPoint(ZoomTrack);
+                startPoint = ptr.Position;
+                initialX = Canvas.GetLeft(pill);
+                initialWidth = pill.Width;
+
+                // Check if user clicked on the right edge (within 8 pixels)
+                if (e.GetCurrentPoint(pill).Position.X >= pill.Width - 8)
+                {
+                    isResizing = true;
+                }
+                else
+                {
+                    isDragging = true;
+                }
+                pill.CapturePointer(e.Pointer);
+            };
+
+            pill.PointerMoved += (s, e) =>
+            {
+                if (isDragging)
+                {
+                    var ptr = e.GetCurrentPoint(ZoomTrack);
+                    double dx = ptr.Position.X - startPoint.X;
+                    double newX = Math.Max(40, initialX + dx); // 40 is track start offset
+                    Canvas.SetLeft(pill, newX);
+                    zoom.StartTime = (newX - 40) / _timelineScale;
+                    NbZoomStart.Value = zoom.StartTime;
+                }
+                else if (isResizing)
+                {
+                    var ptr = e.GetCurrentPoint(ZoomTrack);
+                    double dx = ptr.Position.X - startPoint.X;
+                    double newWidth = Math.Max(20, initialWidth + dx);
+                    pill.Width = newWidth;
+                    zoom.Duration = newWidth / _timelineScale;
+                    NbZoomEnd.Value = zoom.StartTime + zoom.Duration;
+                }
+            };
+
+            pill.PointerReleased += (s, e) =>
+            {
+                isDragging = false;
+                isResizing = false;
+                pill.ReleasePointerCapture(e.Pointer);
+            };
+        }
+        else
+        {
+            pill.Child = label;
+            pill.PointerPressed += (s, e) => 
+            {
+                e.Handled = true;
+                SelectZoom(zoom);
+            };
+        }
 
         Canvas.SetLeft(pill, x);
         Canvas.SetTop(pill, 11);

@@ -17,8 +17,18 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
 
         ExtendsContentIntoTitleBar = true;
-        SetTitleBar(AppTitleBar);
         AppWindow.SetIcon("Assets/AppIcon.ico");
+
+        // Custom Titlebar colors
+        if (AppWindowTitleBar.IsCustomizationSupported())
+        {
+            var titleBar = AppWindow.TitleBar;
+            titleBar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
+            titleBar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
+            titleBar.ButtonHoverBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(25, 255, 255, 255);
+            titleBar.ButtonPressedBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(50, 255, 255, 255);
+            titleBar.ButtonForegroundColor = Microsoft.UI.Colors.White;
+        }
 
         // Set initial window size (1180 x 820)
         AppWindow.Resize(new SizeInt32(1180, 820));
@@ -33,7 +43,6 @@ public sealed partial class MainWindow : Window
         }
 
         // Navigate to Dashboard initially
-        NavView.SelectedItem = NavDashboard;
         RootFrame.Navigate(typeof(DashboardPage));
     }
 
@@ -42,45 +51,18 @@ public sealed partial class MainWindow : Window
         return WinRT.Interop.WindowNative.GetWindowHandle(this);
     }
 
-    private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
-    {
-        if (args.IsSettingsSelected)
-        {
-            RootFrame.Navigate(typeof(SettingsPage));
-        }
-        else if (args.SelectedItemContainer is NavigationViewItem item)
-        {
-            string? tag = item.Tag?.ToString();
-            switch (tag)
-            {
-                case "Dashboard":
-                    RootFrame.Navigate(typeof(DashboardPage));
-                    break;
-                case "Editor":
-                    RootFrame.Navigate(typeof(EditorPage));
-                    break;
-                case "Export":
-                    RootFrame.Navigate(typeof(ExportPage));
-                    break;
-            }
-        }
-    }
-
     public void NavigateToDashboard()
     {
-        NavView.SelectedItem = NavDashboard;
         RootFrame.Navigate(typeof(DashboardPage));
     }
 
     public void NavigateToEditor(string projectDir)
     {
-        NavView.SelectedItem = NavEditor;
         RootFrame.Navigate(typeof(EditorPage), projectDir);
     }
 
     public void NavigateToExport(string projectDir)
     {
-        NavView.SelectedItem = NavExport;
         RootFrame.Navigate(typeof(ExportPage), projectDir);
     }
 }

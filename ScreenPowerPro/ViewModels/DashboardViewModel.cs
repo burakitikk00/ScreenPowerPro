@@ -274,8 +274,8 @@ public partial class DashboardViewModel : ObservableObject
         // 1. Create project dir
         string projectDir = _projectService.CreateNewProjectDirectory();
 
-        // 2. Start input tracker
-        _inputTracker.StartTracking();
+        // 2. Start input tracker with recording crop origin
+        _inputTracker.StartTracking(cropX, cropY);
 
         // 3. Start recorder
         IntPtr? winHandle = SelectedMode == RecordingMode.Window && SelectedWindow != null ? SelectedWindow.Handle : null;

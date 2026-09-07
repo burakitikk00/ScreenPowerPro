@@ -323,6 +323,12 @@ public class RecordingMetadata
     [JsonPropertyName("durationSeconds")]
     public double DurationSeconds { get; set; }
 
+    [JsonPropertyName("originX")]
+    public int OriginX { get; set; } = 0;
+
+    [JsonPropertyName("originY")]
+    public int OriginY { get; set; } = 0;
+
     [JsonPropertyName("hasMicAudio")]
     public bool HasMicAudio { get; set; }
 

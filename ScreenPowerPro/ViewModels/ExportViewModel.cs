@@ -39,6 +39,12 @@ public partial class ExportViewModel : ObservableObject
     private string _selectedResolution = "1080p";
 
     [ObservableProperty]
+    private int _targetWidth = 1920;
+
+    [ObservableProperty]
+    private int _targetHeight = 1080;
+
+    [ObservableProperty]
     private int _selectedFps = 60;
 
     public ExportViewModel(
@@ -77,9 +83,26 @@ public partial class ExportViewModel : ObservableObject
         IsCompleted = false;
         ProgressPercent = 0;
         StatusMessage = "Hazır";
+        TargetWidth = 1920;
+        TargetHeight = 1080;
 
         string fileName = $"{Path.GetFileName(projectDir)}.mp4";
         OutputPath = Path.Combine(projectDir, "bundle", fileName);
+    }
+
+    public void LoadProjectWithOptions(ExportOptions options)
+    {
+        ProjectDir = options.ProjectDir;
+        OutputPath = !string.IsNullOrWhiteSpace(options.OutputPath)
+            ? options.OutputPath
+            : Path.Combine(options.ProjectDir, "bundle", $"{Path.GetFileName(options.ProjectDir)}.mp4");
+        TargetWidth = options.TargetWidth > 0 ? options.TargetWidth : 1920;
+        TargetHeight = options.TargetHeight > 0 ? options.TargetHeight : 1080;
+        SelectedFps = options.TargetFps > 0 ? options.TargetFps : 60;
+        SelectedResolution = $"{TargetWidth}×{TargetHeight}";
+        IsCompleted = false;
+        ProgressPercent = 0;
+        StatusMessage = "Hazır";
     }
 
     [RelayCommand]
@@ -103,7 +126,14 @@ public partial class ExportViewModel : ObservableObject
 
         try
         {
-            await _exportService.ExportVideoAsync(manifest, OutputPath, ProjectDir, SelectedFps, _cts.Token);
+            await _exportService.ExportVideoAsync(
+                manifest,
+                OutputPath,
+                ProjectDir,
+                TargetWidth,
+                TargetHeight,
+                SelectedFps,
+                _cts.Token);
         }
         catch (OperationCanceledException)
         {

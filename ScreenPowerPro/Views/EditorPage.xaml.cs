@@ -67,6 +67,10 @@ public sealed partial class EditorPage : Page
     private Point _lastKnownCursorPoint = new Point(440, 240);
     private readonly List<Border> _motionBlurGhosts = new();
 
+    private double _naturalVideoWidth = 1920.0;
+    private double _naturalVideoHeight = 1080.0;
+    private double _lastTriggeredClickTimestamp = -1.0;
+
     private static Geometry? _arrowGeometry;
     private static Geometry? _crosshairGeometry;
     private static Geometry? _ibeamGeometry;
@@ -133,7 +137,7 @@ public sealed partial class EditorPage : Page
     {
         _playbackTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(50)
+            Interval = TimeSpan.FromMilliseconds(25)
         };
         _playbackTimer.Tick += OnPlaybackTimerTick;
 
@@ -199,7 +203,7 @@ public sealed partial class EditorPage : Page
     private void OnNavigateToExport(string projectDir)
     {
         PausePlayback();
-        MainWindow.CurrentInstance?.NavigateToExport(projectDir);
+        ShowExportSettingsDialog();
     }
 
     private void ApplyLocalization()
@@ -208,6 +212,8 @@ public sealed partial class EditorPage : Page
         if (TbBtnBackText != null) TbBtnBackText.Text = _loc["Editor_Nav_Back"];
         if (TbBtnSaveText != null) TbBtnSaveText.Text = _loc["Editor_Nav_Save"];
         if (TbBtnExportText != null) TbBtnExportText.Text = _loc["Editor_Nav_Export"];
+
+        ApplyExportModalLocalization();
 
         // Sidebar tabs tooltips
         if (TabBtnCursor != null) ToolTipService.SetToolTip(TabBtnCursor, _loc["Editor_Sidebar_Cursor"]);
@@ -441,9 +447,20 @@ public sealed partial class EditorPage : Page
 
                 uint w = session.NaturalVideoWidth;
                 uint h = session.NaturalVideoHeight;
-                if (w > 0 && h > 0 && TbResolution != null)
+                if (w > 0 && h > 0)
                 {
-                    TbResolution.Text = $"{w}x{h} • 60fps";
+                    _naturalVideoWidth = w;
+                    _naturalVideoHeight = h;
+                    if (ViewModel != null)
+                    {
+                        ViewModel.VideoWidth = (int)w;
+                        ViewModel.VideoHeight = (int)h;
+                    }
+                    if (TbResolution != null)
+                    {
+                        TbResolution.Text = $"{w}x{h} • 60fps";
+                    }
+                    UpdateVideoContainerBounds();
                 }
             }
         });
@@ -1292,6 +1309,7 @@ public sealed partial class EditorPage : Page
         }
 
         _isPlaying = true;
+        _lastTriggeredClickTimestamp = -1;
         PlayPauseIcon.Glyph = "\uE769";
         if (PlayOverlay != null) PlayOverlay.Opacity = 0;
 
@@ -1321,6 +1339,7 @@ public sealed partial class EditorPage : Page
     private void PausePlayback()
     {
         _isPlaying = false;
+        _lastTriggeredClickTimestamp = -1;
         PlayPauseIcon.Glyph = "\uE768";
         if (PlayOverlay != null) PlayOverlay.Opacity = 1;
 
@@ -1377,6 +1396,78 @@ public sealed partial class EditorPage : Page
         UpdatePlaybackCursor(_currentTimeSeconds);
     }
 
+    private void OnVideoCanvasHostSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateVideoContainerBounds();
+    }
+
+    private void UpdateVideoContainerBounds()
+    {
+        if (VideoContainer == null) return;
+
+        double hostW = VideoCanvasHost?.ActualWidth > 0 ? VideoCanvasHost.ActualWidth : 920;
+        double hostH = VideoCanvasHost?.ActualHeight > 0 ? VideoCanvasHost.ActualHeight : 540;
+
+        double availW = Math.Max(200, hostW - 48);
+        double availH = Math.Max(150, hostH - 48);
+
+        double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel?.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
+        double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel?.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
+        double aspect = natW / natH;
+
+        double targetW = Math.Min(availW, 960);
+        double targetH = targetW / aspect;
+
+        if (targetH > availH)
+        {
+            targetH = availH;
+            targetW = targetH * aspect;
+        }
+
+        VideoContainer.Width = Math.Round(targetW);
+        VideoContainer.Height = Math.Round(targetH);
+    }
+
+    private Rect GetVideoContentRect()
+    {
+        double containerW = VideoPlayer?.ActualWidth > 0 ? VideoPlayer.ActualWidth : 880;
+        double containerH = VideoPlayer?.ActualHeight > 0 ? VideoPlayer.ActualHeight : 495;
+
+        double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel?.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
+        double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel?.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
+
+        double videoAspect = natW / natH;
+        double containerAspect = containerW / containerH;
+
+        double renderW, renderH, offsetX, offsetY;
+
+        if (containerAspect > videoAspect + 0.001)
+        {
+            // Genişlik fazla (sağda solda siyah şerit)
+            renderH = containerH;
+            renderW = containerH * videoAspect;
+            offsetX = (containerW - renderW) / 2.0;
+            offsetY = 0;
+        }
+        else if (containerAspect < videoAspect - 0.001)
+        {
+            // Yükseklik fazla (üstte altta siyah şerit)
+            renderW = containerW;
+            renderH = containerW / videoAspect;
+            offsetX = 0;
+            offsetY = (containerH - renderH) / 2.0;
+        }
+        else
+        {
+            renderW = containerW;
+            renderH = containerH;
+            offsetX = 0;
+            offsetY = 0;
+        }
+
+        return new Rect(offsetX, offsetY, renderW, renderH);
+    }
+
     private void UpdateZoomSimulation()
     {
         var activeZoom = ViewModel?.GetCurrentZoom();
@@ -1388,17 +1479,18 @@ public sealed partial class EditorPage : Page
                 VideoTransform.ScaleX = activeZoom.Scale;
                 VideoTransform.ScaleY = activeZoom.Scale;
 
-                double renderWidth = VideoPlayer?.ActualWidth > 0 ? VideoPlayer.ActualWidth : 880;
-                double renderHeight = VideoPlayer?.ActualHeight > 0 ? VideoPlayer.ActualHeight : 495;
+                double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel?.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
+                double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel?.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
+                var vRect = GetVideoContentRect();
 
-                double normCenterX = 1920.0 / 2.0;
-                double normCenterY = 1080.0 / 2.0;
+                double normCenterX = natW / 2.0;
+                double normCenterY = natH / 2.0;
 
-                double offsetX = (normCenterX - activeZoom.TargetX) * (renderWidth / 1920.0) * (activeZoom.Scale - 1.0);
-                double offsetY = (normCenterY - activeZoom.TargetY) * (renderHeight / 1080.0) * (activeZoom.Scale - 1.0);
+                double offsetX = (normCenterX - activeZoom.TargetX) * (vRect.Width / natW) * (activeZoom.Scale - 1.0);
+                double offsetY = (normCenterY - activeZoom.TargetY) * (vRect.Height / natH) * (activeZoom.Scale - 1.0);
 
-                VideoTransform.TranslateX = Math.Clamp(offsetX, -renderWidth / 2.0, renderWidth / 2.0);
-                VideoTransform.TranslateY = Math.Clamp(offsetY, -renderHeight / 2.0, renderHeight / 2.0);
+                VideoTransform.TranslateX = Math.Clamp(offsetX, -vRect.Width / 2.0, vRect.Width / 2.0);
+                VideoTransform.TranslateY = Math.Clamp(offsetY, -vRect.Height / 2.0, vRect.Height / 2.0);
             }
         }
         else
@@ -1488,6 +1580,7 @@ public sealed partial class EditorPage : Page
     public void SeekToTime(double time)
     {
         _currentTimeSeconds = Math.Clamp(time, 0, _totalDurationSeconds);
+        _lastTriggeredClickTimestamp = -1;
         var ts = TimeSpan.FromSeconds(_currentTimeSeconds);
 
         try
@@ -1876,10 +1969,188 @@ public sealed partial class EditorPage : Page
     {
         PausePlayback();
         ViewModel?.SaveProject();
-        if (!string.IsNullOrEmpty(ViewModel?.ProjectDir))
+        ShowExportSettingsDialog();
+    }
+
+    private void ShowExportSettingsDialog()
+    {
+        PausePlayback();
+        ViewModel?.SaveProject();
+
+        ApplyExportModalLocalization();
+
+        try
         {
-            MainWindow.CurrentInstance?.NavigateToExport(ViewModel.ProjectDir);
+            var settingsService = App.Current.Services.GetRequiredService<SettingsService>();
+            string exportDir = settingsService.Current?.ExportLocation ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(exportDir))
+            {
+                exportDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "ScreenPowerPro Exports");
+            }
+            if (!Directory.Exists(exportDir))
+            {
+                Directory.CreateDirectory(exportDir);
+            }
+
+            string projName = !string.IsNullOrEmpty(ViewModel?.ProjectName)
+                ? ViewModel.ProjectName
+                : (!string.IsNullOrEmpty(ViewModel?.ProjectDir) ? System.IO.Path.GetFileName(ViewModel.ProjectDir) : "Recording");
+
+            foreach (char c in System.IO.Path.GetInvalidFileNameChars())
+            {
+                projName = projName.Replace(c, '_');
+            }
+
+            TxtExportPath.Text = System.IO.Path.Combine(exportDir, $"{projName}.mp4");
         }
+        catch
+        {
+            TxtExportPath.Text = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "ScreenRecording.mp4");
+        }
+
+        UpdateExportSummaryBadge();
+        ExportModalOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void ApplyExportModalLocalization()
+    {
+        if (TbExportModalTitle != null) TbExportModalTitle.Text = _loc["Export_Dialog_Title"];
+        if (TbExportModalSubtitle != null) TbExportModalSubtitle.Text = _loc["Export_Dialog_Subtitle"];
+        if (TbExportResLabel != null) TbExportResLabel.Text = _loc["Export_Dialog_Resolution"];
+        if (TbExportFpsLabel != null) TbExportFpsLabel.Text = _loc["Export_Dialog_Fps"];
+        if (TbExportFormatLabel != null) TbExportFormatLabel.Text = _loc["Export_Dialog_Format"];
+        if (TbExportLocationLabel != null) TbExportLocationLabel.Text = _loc["Export_Dialog_Location"];
+        if (TbBtnBrowseText != null) TbBtnBrowseText.Text = _loc["Export_Dialog_Browse"];
+        if (TbBtnCancelExportText != null) TbBtnCancelExportText.Text = _loc["Export_Dialog_Cancel"];
+        if (TbBtnConfirmExportText != null) TbBtnConfirmExportText.Text = _loc["Export_Dialog_Start"];
+    }
+
+    private void OnCloseExportDialogClicked(object sender, RoutedEventArgs e)
+    {
+        ExportModalOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnExportBackdropTapped(object sender, TappedRoutedEventArgs e)
+    {
+        ExportModalOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnExportSettingChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateExportSummaryBadge();
+    }
+
+    private void UpdateExportSummaryBadge()
+    {
+        if (TbExportSummaryBadge == null || CmbExportResolution == null || CmbExportFps == null) return;
+
+        string resTag = (CmbExportResolution.SelectedItem as ComboBoxItem)?.Tag as string ?? "1080p";
+        string resText = resTag switch
+        {
+            "4K" => "3840×2160 (4K)",
+            "2K" => "2560×1440 (2K)",
+            "720p" => "1280×720 (HD)",
+            _ => "1920×1080 (FHD)"
+        };
+
+        string fpsTag = (CmbExportFps.SelectedItem as ComboBoxItem)?.Tag as string ?? "60";
+        TbExportSummaryBadge.Text = $"{resText} • {fpsTag} FPS • MP4 (H.264)";
+    }
+
+    private async void OnBrowseExportPathClicked(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileSavePicker();
+            picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.VideosLibrary;
+            picker.FileTypeChoices.Add("MP4 Video (*.mp4)", new List<string> { ".mp4" });
+
+            string current = TxtExportPath.Text;
+            if (!string.IsNullOrWhiteSpace(current))
+            {
+                picker.SuggestedFileName = System.IO.Path.GetFileNameWithoutExtension(current);
+            }
+            else
+            {
+                picker.SuggestedFileName = !string.IsNullOrEmpty(ViewModel?.ProjectName)
+                    ? ViewModel.ProjectName
+                    : "ScreenRecording";
+            }
+
+            IntPtr hwnd = MainWindow.CurrentInstance?.GetWindowHandle() ?? IntPtr.Zero;
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+            var file = await picker.PickSaveFileAsync();
+            if (file != null && !string.IsNullOrWhiteSpace(file.Path))
+            {
+                TxtExportPath.Text = file.Path;
+                UpdateExportSummaryBadge();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Export] FileSavePicker error: {ex.Message}");
+        }
+    }
+
+    private void OnConfirmExportClicked(object sender, RoutedEventArgs e)
+    {
+        string outPath = TxtExportPath.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(outPath))
+        {
+            string exportDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "ScreenPowerPro Exports");
+            string projName = !string.IsNullOrEmpty(ViewModel?.ProjectDir) ? System.IO.Path.GetFileName(ViewModel.ProjectDir) : "Recording";
+            outPath = System.IO.Path.Combine(exportDir, $"{projName}.mp4");
+        }
+
+        if (!outPath.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            outPath += ".mp4";
+        }
+
+        int targetWidth = 1920;
+        int targetHeight = 1080;
+        string resTag = (CmbExportResolution.SelectedItem as ComboBoxItem)?.Tag as string ?? "1080p";
+        switch (resTag)
+        {
+            case "4K":
+                targetWidth = 3840;
+                targetHeight = 2160;
+                break;
+            case "2K":
+                targetWidth = 2560;
+                targetHeight = 1440;
+                break;
+            case "1080p":
+                targetWidth = 1920;
+                targetHeight = 1080;
+                break;
+            case "720p":
+                targetWidth = 1280;
+                targetHeight = 720;
+                break;
+        }
+
+        int fps = 60;
+        string fpsTag = (CmbExportFps.SelectedItem as ComboBoxItem)?.Tag as string ?? "60";
+        if (int.TryParse(fpsTag, out int parsedFps))
+        {
+            fps = parsedFps;
+        }
+
+        var options = new ScreenPowerPro.Models.ExportOptions
+        {
+            ProjectDir = ViewModel?.ProjectDir ?? string.Empty,
+            OutputPath = outPath,
+            TargetWidth = targetWidth,
+            TargetHeight = targetHeight,
+            TargetFps = fps,
+            Format = "mp4",
+            ResolutionLabel = $"{targetWidth}×{targetHeight}"
+        };
+
+        ExportModalOverlay.Visibility = Visibility.Collapsed;
+        MainWindow.CurrentInstance?.NavigateToExport(options);
     }
 
     private static string FormatTime(double seconds)
@@ -2186,8 +2457,7 @@ public sealed partial class EditorPage : Page
 
         if (ViewModel.HideCursorWhenIdle)
         {
-            double currentMs = _currentTimeSeconds * 1000.0;
-            if (_isPlaying && (currentMs - _lastMouseMoveTimestamp > 1500) && _lastMouseMoveTimestamp > 0)
+            if (_isPlaying && (_currentTimeSeconds - _lastMouseMoveTimestamp > 1.5) && _lastMouseMoveTimestamp > 0)
             {
                 _cursorVisualRoot.Opacity = 0;
                 return;
@@ -2199,12 +2469,69 @@ public sealed partial class EditorPage : Page
 
     private void OnVideoPointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        if (VideoClickOverlay == null) return;
+        if (VideoClickOverlay == null || _isPlaying) return;
         var pt = e.GetCurrentPoint(VideoClickOverlay).Position;
         _currentCursorX = pt.X;
         _currentCursorY = pt.Y;
-        _lastMouseMoveTimestamp = _currentTimeSeconds * 1000.0;
+        _lastMouseMoveTimestamp = _currentTimeSeconds;
         UpdateCursorPosition(pt.X, pt.Y);
+    }
+
+    /// <summary>
+    /// Verilen saniye zamanına karşılık gelen fare konumunu ikili arama (binary search)
+    /// ve ardışık örnekler arası doğrusal enterpolasyonla O(log N) hızında pürüzsüz hesaplar.
+    /// </summary>
+    private Point? GetCursorPositionAtTime(IReadOnlyList<MouseMoveEvent> moves, double currentSec)
+    {
+        if (moves == null || moves.Count == 0)
+            return null;
+
+        if (currentSec <= moves[0].Timestamp)
+        {
+            return new Point(moves[0].X, moves[0].Y);
+        }
+
+        if (currentSec >= moves[^1].Timestamp)
+        {
+            return new Point(moves[^1].X, moves[^1].Y);
+        }
+
+        int low = 0;
+        int high = moves.Count - 1;
+        int idx = 0;
+
+        while (low <= high)
+        {
+            int mid = low + (high - low) / 2;
+            if (moves[mid].Timestamp <= currentSec)
+            {
+                idx = mid;
+                low = mid + 1;
+            }
+            else
+            {
+                high = mid - 1;
+            }
+        }
+
+        if (idx >= moves.Count - 1)
+        {
+            return new Point(moves[^1].X, moves[^1].Y);
+        }
+
+        var m1 = moves[idx];
+        var m2 = moves[idx + 1];
+        double dt = m2.Timestamp - m1.Timestamp;
+
+        if (dt > 0.0001 && currentSec >= m1.Timestamp && currentSec <= m2.Timestamp)
+        {
+            double t = (currentSec - m1.Timestamp) / dt;
+            double x = m1.X + (m2.X - m1.X) * t;
+            double y = m1.Y + (m2.Y - m1.Y) * t;
+            return new Point(x, y);
+        }
+
+        return new Point(m1.X, m1.Y);
     }
 
     private void UpdatePlaybackCursor(double currentSec)
@@ -2220,42 +2547,27 @@ public sealed partial class EditorPage : Page
             CursorCanvasTransform.TranslateY = VideoTransform.TranslateY;
         }
 
-        double currentMs = currentSec * 1000.0;
         var moves = ViewModel.MouseMoves;
         var clicks = ViewModel.MouseClicks;
 
-        double renderWidth = VideoPlayer?.ActualWidth > 0 ? VideoPlayer.ActualWidth : 880;
-        double renderHeight = VideoPlayer?.ActualHeight > 0 ? VideoPlayer.ActualHeight : 495;
+        double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
+        double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
+        var vRect = GetVideoContentRect();
 
         if (moves != null && moves.Count > 0)
         {
-            int idx = 0;
-            while (idx < moves.Count - 1 && moves[idx + 1].Timestamp <= currentMs)
+            var pt = GetCursorPositionAtTime(moves, currentSec);
+            if (pt.HasValue)
             {
-                idx++;
+                double normX = Math.Clamp(pt.Value.X / natW, 0, 1);
+                double normY = Math.Clamp(pt.Value.Y / natH, 0, 1);
+
+                double canvasX = vRect.X + (normX * vRect.Width);
+                double canvasY = vRect.Y + (normY * vRect.Height);
+
+                UpdateCursorPosition(canvasX, canvasY);
+                _lastMouseMoveTimestamp = currentSec;
             }
-
-            double x = moves[idx].X;
-            double y = moves[idx].Y;
-
-            if (idx < moves.Count - 1 && currentMs >= moves[idx].Timestamp)
-            {
-                var m1 = moves[idx];
-                var m2 = moves[idx + 1];
-                double denom = m2.Timestamp - m1.Timestamp;
-                double t = denom > 0 ? (currentMs - m1.Timestamp) / denom : 0;
-                x = m1.X + (m2.X - m1.X) * t;
-                y = m1.Y + (m2.Y - m1.Y) * t;
-                _lastMouseMoveTimestamp = currentMs;
-            }
-
-            double normX = Math.Clamp(x / 1920.0, 0, 1);
-            double normY = Math.Clamp(y / 1080.0, 0, 1);
-
-            double canvasX = normX * renderWidth;
-            double canvasY = normY * renderHeight;
-
-            UpdateCursorPosition(canvasX, canvasY);
         }
         else
         {
@@ -2264,12 +2576,22 @@ public sealed partial class EditorPage : Page
 
         if (_isPlaying && clicks != null && clicks.Count > 0)
         {
-            var recentClicks = clicks.Where(c => c.Timestamp >= currentMs - 55 && c.Timestamp <= currentMs + 10 && (c.Type == "left_down" || c.Type == "right_down"));
+            // Saniye cinsinden tıklama penceresi (80ms aralık)
+            double windowStart = currentSec - 0.07;
+            double windowEnd = currentSec + 0.02;
+
+            var recentClicks = clicks.Where(c =>
+                c.Timestamp >= windowStart &&
+                c.Timestamp <= windowEnd &&
+                (c.Type == "left_down" || c.Type == "right_down") &&
+                Math.Abs(c.Timestamp - _lastTriggeredClickTimestamp) > 0.05);
+
             foreach (var c in recentClicks)
             {
-                double normX = Math.Clamp(c.X / 1920.0, 0, 1);
-                double normY = Math.Clamp(c.Y / 1080.0, 0, 1);
-                PlayClickEffectAt(normX * renderWidth, normY * renderHeight, ViewModel.ClickEffect);
+                _lastTriggeredClickTimestamp = c.Timestamp;
+                double normX = Math.Clamp(c.X / natW, 0, 1);
+                double normY = Math.Clamp(c.Y / natH, 0, 1);
+                PlayClickEffectAt(vRect.X + (normX * vRect.Width), vRect.Y + (normY * vRect.Height), ViewModel.ClickEffect);
             }
         }
     }

@@ -144,6 +144,12 @@ public partial class EditorViewModel : ObservableObject
     public List<KeystrokeEvent> Keystrokes { get; private set; } = new();
 
     [ObservableProperty]
+    private int _videoWidth = 1920;
+
+    [ObservableProperty]
+    private int _videoHeight = 1080;
+
+    [ObservableProperty]
     private double _timelineScroll = 0;
 
     // --- Parçalar (Tracks) ---
@@ -580,6 +586,12 @@ public partial class EditorViewModel : ObservableObject
         if (ZoomEffects.Count > 0)
         {
             SelectedZoomEffect = ZoomEffects[0];
+        }
+
+        if (manifest.Metadata != null)
+        {
+            if (manifest.Metadata.Width > 0) VideoWidth = manifest.Metadata.Width;
+            if (manifest.Metadata.Height > 0) VideoHeight = manifest.Metadata.Height;
         }
 
         // Telemetri verilerini yükle

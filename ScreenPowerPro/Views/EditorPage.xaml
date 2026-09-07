@@ -1243,7 +1243,7 @@
                 CornerRadius="12"
                 BorderBrush="{StaticResource GlassBorderBrush}"
                 BorderThickness="1">
-                <Grid>
+                <Grid x:Name="VideoCanvasHost" SizeChanged="OnVideoCanvasHostSizeChanged">
                     <!-- Radial glow background -->
                     <Ellipse Width="600" Height="400" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Ellipse.Fill>
@@ -1697,5 +1697,185 @@
                 </Grid>
             </Grid>
         </Border>
+
+        <!-- ====================================================
+             EXPORT SETTINGS MODAL / POPUP DIALOG
+             ==================================================== -->
+        <Grid x:Name="ExportModalOverlay"
+              Grid.Row="0" Grid.RowSpan="3"
+              Visibility="Collapsed"
+              Background="#B3090A10"
+              Canvas.ZIndex="1000">
+
+            <!-- Backdrop click dismiss -->
+            <Border Background="Transparent" Tapped="OnExportBackdropTapped" />
+
+            <!-- Dialog Container (Modern Dark Glassmorphism) -->
+            <Border Width="480"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="#1E1F2A"
+                    BorderBrush="#33FFFFFF"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Padding="26,22">
+
+                <StackPanel Spacing="16">
+                    <!-- Header -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <Border Width="36" Height="36" CornerRadius="10" Background="#26A078FF" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE898;" FontSize="16" Foreground="#C0C1FF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock x:Name="TbExportModalTitle" Text="Dışa Aktarma Ayarları"
+                                           FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock x:Name="TbExportModalSubtitle" Text="Çözünürlük, kare hızı ve kayıt yerini belirleyin."
+                                           FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Button Grid.Column="1" Click="OnCloseExportDialogClicked"
+                                Background="Transparent" BorderThickness="0" CornerRadius="8" Width="32" Height="32" Padding="0">
+                            <FontIcon Glyph="&#xE711;" FontSize="13" Foreground="{StaticResource TextMutedBrush}"/>
+                        </Button>
+                    </Grid>
+
+                    <Rectangle Height="1" Fill="#1AFFFFFF" />
+
+                    <!-- Resolution (Çözünürlük) -->
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE790;" FontSize="13" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                            <TextBlock x:Name="TbExportResLabel" Text="Çözünürlük" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                        <ComboBox x:Name="CmbExportResolution" HorizontalAlignment="Stretch" CornerRadius="8"
+                                  Background="#14151E" BorderBrush="#26FFFFFF" SelectionChanged="OnExportSettingChanged">
+                            <ComboBoxItem Tag="4K" Content="4K Ultra HD (3840 × 2160)" />
+                            <ComboBoxItem Tag="2K" Content="2K Quad HD (2560 × 1440)" />
+                            <ComboBoxItem Tag="1080p" Content="1080p Full HD (1920 × 1080)" IsSelected="True" />
+                            <ComboBoxItem Tag="720p" Content="720p HD (1280 × 720)" />
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Frame Rate & Format (Grid with 2 columns) -->
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- FPS -->
+                        <StackPanel Grid.Column="0" Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE768;" FontSize="13" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock x:Name="TbExportFpsLabel" Text="Kare Hızı (FPS)" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                            </StackPanel>
+                            <ComboBox x:Name="CmbExportFps" HorizontalAlignment="Stretch" CornerRadius="8"
+                                      Background="#14151E" BorderBrush="#26FFFFFF" SelectionChanged="OnExportSettingChanged">
+                                <ComboBoxItem Tag="60" Content="60 FPS (Akıcı)" IsSelected="True" />
+                                <ComboBoxItem Tag="30" Content="30 FPS (Standart)" />
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Format -->
+                        <StackPanel Grid.Column="1" Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8B9;" FontSize="13" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock x:Name="TbExportFormatLabel" Text="Format" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                            </StackPanel>
+                            <ComboBox x:Name="CmbExportFormat" HorizontalAlignment="Stretch" CornerRadius="8"
+                                      Background="#14151E" BorderBrush="#26FFFFFF" IsEnabled="False" SelectedIndex="0">
+                                <ComboBoxItem Content="MP4 (H.264 / AAC)" IsSelected="True" />
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Save Location (Kayıt Yeri) -->
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xED25;" FontSize="13" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                            <TextBlock x:Name="TbExportLocationLabel" Text="Kayıt Konumu" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtExportPath"
+                                     Grid.Column="0"
+                                     CornerRadius="8"
+                                     FontSize="12"
+                                     Background="#14151E"
+                                     BorderBrush="#26FFFFFF"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     Padding="10,7" />
+                            <Button x:Name="BtnBrowseExportPath"
+                                    Grid.Column="1"
+                                    Click="OnBrowseExportPathClicked"
+                                    CornerRadius="8"
+                                    Padding="14,7"
+                                    Background="{StaticResource SurfaceHighBrush}"
+                                    BorderThickness="0">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE8B7;" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock x:Name="TbBtnBrowseText" Text="Gözat..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Summary Info Badge -->
+                    <Border Background="#14151E" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="8" Padding="12,7">
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE946;" FontSize="13" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                            <TextBlock x:Name="TbExportSummaryBadge" Text="1920×1080 • 60 FPS • MP4 Video"
+                                       FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Action Buttons -->
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button x:Name="BtnCancelExportModal"
+                                Grid.Column="0"
+                                Click="OnCloseExportDialogClicked"
+                                HorizontalAlignment="Left"
+                                Background="Transparent"
+                                BorderThickness="1"
+                                BorderBrush="#26FFFFFF"
+                                CornerRadius="8"
+                                Padding="16,7">
+                            <TextBlock x:Name="TbBtnCancelExportText" Text="İptal" FontSize="13" Foreground="{StaticResource TextMutedBrush}"/>
+                        </Button>
+
+                        <Button x:Name="BtnConfirmExport"
+                                Grid.Column="1"
+                                Click="OnConfirmExportClicked"
+                                BorderThickness="0"
+                                CornerRadius="8"
+                                Padding="20,8">
+                            <Button.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#C0C1FF" Offset="0.0"/>
+                                    <GradientStop Color="#A078FF" Offset="1.0"/>
+                                </LinearGradientBrush>
+                            </Button.Background>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE898;" FontSize="13" Foreground="#1000A9"/>
+                                <TextBlock x:Name="TbBtnConfirmExportText" Text="Dışa Aktar" FontSize="13" FontWeight="Bold" Foreground="#1000A9"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Page>

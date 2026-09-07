@@ -50,9 +50,19 @@ public partial class RecordingBarViewModel : ObservableObject
         };
     }
 
-    public void SetActiveProject(string projectDir)
+    private int _recordingWidth = 1920;
+    private int _recordingHeight = 1080;
+    private int _originX = 0;
+    private int _originY = 0;
+
+    public void SetActiveProject(string projectDir, int width = 1920, int height = 1080, int originX = 0, int originY = 0)
     {
         _activeProjectDir = projectDir;
+        _recordingWidth = width > 0 ? width : 1920;
+        _recordingHeight = height > 0 ? height : 1080;
+        _originX = originX;
+        _originY = originY;
+
         IsRecording = true;
         IsPaused = false;
         ElapsedTime = "00:00:00";
@@ -108,6 +118,10 @@ public partial class RecordingBarViewModel : ObservableObject
             SystemAudioPath = hasSysFile ? "./recording/system_audio-0.wav" : null,
             Metadata = new RecordingMetadata
             {
+                Width = _recordingWidth,
+                Height = _recordingHeight,
+                OriginX = _originX,
+                OriginY = _originY,
                 DurationSeconds = duration,
                 Fps = _settingsService.Current.Fps,
                 HasMicAudio = hasMicFile,

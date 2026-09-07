@@ -603,7 +603,12 @@ public sealed partial class DashboardPage : Page
         DispatcherQueue.TryEnqueue(() =>
         {
             // 1. Floating Recording Bar
-            var recordingBar = new RecordingBarWindow(projectDir);
+            int recW = ViewModel.SelectedMode == RecordingMode.Region && ViewModel.LastCropWidth > 0 ? ViewModel.LastCropWidth : 1920;
+            int recH = ViewModel.SelectedMode == RecordingMode.Region && ViewModel.LastCropHeight > 0 ? ViewModel.LastCropHeight : 1080;
+            int origX = ViewModel.SelectedMode == RecordingMode.Region ? ViewModel.LastCropX : 0;
+            int origY = ViewModel.SelectedMode == RecordingMode.Region ? ViewModel.LastCropY : 0;
+
+            var recordingBar = new RecordingBarWindow(projectDir, recW, recH, origX, origY);
             recordingBar.Activate();
 
             var settingsService = App.Current.Services.GetRequiredService<SettingsService>();

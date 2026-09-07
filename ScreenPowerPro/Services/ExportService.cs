@@ -22,11 +22,19 @@ public class ExportService
         ProjectManifest manifest,
         string outputPath,
         string? projectDir = null,
+        int targetWidth = 1920,
+        int targetHeight = 1080,
         int targetFps = 60,
         CancellationToken cancellationToken = default)
     {
+        string? outDir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
+        {
+            Directory.CreateDirectory(outDir);
+        }
+
         string ffmpegPath = FFmpegHelper.FindFFmpeg();
-        string args = FFmpegHelper.BuildRenderCommand(manifest, outputPath, projectDir, targetFps: targetFps);
+        string args = FFmpegHelper.BuildRenderCommand(manifest, outputPath, projectDir, targetWidth, targetHeight, targetFps);
 
         double totalDuration = manifest.Metadata.DurationSeconds > 0 ? manifest.Metadata.DurationSeconds : 10.0;
 

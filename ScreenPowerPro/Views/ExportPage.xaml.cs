@@ -95,9 +95,20 @@ public sealed partial class ExportPage : Page
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
-        if (e.Parameter is string projectDir)
+        if (e.Parameter is ScreenPowerPro.Models.ExportOptions options)
+        {
+            ViewModel.LoadProjectWithOptions(options);
+            TbResolution.Text = $"{options.TargetWidth}×{options.TargetHeight}";
+            TbFps.Text = options.TargetFps.ToString();
+            TbFormat.Text = (options.Format ?? "MP4").ToUpperInvariant() + " (H.264)";
+            await ViewModel.StartExportAsync();
+        }
+        else if (e.Parameter is string projectDir)
         {
             ViewModel.LoadProject(projectDir);
+            TbResolution.Text = "1920×1080";
+            TbFps.Text = "60";
+            TbFormat.Text = "MP4 (H.264)";
             await ViewModel.StartExportAsync();
         }
     }

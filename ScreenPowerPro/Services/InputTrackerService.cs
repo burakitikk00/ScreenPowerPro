@@ -21,11 +21,16 @@ public class InputTrackerService : IDisposable
     public List<MouseMoveEvent> Moves { get; private set; } = new();
     public List<KeystrokeEvent> Keystrokes { get; private set; } = new();
 
+    private int _originX = 0;
+    private int _originY = 0;
     private long _lastMoveTimestampMs = 0;
 
-    public void StartTracking()
+    public void StartTracking(int originX = 0, int originY = 0)
     {
         if (_isTracking) return;
+
+        _originX = originX;
+        _originY = originY;
 
         Clicks.Clear();
         Moves.Clear();
@@ -73,14 +78,18 @@ public class InputTrackerService : IDisposable
             double timestampSec = _stopwatch.ElapsedMilliseconds / 1000.0;
             int msg = wParam.ToInt32();
 
+            // Ekran koordinatını kayıt bölgesi koordinatına dönüştür
+            int relX = hookStruct.pt.x - _originX;
+            int relY = hookStruct.pt.y - _originY;
+
             if (msg == Win32Helper.WM_LBUTTONDOWN)
             {
                 Clicks.Add(new MouseClickEvent
                 {
                     Timestamp = timestampSec,
                     Type = "left_down",
-                    X = hookStruct.pt.x,
-                    Y = hookStruct.pt.y
+                    X = relX,
+                    Y = relY
                 });
             }
             else if (msg == Win32Helper.WM_LBUTTONUP)
@@ -89,8 +98,8 @@ public class InputTrackerService : IDisposable
                 {
                     Timestamp = timestampSec,
                     Type = "left_up",
-                    X = hookStruct.pt.x,
-                    Y = hookStruct.pt.y
+                    X = relX,
+                    Y = relY
                 });
             }
             else if (msg == Win32Helper.WM_RBUTTONDOWN)
@@ -99,8 +108,8 @@ public class InputTrackerService : IDisposable
                 {
                     Timestamp = timestampSec,
                     Type = "right_down",
-                    X = hookStruct.pt.x,
-                    Y = hookStruct.pt.y
+                    X = relX,
+                    Y = relY
                 });
             }
             else if (msg == Win32Helper.WM_RBUTTONUP)
@@ -109,13 +118,13 @@ public class InputTrackerService : IDisposable
                 {
                     Timestamp = timestampSec,
                     Type = "right_up",
-                    X = hookStruct.pt.x,
-                    Y = hookStruct.pt.y
+                    X = relX,
+                    Y = relY
                 });
             }
             else if (msg == Win32Helper.WM_MOUSEMOVE)
             {
-                // Throttle mouse moves to at most every 25ms (40Hz) to save memory
+                // Bellek ve performans için fare hareketlerini en fazla 25ms'de bir (40Hz) örnekle
                 long nowMs = _stopwatch.ElapsedMilliseconds;
                 if (nowMs - _lastMoveTimestampMs >= 25)
                 {
@@ -123,8 +132,8 @@ public class InputTrackerService : IDisposable
                     Moves.Add(new MouseMoveEvent
                     {
                         Timestamp = timestampSec,
-                        X = hookStruct.pt.x,
-                        Y = hookStruct.pt.y
+                        X = relX,
+                        Y = relY
                     });
                 }
             }

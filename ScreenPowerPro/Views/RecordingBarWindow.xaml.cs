@@ -25,13 +25,13 @@ public sealed partial class RecordingBarWindow : Window
     private PointInt32 _windowStartPoint;
     private readonly LocalizationService _loc;
 
-    public RecordingBarWindow(string projectDir)
+    public RecordingBarWindow(string projectDir, int width = 1920, int height = 1080, int originX = 0, int originY = 0)
     {
         InitializeComponent();
 
         _viewModel = App.Current.Services.GetRequiredService<RecordingBarViewModel>();
         _loc = App.Current.Services.GetRequiredService<LocalizationService>();
-        _viewModel.SetActiveProject(projectDir);
+        _viewModel.SetActiveProject(projectDir, width, height, originX, originY);
 
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
 

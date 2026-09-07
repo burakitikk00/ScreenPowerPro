@@ -107,4 +107,9 @@ public sealed partial class MainWindow : Window
     {
         RootFrame.Navigate(typeof(ExportPage), projectDir);
     }
+
+    public void NavigateToExport(ScreenPowerPro.Models.ExportOptions options)
+    {
+        RootFrame.Navigate(typeof(ExportPage), options);
+    }
 }

@@ -540,9 +540,12 @@ public sealed partial class DashboardPage : Page
                 }
             }
 
-            var countdownWindow = new CountdownWindow(countdown, async () =>
+            var countdownWindow = new CountdownWindow(countdown, () =>
             {
-                await ViewModel.StartRecordingAsync();
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    await ViewModel.StartRecordingAsync();
+                });
             });
             countdownWindow.Activate();
         }
@@ -562,40 +565,43 @@ public sealed partial class DashboardPage : Page
 
     private void OnRecordingStarted(string projectDir)
     {
-        // 1. Floating Recording Bar
-        var recordingBar = new RecordingBarWindow(projectDir);
-        recordingBar.Activate();
-
-        var settingsService = App.Current.Services.GetRequiredService<SettingsService>();
-
-        // 2. Camera overlay if enabled and not "none"
-        if (settingsService.Current.CameraEnabled &&
-            !string.IsNullOrEmpty(settingsService.Current.SelectedCameraDevice) &&
-            settingsService.Current.SelectedCameraDevice != "none")
+        DispatcherQueue.TryEnqueue(() =>
         {
-            var cameraOverlay = new CameraOverlayWindow();
-            cameraOverlay.Activate();
-        }
+            // 1. Floating Recording Bar
+            var recordingBar = new RecordingBarWindow(projectDir);
+            recordingBar.Activate();
 
-        // 3. Mask overlay if region recording
-        if (ViewModel.SelectedMode == RecordingMode.Region && ViewModel.LastCropWidth > 0 && ViewModel.LastCropHeight > 0)
-        {
-            var maskOverlay = new MaskOverlayWindow(
-                ViewModel.LastCropX,
-                ViewModel.LastCropY,
-                ViewModel.LastCropWidth,
-                ViewModel.LastCropHeight);
-            maskOverlay.Activate();
-        }
+            var settingsService = App.Current.Services.GetRequiredService<SettingsService>();
 
-        // 4. Window exclusion from capture
-        if (settingsService.Current.ExcludeAppFromRecording && MainWindow.CurrentInstance != null)
-        {
-            Helpers.Win32Helper.SetWindowDisplayAffinity(
-                MainWindow.CurrentInstance.GetWindowHandle(),
-                Helpers.Win32Helper.WDA_EXCLUDEFROMCAPTURE
-            );
-        }
+            // 2. Camera overlay if enabled and not "none"
+            if (settingsService.Current.CameraEnabled &&
+                !string.IsNullOrEmpty(settingsService.Current.SelectedCameraDevice) &&
+                settingsService.Current.SelectedCameraDevice != "none")
+            {
+                var cameraOverlay = new CameraOverlayWindow();
+                cameraOverlay.Activate();
+            }
+
+            // 3. Mask overlay if region recording
+            if (ViewModel.SelectedMode == RecordingMode.Region && ViewModel.LastCropWidth > 0 && ViewModel.LastCropHeight > 0)
+            {
+                var maskOverlay = new MaskOverlayWindow(
+                    ViewModel.LastCropX,
+                    ViewModel.LastCropY,
+                    ViewModel.LastCropWidth,
+                    ViewModel.LastCropHeight);
+                maskOverlay.Activate();
+            }
+
+            // 4. Window exclusion from capture
+            if (settingsService.Current.ExcludeAppFromRecording && MainWindow.CurrentInstance != null)
+            {
+                Helpers.Win32Helper.SetWindowDisplayAffinity(
+                    MainWindow.CurrentInstance.GetWindowHandle(),
+                    Helpers.Win32Helper.WDA_EXCLUDEFROMCAPTURE
+                );
+            }
+        });
     }
 
     #endregion

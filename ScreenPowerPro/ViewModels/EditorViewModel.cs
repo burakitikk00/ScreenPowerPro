@@ -359,9 +359,18 @@ public partial class EditorViewModel : ObservableObject
         MicAudioPath = !string.IsNullOrEmpty(manifest.MicAudioPath)
             ? ResolveMediaPath(projectDir, manifest.MicAudioPath, "microphone-0.wav")
             : null;
+        if (!string.IsNullOrEmpty(MicAudioPath) && (!File.Exists(MicAudioPath) || new FileInfo(MicAudioPath).Length <= 200))
+        {
+            MicAudioPath = null;
+        }
+
         SystemAudioPath = !string.IsNullOrEmpty(manifest.SystemAudioPath)
             ? ResolveMediaPath(projectDir, manifest.SystemAudioPath, "system_audio-0.wav")
             : null;
+        if (!string.IsNullOrEmpty(SystemAudioPath) && (!File.Exists(SystemAudioPath) || new FileInfo(SystemAudioPath).Length <= 200))
+        {
+            SystemAudioPath = null;
+        }
 
         double duration = manifest.Metadata.DurationSeconds;
         if (duration <= 0 && File.Exists(VideoPath))
@@ -388,6 +397,15 @@ public partial class EditorViewModel : ObservableObject
         SysTrack = manifest.Timeline.SysTrack ?? new TrackState();
 
         InitClipsFromDuration(TotalDurationSec);
+
+        if (string.IsNullOrEmpty(MicAudioPath))
+        {
+            MicTrack.Clips.Clear();
+        }
+        if (string.IsNullOrEmpty(SystemAudioPath))
+        {
+            SysTrack.Clips.Clear();
+        }
 
         // Geçmişi temizle ve ilk durumu snapshot olarak ekle
         _history.Clear();

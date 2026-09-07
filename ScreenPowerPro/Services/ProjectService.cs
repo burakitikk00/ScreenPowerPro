@@ -57,9 +57,14 @@ public class ProjectService
 
     public void SaveMouseClicks(string projectDir, List<MouseClickEvent> clicks)
     {
-        string path = Path.Combine(projectDir, "recording", "mouseclicks-0.json");
-        string json = JsonSerializer.Serialize(clicks, JsonOptions);
-        File.WriteAllText(path, json);
+        try
+        {
+            string path = Path.Combine(projectDir, "recording", "mouseclicks-0.json");
+            var snapshot = clicks.ToList();
+            string json = JsonSerializer.Serialize(snapshot, JsonOptions);
+            File.WriteAllText(path, json);
+        }
+        catch { }
     }
 
     public List<MouseClickEvent> LoadMouseClicks(string projectDir)
@@ -72,16 +77,26 @@ public class ProjectService
 
     public void SaveMouseMoves(string projectDir, List<MouseMoveEvent> moves)
     {
-        string path = Path.Combine(projectDir, "recording", "mousemoves-0.json");
-        string json = JsonSerializer.Serialize(moves, JsonOptions);
-        File.WriteAllText(path, json);
+        try
+        {
+            string path = Path.Combine(projectDir, "recording", "mousemoves-0.json");
+            var snapshot = moves.ToList();
+            string json = JsonSerializer.Serialize(snapshot, JsonOptions);
+            File.WriteAllText(path, json);
+        }
+        catch { }
     }
 
     public void SaveKeystrokes(string projectDir, List<KeystrokeEvent> keystrokes)
     {
-        string path = Path.Combine(projectDir, "recording", "keystrokes-0.json");
-        string json = JsonSerializer.Serialize(keystrokes, JsonOptions);
-        File.WriteAllText(path, json);
+        try
+        {
+            string path = Path.Combine(projectDir, "recording", "keystrokes-0.json");
+            var snapshot = keystrokes.ToList();
+            string json = JsonSerializer.Serialize(snapshot, JsonOptions);
+            File.WriteAllText(path, json);
+        }
+        catch { }
     }
 
     public List<ProjectInfo> GetRecentProjects()

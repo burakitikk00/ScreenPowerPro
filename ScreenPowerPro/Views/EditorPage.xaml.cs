@@ -65,10 +65,17 @@ public sealed partial class EditorPage : Page
         if (!string.IsNullOrEmpty(projectDir))
         {
             _projectDir = projectDir;
-            ViewModel.LoadProject(projectDir);
-            UpdateFromViewModel();
-            RenderTimeline();
-            await LoadVideoAsync();
+            try
+            {
+                ViewModel.LoadProject(projectDir);
+                UpdateFromViewModel();
+                RenderTimeline();
+                await LoadVideoAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[EditorPage] Proje yükleme hatası: {ex}");
+            }
         }
     }
 
@@ -197,13 +204,25 @@ public sealed partial class EditorPage : Page
         {
             if (!string.IsNullOrEmpty(ViewModel.MicAudioPath) && File.Exists(ViewModel.MicAudioPath))
             {
-                var micFile = await StorageFile.GetFileFromPathAsync(ViewModel.MicAudioPath);
-                _micPlayer = new Windows.Media.Playback.MediaPlayer
+                var fi = new FileInfo(ViewModel.MicAudioPath);
+                if (fi.Length > 200)
                 {
-                    Source = MediaSource.CreateFromStorageFile(micFile),
-                    AutoPlay = false,
-                    Volume = ViewModel.MicVolume / 100.0
-                };
+                    var micFile = await StorageFile.GetFileFromPathAsync(ViewModel.MicAudioPath);
+                    _micPlayer = new Windows.Media.Playback.MediaPlayer
+                    {
+                        Source = MediaSource.CreateFromStorageFile(micFile),
+                        AutoPlay = false,
+                        Volume = ViewModel.MicVolume / 100.0
+                    };
+                    _micPlayer.MediaFailed += (s, args) =>
+                    {
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            try { _micPlayer?.Dispose(); } catch { }
+                            _micPlayer = null;
+                        });
+                    };
+                }
             }
         }
         catch { }
@@ -212,13 +231,25 @@ public sealed partial class EditorPage : Page
         {
             if (!string.IsNullOrEmpty(ViewModel.SystemAudioPath) && File.Exists(ViewModel.SystemAudioPath))
             {
-                var sysFile = await StorageFile.GetFileFromPathAsync(ViewModel.SystemAudioPath);
-                _sysPlayer = new Windows.Media.Playback.MediaPlayer
+                var fi = new FileInfo(ViewModel.SystemAudioPath);
+                if (fi.Length > 200)
                 {
-                    Source = MediaSource.CreateFromStorageFile(sysFile),
-                    AutoPlay = false,
-                    Volume = ViewModel.SysVolume / 100.0
-                };
+                    var sysFile = await StorageFile.GetFileFromPathAsync(ViewModel.SystemAudioPath);
+                    _sysPlayer = new Windows.Media.Playback.MediaPlayer
+                    {
+                        Source = MediaSource.CreateFromStorageFile(sysFile),
+                        AutoPlay = false,
+                        Volume = ViewModel.SysVolume / 100.0
+                    };
+                    _sysPlayer.MediaFailed += (s, args) =>
+                    {
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            try { _sysPlayer?.Dispose(); } catch { }
+                            _sysPlayer = null;
+                        });
+                    };
+                }
             }
         }
         catch { }
@@ -264,6 +295,11 @@ public sealed partial class EditorPage : Page
         {
             PausePlayback();
             System.Diagnostics.Debug.WriteLine($"[EditorPage] Medya oynatılamadı: {args.ErrorMessage}");
+            if (NoVideoMessage != null)
+            {
+                NoVideoMessage.Visibility = Visibility.Visible;
+                TbMissingVideoPath.Text = $"Video oynatılamadı: {args.ErrorMessage}\n{ViewModel.VideoPath}";
+            }
         });
     }
 
@@ -542,16 +578,11 @@ public sealed partial class EditorPage : Page
         if (PlayheadLine == null) return;
         double x = 40 + _currentTimeSeconds * _timelineScale;
         Canvas.SetLeft(PlayheadLine, x - 1);
-        Canvas.SetLeft(PlayheadTriangle, 0);
-        PlayheadLine.Height = 72 + 56 + 22;
-
-        double triX = x;
-        PlayheadTriangle.Points = new PointCollection
+        if (PlayheadTriangle != null)
         {
-            new Point(triX - 7, 0),
-            new Point(triX + 7, 0),
-            new Point(triX, 12)
-        };
+            Canvas.SetLeft(PlayheadTriangle, x);
+        }
+        PlayheadLine.Height = 72 + 56 + 22;
     }
 
     private void SelectZoom(ZoomEffect zoom)
@@ -617,9 +648,29 @@ public sealed partial class EditorPage : Page
         PlayPauseIcon.Glyph = "\uE769";
         if (PlayOverlay != null) PlayOverlay.Opacity = 0;
 
-        VideoPlayer?.MediaPlayer?.Play();
-        _micPlayer?.Play();
-        _sysPlayer?.Play();
+        try
+        {
+            VideoPlayer?.MediaPlayer?.Play();
+        }
+        catch { }
+
+        try
+        {
+            if (_micPlayer != null && _micPlayer.PlaybackSession?.NaturalDuration > TimeSpan.Zero)
+            {
+                _micPlayer.Play();
+            }
+        }
+        catch { }
+
+        try
+        {
+            if (_sysPlayer != null && _sysPlayer.PlaybackSession?.NaturalDuration > TimeSpan.Zero)
+            {
+                _sysPlayer.Play();
+            }
+        }
+        catch { }
 
         _playbackTimer?.Start();
     }
@@ -630,9 +681,23 @@ public sealed partial class EditorPage : Page
         PlayPauseIcon.Glyph = "\uE768";
         if (PlayOverlay != null) PlayOverlay.Opacity = 1;
 
-        VideoPlayer?.MediaPlayer?.Pause();
-        _micPlayer?.Pause();
-        _sysPlayer?.Pause();
+        try
+        {
+            VideoPlayer?.MediaPlayer?.Pause();
+        }
+        catch { }
+
+        try
+        {
+            _micPlayer?.Pause();
+        }
+        catch { }
+
+        try
+        {
+            _sysPlayer?.Pause();
+        }
+        catch { }
 
         _playbackTimer?.Stop();
     }
@@ -650,16 +715,29 @@ public sealed partial class EditorPage : Page
             return;
         }
 
-        // Ses kanallarını video ile senkron tut
+        // Ses kanallarını video ile senkron tut (Yalnızca ses süresi aşılmamışsa ve fark > 600ms ise)
         if (_isPlaying)
         {
-            if (_micPlayer != null && Math.Abs((_micPlayer.Position - pos).TotalMilliseconds) > 150)
+            if (_micPlayer != null && _micPlayer.PlaybackSession != null && _micPlayer.PlaybackSession.NaturalDuration > TimeSpan.Zero)
             {
-                _micPlayer.Position = pos;
+                if (pos <= _micPlayer.PlaybackSession.NaturalDuration)
+                {
+                    if (Math.Abs((_micPlayer.Position - pos).TotalMilliseconds) > 600)
+                    {
+                        try { _micPlayer.Position = pos; } catch { }
+                    }
+                }
             }
-            if (_sysPlayer != null && Math.Abs((_sysPlayer.Position - pos).TotalMilliseconds) > 150)
+
+            if (_sysPlayer != null && _sysPlayer.PlaybackSession != null && _sysPlayer.PlaybackSession.NaturalDuration > TimeSpan.Zero)
             {
-                _sysPlayer.Position = pos;
+                if (pos <= _sysPlayer.PlaybackSession.NaturalDuration)
+                {
+                    if (Math.Abs((_sysPlayer.Position - pos).TotalMilliseconds) > 600)
+                    {
+                        try { _sysPlayer.Position = pos; } catch { }
+                    }
+                }
             }
         }
 
@@ -751,18 +829,32 @@ public sealed partial class EditorPage : Page
         _currentTimeSeconds = Math.Clamp(time, 0, _totalDurationSeconds);
         var ts = TimeSpan.FromSeconds(_currentTimeSeconds);
 
-        if (VideoPlayer?.MediaPlayer != null)
+        try
         {
-            VideoPlayer.MediaPlayer.Position = ts;
+            if (VideoPlayer?.MediaPlayer != null)
+            {
+                VideoPlayer.MediaPlayer.Position = ts;
+            }
         }
-        if (_micPlayer != null)
+        catch { }
+
+        try
         {
-            _micPlayer.Position = ts;
+            if (_micPlayer != null && _micPlayer.PlaybackSession != null && ts <= _micPlayer.PlaybackSession.NaturalDuration)
+            {
+                _micPlayer.Position = ts;
+            }
         }
-        if (_sysPlayer != null)
+        catch { }
+
+        try
         {
-            _sysPlayer.Position = ts;
+            if (_sysPlayer != null && _sysPlayer.PlaybackSession != null && ts <= _sysPlayer.PlaybackSession.NaturalDuration)
+            {
+                _sysPlayer.Position = ts;
+            }
         }
+        catch { }
 
         ViewModel.CurrentTimeSec = _currentTimeSeconds;
         TbCurrentTime.Text = FormatTime(_currentTimeSeconds);

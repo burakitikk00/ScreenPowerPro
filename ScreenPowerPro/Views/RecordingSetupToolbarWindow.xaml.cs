@@ -20,6 +20,8 @@ public sealed partial class RecordingSetupToolbarWindow : Window
     private readonly DeviceManagerService _deviceManager;
     private readonly DashboardViewModel _viewModel;
 
+    private readonly IntPtr _hwnd;
+    private bool _hasPositioned = false;
     private bool _isDragging = false;
     private PointInt32 _dragStartPoint;
     private PointInt32 _windowStartPoint;
@@ -32,8 +34,6 @@ public sealed partial class RecordingSetupToolbarWindow : Window
         _deviceManager = App.Current.Services.GetRequiredService<DeviceManagerService>();
         _viewModel = App.Current.Services.GetRequiredService<DashboardViewModel>();
 
-        ExtendsContentIntoTitleBar = true;
-
         var appWindow = AppWindow;
         if (appWindow.Presenter is OverlappedPresenter presenter)
         {
@@ -42,22 +42,8 @@ public sealed partial class RecordingSetupToolbarWindow : Window
             presenter.IsResizable = false;
         }
 
-        // Toolbar dimensions: 720 x 56
-        int width = 720;
-        int height = 56;
-        appWindow.Resize(new SizeInt32(width, height));
-
-        // Position horizontally centered near bottom of screen
-        var displayArea = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Primary);
-        if (displayArea != null)
-        {
-            int x = (displayArea.WorkArea.Width - width) / 2;
-            int y = displayArea.WorkArea.Y + displayArea.WorkArea.Height - height - 35;
-            appWindow.Move(new PointInt32(Math.Max(0, x), Math.Max(0, y)));
-        }
-
-        IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-        Win32Helper.SetWindowDisplayAffinity(hwnd, Win32Helper.WDA_EXCLUDEFROMCAPTURE);
+        _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        Win32Helper.SetWindowDisplayAffinity(_hwnd, Win32Helper.WDA_EXCLUDEFROMCAPTURE);
 
         GearFlyout.Opening += (s, e) => RefreshMenuCheckmarks();
 
@@ -66,8 +52,67 @@ public sealed partial class RecordingSetupToolbarWindow : Window
 
         _deviceManager.DevicesUpdated += () =>
         {
-            DispatcherQueue.TryEnqueue(RefreshDeviceLabels);
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                RefreshDeviceLabels();
+                UpdateToolbarSize();
+            });
         };
+
+        ToolbarBorder.SizeChanged += (s, e) => UpdateToolbarSize();
+        ToolbarBorder.Loaded += (s, e) => UpdateToolbarSize();
+
+        UpdateToolbarSize();
+    }
+
+    private void UpdateToolbarSize()
+    {
+        if (ToolbarBorder == null) return;
+
+        ToolbarBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double desiredDipWidth = ToolbarBorder.DesiredSize.Width;
+        double desiredDipHeight = Math.Max(ToolbarBorder.DesiredSize.Height, 46);
+
+        if (desiredDipWidth < 50) return;
+
+        uint dpi = Win32Helper.GetDpiForWindow(_hwnd);
+        float scale = dpi > 0 ? dpi / 96f : 1.0f;
+
+        int newWidth = (int)Math.Ceiling(desiredDipWidth * scale);
+        int newHeight = (int)Math.Ceiling(desiredDipHeight * scale);
+
+        var appWindow = AppWindow;
+        var curSize = appWindow.Size;
+        var curPos = appWindow.Position;
+
+        if (Math.Abs(curSize.Width - newWidth) < 2 && Math.Abs(curSize.Height - newHeight) < 2 && _hasPositioned)
+        {
+            return;
+        }
+
+        int newX;
+        int newY;
+
+        if (!_hasPositioned)
+        {
+            var displayArea = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Primary);
+            int workAreaWidth = displayArea?.WorkArea.Width ?? 1920;
+            int workAreaHeight = displayArea?.WorkArea.Height ?? 1080;
+            int workAreaY = displayArea?.WorkArea.Y ?? 0;
+
+            newX = (workAreaWidth - newWidth) / 2;
+            newY = workAreaY + workAreaHeight - newHeight - (int)(30 * scale);
+            _hasPositioned = true;
+        }
+        else
+        {
+            int curCenterX = curPos.X + curSize.Width / 2;
+            newX = curCenterX - newWidth / 2;
+            newY = curPos.Y;
+        }
+
+        appWindow.MoveAndResize(new RectInt32(newX, newY, newWidth, newHeight));
+        Win32Helper.ApplyRoundedCorners(_hwnd, newWidth, newHeight, (int)(16 * scale));
     }
 
     #region Window Dragging
@@ -317,15 +362,35 @@ public sealed partial class RecordingSetupToolbarWindow : Window
 
         if (countdown > 0)
         {
-            var countdownWindow = new CountdownWindow(countdown, async () =>
+            var countdownWindow = new CountdownWindow(countdown, () =>
             {
-                await _viewModel.StartRecordingAsync();
+                if (MainWindow.CurrentInstance != null)
+                {
+                    MainWindow.CurrentInstance.DispatcherQueue.TryEnqueue(async () =>
+                    {
+                        await _viewModel.StartRecordingAsync();
+                    });
+                }
+                else
+                {
+                    _ = _viewModel.StartRecordingAsync();
+                }
             });
             countdownWindow.Activate();
         }
         else
         {
-            _ = _viewModel.StartRecordingAsync();
+            if (MainWindow.CurrentInstance != null)
+            {
+                MainWindow.CurrentInstance.DispatcherQueue.TryEnqueue(async () =>
+                {
+                    await _viewModel.StartRecordingAsync();
+                });
+            }
+            else
+            {
+                _ = _viewModel.StartRecordingAsync();
+            }
         }
     }
 

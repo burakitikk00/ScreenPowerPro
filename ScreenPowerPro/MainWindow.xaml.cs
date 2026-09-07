@@ -79,6 +79,7 @@ public sealed partial class MainWindow : Window
     {
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
+            presenter.Restore();
             presenter.IsResizable = true;
             presenter.IsMaximizable = true;
         }

@@ -8,27 +8,26 @@
     mc:Ignorable="d"
     Title="Screen Recording Setup">
 
-    <Grid Background="Transparent">
-        <!-- Floating Dark Obsidian Toolbar Container -->
+    <!-- Seamless floating container: fills window, no white corners or outer white borders -->
+    <Grid Background="#161722" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
         <Border x:Name="ToolbarBorder"
-                Background="#161720"
-                BorderBrush="#2A2B3A"
-                BorderThickness="1"
-                CornerRadius="14"
-                Padding="8,5"
-                HorizontalAlignment="Center"
+                Background="#161722"
+                BorderThickness="0"
+                CornerRadius="16"
+                Padding="10,6"
+                HorizontalAlignment="Left"
                 VerticalAlignment="Center"
                 PointerPressed="OnToolbarPointerPressed"
                 PointerMoved="OnToolbarPointerMoved"
                 PointerReleased="OnToolbarPointerReleased">
 
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <StackPanel x:Name="ToolbarContentPanel" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
 
                 <!-- 1. Close Button [X] -->
                 <Button Click="OnCloseClicked"
                         Background="Transparent" BorderThickness="0" CornerRadius="6"
-                        Width="30" Height="32" Padding="0"
-                        ToolTipService.ToolTip="Close and return to Dashboard">
+                        Width="28" Height="32" Padding="0"
+                        ToolTipService.ToolTip="Kapat ve Dashboard'a Dön">
                     <FontIcon Glyph="&#xE711;" FontSize="11" Foreground="#8E8E9F" />
                 </Button>
 
@@ -37,41 +36,41 @@
                         CornerRadius="7" Width="32" Height="32">
                     <FontIcon x:Name="ModeIcon" Glyph="&#xE7F4;" FontSize="13" Foreground="#93C5FD"
                               HorizontalAlignment="Center" VerticalAlignment="Center"
-                              ToolTipService.ToolTip="Full Screen Capture"/>
+                              ToolTipService.ToolTip="Tam Ekran Kaydı"/>
                 </Border>
 
                 <!-- 3. Settings Gear Button with Popout Flyout -->
                 <Button x:Name="BtnSettingsGear"
                         Background="#1F202C" BorderBrush="#2B2D3D" BorderThickness="1"
-                        CornerRadius="7" Height="32" Padding="8,0">
+                        CornerRadius="7" Height="32" Padding="6,0">
                     <Button.Flyout>
                         <MenuFlyout x:Name="GearFlyout" Placement="Top">
                             <!-- Zoom Effect Submenu -->
-                            <MenuFlyoutSubItem Text="Zoom Effect">
-                                <ToggleMenuFlyoutItem x:Name="ItemZoomNone" Text="None" Click="OnSelectZoomNone" />
+                            <MenuFlyoutSubItem Text="Zoom Efekti">
+                                <ToggleMenuFlyoutItem x:Name="ItemZoomNone" Text="Yok" Click="OnSelectZoomNone" />
                                 <ToggleMenuFlyoutItem x:Name="ItemZoom2D" Text="2D Zoom" Click="OnSelectZoom2D" />
-                                <ToggleMenuFlyoutItem x:Name="ItemZoom3D" Text="3D Motion" Click="OnSelectZoom3D" />
+                                <ToggleMenuFlyoutItem x:Name="ItemZoom3D" Text="3D Hareket" Click="OnSelectZoom3D" />
                             </MenuFlyoutSubItem>
 
                             <!-- Pre-Recording Countdown Submenu -->
-                            <MenuFlyoutSubItem Text="Pre-Recording Countdown">
-                                <ToggleMenuFlyoutItem x:Name="ItemCount3s" Text="3s" Click="OnSelectCount3s" />
-                                <ToggleMenuFlyoutItem x:Name="ItemCount5s" Text="5s" Click="OnSelectCount5s" />
-                                <ToggleMenuFlyoutItem x:Name="ItemCountNone" Text="No countdown" Click="OnSelectCountNone" />
+                            <MenuFlyoutSubItem Text="Geri Sayım Süresi">
+                                <ToggleMenuFlyoutItem x:Name="ItemCount3s" Text="3 saniye" Click="OnSelectCount3s" />
+                                <ToggleMenuFlyoutItem x:Name="ItemCount5s" Text="5 saniye" Click="OnSelectCount5s" />
+                                <ToggleMenuFlyoutItem x:Name="ItemCountNone" Text="Geri sayım yok" Click="OnSelectCountNone" />
                             </MenuFlyoutSubItem>
 
                             <MenuFlyoutSeparator />
 
                             <!-- Hide Desktop Icons Toggle -->
-                            <ToggleMenuFlyoutItem x:Name="ItemHideIcons" Text="Hide Desktop Icons" Click="OnToggleHideIcons" />
+                            <ToggleMenuFlyoutItem x:Name="ItemHideIcons" Text="Masaüstü Simgelerini Gizle" Click="OnToggleHideIcons" />
 
                             <!-- Hide Taskbar Toggle -->
-                            <ToggleMenuFlyoutItem x:Name="ItemHideTaskbar" Text="Hide Taskbar" Click="OnToggleHideTaskbar" />
+                            <ToggleMenuFlyoutItem x:Name="ItemHideTaskbar" Text="Görev Çubuğunu Gizle" Click="OnToggleHideTaskbar" />
 
                             <MenuFlyoutSeparator />
 
                             <!-- More Settings -->
-                            <MenuFlyoutItem Text="More Settings" Click="OnOpenMoreSettings">
+                            <MenuFlyoutItem Text="Daha Fazla Ayar" Click="OnOpenMoreSettings">
                                 <MenuFlyoutItem.Icon>
                                     <FontIcon Glyph="&#xE713;" FontSize="12" Foreground="#C0C1FF"/>
                                 </MenuFlyoutItem.Icon>
@@ -88,11 +87,11 @@
                 <!-- 4. Camera Dropdown -->
                 <Button x:Name="BtnCamera" Click="OnCameraClicked"
                         Background="#1F202C" BorderBrush="#2B2D3D" BorderThickness="1"
-                        CornerRadius="7" Height="32" Padding="8,0" MaxWidth="150">
+                        CornerRadius="7" Height="32" Padding="6,0" MaxWidth="130">
                     <Button.Flyout>
                         <MenuFlyout x:Name="CameraFlyout" Placement="Top" />
                     </Button.Flyout>
-                    <Grid ColumnSpacing="6">
+                    <Grid ColumnSpacing="5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -108,11 +107,11 @@
                 <!-- 5. Microphone Dropdown -->
                 <Button x:Name="BtnMic" Click="OnMicClicked"
                         Background="#1F202C" BorderBrush="#2B2D3D" BorderThickness="1"
-                        CornerRadius="7" Height="32" Padding="8,0" MaxWidth="150">
+                        CornerRadius="7" Height="32" Padding="6,0" MaxWidth="130">
                     <Button.Flyout>
                         <MenuFlyout x:Name="MicFlyout" Placement="Top" />
                     </Button.Flyout>
-                    <Grid ColumnSpacing="6">
+                    <Grid ColumnSpacing="5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -128,11 +127,11 @@
                 <!-- 6. Speaker Dropdown -->
                 <Button x:Name="BtnSpeaker" Click="OnSpeakerClicked"
                         Background="#1F202C" BorderBrush="#2B2D3D" BorderThickness="1"
-                        CornerRadius="7" Height="32" Padding="8,0" MaxWidth="150">
+                        CornerRadius="7" Height="32" Padding="6,0" MaxWidth="130">
                     <Button.Flyout>
                         <MenuFlyout x:Name="SpeakerFlyout" Placement="Top" />
                     </Button.Flyout>
-                    <Grid ColumnSpacing="6">
+                    <Grid ColumnSpacing="5">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -145,20 +144,20 @@
                     </Grid>
                 </Button>
 
-                <!-- 7. Kayıta Başla Action Button (On Far Right) -->
+                <!-- 7. Kayıta Başla / Record Action Button -->
                 <Button Click="OnRecClicked"
-                        Height="34" CornerRadius="10" Padding="14,0"
-                        BorderThickness="0" Margin="4,0,0,0"
-                        ToolTipService.ToolTip="Kayıta Başla">
+                        Height="34" CornerRadius="10" Padding="12,0"
+                        BorderThickness="0" Margin="0"
+                        ToolTipService.ToolTip="Kayıta Başla (Record)">
                     <Button.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                             <GradientStop Color="#DC2626" Offset="0"/>
                             <GradientStop Color="#EF4444" Offset="1"/>
                         </LinearGradientBrush>
                     </Button.Background>
-                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Ellipse Width="9" Height="9" Fill="White" />
-                        <TextBlock Text="Kayıta Başla" FontSize="12" FontWeight="Bold" Foreground="White"
+                    <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                        <Ellipse Width="8" Height="8" Fill="White" />
+                        <TextBlock Text="Kayıta Başla (Record)" FontSize="12" FontWeight="Bold" Foreground="White"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>

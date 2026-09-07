@@ -17,8 +17,10 @@ public sealed partial class RecordingBarWindow : Window
 {
     private readonly RecordingBarViewModel _viewModel;
     private readonly IntPtr _hwnd;
+    private bool _hasPositioned = false;
     private bool _isDragging = false;
-    private Windows.Foundation.Point _startPoint;
+    private PointInt32 _dragStartPoint;
+    private PointInt32 _windowStartPoint;
 
     public RecordingBarWindow(string projectDir)
     {
@@ -38,17 +40,15 @@ public sealed partial class RecordingBarWindow : Window
         {
             presenter.IsAlwaysOnTop = true;
             presenter.SetBorderAndTitleBar(false, false);
+            presenter.IsResizable = false;
+            presenter.IsMaximizable = false;
+            presenter.IsMinimizable = false;
         }
 
-        // Boyutlandırma ve ekranın üst merkezine yerleştirme
-        appWindow.Resize(new SizeInt32(400, 72));
-        var displayArea = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Primary);
-        if (displayArea != null)
-        {
-            int x = (displayArea.WorkArea.Width - 400) / 2;
-            int y = 20;
-            appWindow.Move(new PointInt32(x, y));
-        }
+        // Dinamik boyutlandırma dinleyicileri
+        BarBorder.SizeChanged += (s, e) => UpdateBarSize();
+        BarBorder.Loaded += (s, e) => UpdateBarSize();
+        UpdateBarSize();
 
         // Süre güncellemesini dinle
         _viewModel.PropertyChanged += (s, e) =>
@@ -67,23 +67,76 @@ public sealed partial class RecordingBarWindow : Window
         Activated += (s, e) => PulseStoryboard.Begin();
     }
 
+    private void UpdateBarSize()
+    {
+        if (BarBorder == null) return;
+
+        BarBorder.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+        double desiredDipWidth = BarBorder.DesiredSize.Width;
+        double desiredDipHeight = Math.Max(BarBorder.DesiredSize.Height, 46);
+
+        if (desiredDipWidth < 50) return;
+
+        uint dpi = Win32Helper.GetDpiForWindow(_hwnd);
+        float scale = dpi > 0 ? dpi / 96f : 1.0f;
+
+        int newWidth = (int)Math.Ceiling(desiredDipWidth * scale);
+        int newHeight = (int)Math.Ceiling(desiredDipHeight * scale);
+
+        var appWindow = AppWindow;
+        var curSize = appWindow.Size;
+        var curPos = appWindow.Position;
+
+        if (Math.Abs(curSize.Width - newWidth) < 2 && Math.Abs(curSize.Height - newHeight) < 2 && _hasPositioned)
+        {
+            return;
+        }
+
+        int newX;
+        int newY;
+
+        if (!_hasPositioned)
+        {
+            var displayArea = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Primary);
+            int workAreaWidth = displayArea?.WorkArea.Width ?? 1920;
+            int workAreaY = displayArea?.WorkArea.Y ?? 0;
+
+            newX = (workAreaWidth - newWidth) / 2;
+            newY = workAreaY + (int)(18 * scale);
+            _hasPositioned = true;
+        }
+        else
+        {
+            int curCenterX = curPos.X + curSize.Width / 2;
+            newX = curCenterX - newWidth / 2;
+            newY = curPos.Y;
+        }
+
+        appWindow.MoveAndResize(new RectInt32(newX, newY, newWidth, newHeight));
+        Win32Helper.ApplyRoundedCorners(_hwnd, newWidth, newHeight, (int)(16 * scale));
+    }
+
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        _isDragging = true;
-        _startPoint = e.GetCurrentPoint(null).Position;
-        (sender as UIElement)?.CapturePointer(e.Pointer);
+        var pt = e.GetCurrentPoint(null);
+        if (pt.Properties.IsLeftButtonPressed)
+        {
+            _isDragging = true;
+            Win32Helper.GetCursorPos(out var winPt);
+            _dragStartPoint = new PointInt32(winPt.x, winPt.y);
+            _windowStartPoint = AppWindow.Position;
+            (sender as UIElement)?.CapturePointer(e.Pointer);
+        }
     }
 
     private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
     {
         if (_isDragging)
         {
-            var currentPoint = e.GetCurrentPoint(null).Position;
-            int dx = (int)(currentPoint.X - _startPoint.X);
-            int dy = (int)(currentPoint.Y - _startPoint.Y);
-
-            var pos = AppWindow.Position;
-            AppWindow.Move(new PointInt32(pos.X + dx, pos.Y + dy));
+            Win32Helper.GetCursorPos(out var winPt);
+            int deltaX = winPt.x - _dragStartPoint.X;
+            int deltaY = winPt.y - _dragStartPoint.Y;
+            AppWindow.Move(new PointInt32(_windowStartPoint.X + deltaX, _windowStartPoint.Y + deltaY));
         }
     }
 
@@ -108,37 +161,105 @@ public sealed partial class RecordingBarWindow : Window
             StatusTextBlock.Text = "KAYIT";
             PulseStoryboard.Resume();
         }
+        UpdateBarSize();
     }
 
     private async void OnStopClicked(object sender, RoutedEventArgs e)
     {
-        await _viewModel.StopRecordingAsync();
+        // 1. Durdur butonunu loading ve yanıp sönme durumuna geçir
+        BtnStop.IsHitTestVisible = false; // Tekrar tıklanmayı önle, ancak butonun canlı renklerini koru
+        BtnPause.IsEnabled = false;
+
+        StopNormalPanel.Visibility = Visibility.Collapsed;
+        StopLoadingPanel.Visibility = Visibility.Visible;
+        StopLoadingStoryboard.Begin();
+
+        StatusTextBlock.Text = "KAYDEDİLİYOR...";
+        PulseStoryboard.Pause();
+        UpdateBarSize();
+
+        try
+        {
+            await _viewModel.StopRecordingAsync();
+        }
+        catch
+        {
+            // Olası hata durumunda kilitlenmeyi önle
+            BtnStop.IsHitTestVisible = true;
+            StopLoadingStoryboard.Stop();
+            StopLoadingPanel.Visibility = Visibility.Collapsed;
+            StopNormalPanel.Visibility = Visibility.Visible;
+            StatusTextBlock.Text = "HATA";
+            UpdateBarSize();
+        }
     }
 
     private async void OnCancelClicked(object sender, RoutedEventArgs e)
     {
+        BtnStop.IsHitTestVisible = false;
+        BtnPause.IsEnabled = false;
+        StatusTextBlock.Text = "İPTAL EDİLİYOR...";
+        PulseStoryboard.Pause();
+        UpdateBarSize();
+
         // Kaydı durdur ve pencereyi kapat, düzenleyiciye yönlendirme yapma
         await _viewModel.StopRecordingAsync();
-        Close();
 
         if (MainWindow.CurrentInstance != null)
         {
-            MainWindow.CurrentInstance.Activate();
-            MainWindow.CurrentInstance.NavigateToDashboard();
+            var mainWin = MainWindow.CurrentInstance;
+            mainWin.DispatcherQueue.TryEnqueue(() =>
+            {
+                var appWin = mainWin.AppWindow;
+                if (appWin.Presenter is OverlappedPresenter presenter)
+                {
+                    presenter.Restore();
+                }
+
+                var hwnd = mainWin.GetWindowHandle();
+                Win32Helper.ShowWindow(hwnd, Win32Helper.SW_RESTORE);
+                Win32Helper.SetForegroundWindow(hwnd);
+
+                mainWin.Activate();
+                mainWin.NavigateToDashboard();
+                Close();
+            });
+        }
+        else
+        {
+            Close();
         }
     }
 
     private void OnRecordingFinished(string projectDir)
     {
-        DispatcherQueue.TryEnqueue(() =>
+        if (MainWindow.CurrentInstance != null)
+        {
+            var mainWin = MainWindow.CurrentInstance;
+            mainWin.DispatcherQueue.TryEnqueue(() =>
+            {
+                var appWin = mainWin.AppWindow;
+                if (appWin.Presenter is OverlappedPresenter presenter)
+                {
+                    presenter.Restore();
+                    presenter.IsResizable = true;
+                    presenter.IsMaximizable = true;
+                }
+
+                var hwnd = mainWin.GetWindowHandle();
+                Win32Helper.ShowWindow(hwnd, Win32Helper.SW_RESTORE);
+                Win32Helper.SetForegroundWindow(hwnd);
+
+                mainWin.Activate();
+                mainWin.NavigateToEditor(projectDir);
+
+                // Ana pencere başarıyla geri yüklenip düzenleyiciye geçtikten sonra çubuğu kapat
+                Close();
+            });
+        }
+        else
         {
             Close();
-
-            if (MainWindow.CurrentInstance != null)
-            {
-                MainWindow.CurrentInstance.Activate();
-                MainWindow.CurrentInstance.NavigateToEditor(projectDir);
-            }
-        });
+        }
     }
 }

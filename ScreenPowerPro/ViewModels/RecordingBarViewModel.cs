@@ -93,19 +93,25 @@ public partial class RecordingBarViewModel : ObservableObject
 
         double duration = _recorderService.ElapsedSeconds;
 
+        string recFolder = Path.Combine(_activeProjectDir, "recording");
+        string micFullPath = Path.Combine(recFolder, "microphone-0.wav");
+        string sysFullPath = Path.Combine(recFolder, "system_audio-0.wav");
+        bool hasMicFile = File.Exists(micFullPath) && new FileInfo(micFullPath).Length > 200;
+        bool hasSysFile = File.Exists(sysFullPath) && new FileInfo(sysFullPath).Length > 200;
+
         // 4. Proje manifestosunu göreceli yollarla oluştur (Taşınabilirlik için kritik)
         var manifest = new ProjectManifest
         {
             ProjectName = Path.GetFileName(_activeProjectDir),
             VideoPath = "./recording/display-0.mp4",
-            MicAudioPath = _settingsService.Current.MicAudioEnabled ? "./recording/microphone-0.wav" : null,
-            SystemAudioPath = _settingsService.Current.SystemAudioEnabled ? "./recording/system_audio-0.wav" : null,
+            MicAudioPath = hasMicFile ? "./recording/microphone-0.wav" : null,
+            SystemAudioPath = hasSysFile ? "./recording/system_audio-0.wav" : null,
             Metadata = new RecordingMetadata
             {
                 DurationSeconds = duration,
                 Fps = _settingsService.Current.Fps,
-                HasMicAudio = _settingsService.Current.MicAudioEnabled,
-                HasSystemAudio = _settingsService.Current.SystemAudioEnabled
+                HasMicAudio = hasMicFile,
+                HasSystemAudio = hasSysFile
             }
         };
 
@@ -128,7 +134,7 @@ public partial class RecordingBarViewModel : ObservableObject
                 TrackOffset = 0
             });
 
-            if (_settingsService.Current.MicAudioEnabled)
+            if (hasMicFile)
             {
                 manifest.Timeline.MicTrack.Clips.Add(new ClipSegment
                 {
@@ -139,7 +145,7 @@ public partial class RecordingBarViewModel : ObservableObject
                 });
             }
 
-            if (_settingsService.Current.SystemAudioEnabled)
+            if (hasSysFile)
             {
                 manifest.Timeline.SysTrack.Clips.Add(new ClipSegment
                 {

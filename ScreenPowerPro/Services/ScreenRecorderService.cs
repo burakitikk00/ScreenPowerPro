@@ -99,7 +99,11 @@ public class ScreenRecorderService : IDisposable
                     _micWriter = new WaveFileWriter(_currentMicPath, _micRecorder.WaveFormat);
                     _micRecorder.DataAvailable += (buffer, flags, dev, qpc) =>
                     {
-                        _micWriter?.Write(buffer.ToArray(), 0, buffer.Length);
+                        try
+                        {
+                            _micWriter?.Write(buffer.ToArray(), 0, buffer.Length);
+                        }
+                        catch { }
                     };
                     _micRecorder.StartRecording();
                 }
@@ -110,7 +114,14 @@ public class ScreenRecorderService : IDisposable
                     {
                         _legacyMicCapture = new WaveIn { WaveFormat = new WaveFormat(44100, 1) };
                         _micWriter = new WaveFileWriter(_currentMicPath, _legacyMicCapture.WaveFormat);
-                        _legacyMicCapture.DataAvailable += (s, e) => _micWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                        _legacyMicCapture.DataAvailable += (s, e) =>
+                        {
+                            try
+                            {
+                                _micWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                            }
+                            catch { }
+                        };
                         _legacyMicCapture.StartRecording();
                     }
                     catch { }
@@ -166,7 +177,11 @@ public class ScreenRecorderService : IDisposable
                     _loopbackWriter = new WaveFileWriter(_currentSystemAudioPath, _loopbackRecorder.WaveFormat);
                     _loopbackRecorder.DataAvailable += (buffer, flags, dev, qpc) =>
                     {
-                        _loopbackWriter?.Write(buffer.ToArray(), 0, buffer.Length);
+                        try
+                        {
+                            _loopbackWriter?.Write(buffer.ToArray(), 0, buffer.Length);
+                        }
+                        catch { }
                     };
                     _loopbackRecorder.StartRecording();
                 }
@@ -179,7 +194,14 @@ public class ScreenRecorderService : IDisposable
                         _legacyLoopbackCapture = new WasapiLoopbackCapture();
 #pragma warning restore CS0618
                         _loopbackWriter = new WaveFileWriter(_currentSystemAudioPath, _legacyLoopbackCapture.WaveFormat);
-                        _legacyLoopbackCapture.DataAvailable += (s, e) => _loopbackWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                        _legacyLoopbackCapture.DataAvailable += (s, e) =>
+                        {
+                            try
+                            {
+                                _loopbackWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                            }
+                            catch { }
+                        };
                         _legacyLoopbackCapture.StartRecording();
                     }
                     catch { }
@@ -218,7 +240,9 @@ public class ScreenRecorderService : IDisposable
                 "Low" => 28,
                 _ => 18
             };
-            string fullFfmpegArgs = $"-y {videoInputArgs} -c:v libx264 -preset ultrafast -tune zerolatency -crf {crf} -pix_fmt yuv420p \"{_currentVideoPath}\"";
+            // Fragmented MP4 (+frag_keyframe+empty_moov+default_base_moof) ensures instant indexing per GOP,
+            // completely eliminating "moov atom not found" corruption even if terminated or power is lost.
+            string fullFfmpegArgs = $"-y {videoInputArgs} -c:v libx264 -preset ultrafast -tune zerolatency -crf {crf} -pix_fmt yuv420p -movflags +frag_keyframe+empty_moov+default_base_moof \"{_currentVideoPath}\"";
 
             var psi = new ProcessStartInfo
             {
@@ -231,7 +255,10 @@ public class ScreenRecorderService : IDisposable
             };
 
             _ffmpegProcess = new Process { StartInfo = psi };
+            // Drain standard error so the Windows pipe buffer never fills up and deadlocks FFmpeg
+            _ffmpegProcess.ErrorDataReceived += (s, e) => { };
             _ffmpegProcess.Start();
+            _ffmpegProcess.BeginErrorReadLine();
         });
 
         // 5. Start Elapsed Stopwatch & Timer
@@ -303,14 +330,44 @@ public class ScreenRecorderService : IDisposable
         }
         catch { }
 
-        // Gracefully Stop FFmpeg by writing 'q'
+        // Boş veya sadece başlık içeren (<= 200 bayt) ses dosyalarını temizle
+        try
+        {
+            if (!string.IsNullOrEmpty(_currentSystemAudioPath) && File.Exists(_currentSystemAudioPath))
+            {
+                var fi = new FileInfo(_currentSystemAudioPath);
+                if (fi.Length <= 200)
+                {
+                    File.Delete(_currentSystemAudioPath);
+                    _currentSystemAudioPath = null;
+                }
+            }
+        }
+        catch { }
+
+        try
+        {
+            if (!string.IsNullOrEmpty(_currentMicPath) && File.Exists(_currentMicPath))
+            {
+                var fi = new FileInfo(_currentMicPath);
+                if (fi.Length <= 200)
+                {
+                    File.Delete(_currentMicPath);
+                    _currentMicPath = null;
+                }
+            }
+        }
+        catch { }
+
+        // Gracefully Stop FFmpeg by writing 'q' and closing stdin
         if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
         {
             try
             {
-                _ffmpegProcess.StandardInput.Write('q');
+                _ffmpegProcess.StandardInput.WriteLine("q");
                 _ffmpegProcess.StandardInput.Flush();
-                await Task.Run(() => _ffmpegProcess.WaitForExit(4000));
+                _ffmpegProcess.StandardInput.Close();
+                await Task.Run(() => _ffmpegProcess.WaitForExit(5000));
                 if (!_ffmpegProcess.HasExited)
                 {
                     _ffmpegProcess.Kill();
@@ -324,6 +381,12 @@ public class ScreenRecorderService : IDisposable
             }
         }
 
+        // Fragmented MP4 dosyasını standart faststart MP4 formatına normalize et
+        if (!string.IsNullOrEmpty(_currentVideoPath) && File.Exists(_currentVideoPath))
+        {
+            await NormalizeVideoFaststartAsync(_currentVideoPath);
+        }
+
         // Restore Desktop Icons & Taskbar
         Win32Helper.SetDesktopIconsVisible(true);
         Win32Helper.SetTaskbarVisible(true);
@@ -332,6 +395,47 @@ public class ScreenRecorderService : IDisposable
         {
             RecordingStopped?.Invoke(_currentProjectDir);
         }
+    }
+
+    /// <summary>
+    /// Kayıt esnasında fMP4 (fragmented mp4) olarak yazılan video dosyasını
+    /// -c copy -movflags +faststart ile anında standart ve ultra akıcı MP4 formatına dönüştürür.
+    /// </summary>
+    private static async Task NormalizeVideoFaststartAsync(string videoPath)
+    {
+        await Task.Run(() =>
+        {
+            try
+            {
+                string ffmpegExe = FFmpegHelper.FindFFmpeg();
+                string dir = Path.GetDirectoryName(videoPath)!;
+                string tempPath = Path.Combine(dir, "temp_faststart.mp4");
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = ffmpegExe,
+                    Arguments = $"-y -i \"{videoPath}\" -c copy -movflags +faststart \"{tempPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var proc = Process.Start(psi);
+                if (proc != null)
+                {
+                    proc.WaitForExit(4000);
+                    if (proc.HasExited && proc.ExitCode == 0 && File.Exists(tempPath) && new FileInfo(tempPath).Length > 0)
+                    {
+                        File.Delete(videoPath);
+                        File.Move(tempPath, videoPath);
+                    }
+                    else if (File.Exists(tempPath))
+                    {
+                        File.Delete(tempPath);
+                    }
+                }
+            }
+            catch { }
+        });
     }
 
     public void Dispose()

@@ -8,52 +8,69 @@
     mc:Ignorable="d"
     Title="Kayıt Kontrol Paneli">
 
-    <Grid Background="Transparent"
+    <!-- Seamless Floating Obsidian Capsule (No white borders) -->
+    <Grid Background="#161722"
         PointerPressed="OnPointerPressed"
         PointerMoved="OnPointerMoved"
-        PointerReleased="OnPointerReleased">
+        PointerReleased="OnPointerReleased"
+        HorizontalAlignment="Stretch"
+        VerticalAlignment="Stretch">
 
         <Grid.Resources>
+            <!-- Recording Pulse Storyboard -->
             <Storyboard x:Name="PulseStoryboard" RepeatBehavior="Forever">
                 <DoubleAnimation Storyboard.TargetName="RecIndicator"
                                  Storyboard.TargetProperty="Opacity"
-                                 From="1.0" To="0.2" Duration="0:0:1" AutoReverse="True"/>
+                                 From="1.0" To="0.25" Duration="0:0:1" AutoReverse="True"/>
+                <DoubleAnimation Storyboard.TargetName="RecGlow"
+                                 Storyboard.TargetProperty="Opacity"
+                                 From="0.6" To="0.0" Duration="0:0:1" AutoReverse="True"/>
+            </Storyboard>
+
+            <!-- Stop Button Loading Blink / Pulse Storyboard -->
+            <Storyboard x:Name="StopLoadingStoryboard" RepeatBehavior="Forever">
+                <DoubleAnimation Storyboard.TargetName="StopLoadingPanel"
+                                 Storyboard.TargetProperty="Opacity"
+                                 From="1.0" To="0.2" Duration="0:0:0.6" AutoReverse="True"/>
             </Storyboard>
 
             <Style x:Key="BarButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Background" Value="#252736" />
                 <Setter Property="BorderThickness" Value="0" />
-                <Setter Property="CornerRadius" Value="14" />
-                <Setter Property="Width" Value="32" />
-                <Setter Property="Height" Value="32" />
+                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Width" Value="34" />
+                <Setter Property="Height" Value="34" />
                 <Setter Property="Padding" Value="0" />
                 <Setter Property="HorizontalContentAlignment" Value="Center" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
             </Style>
         </Grid.Resources>
 
-        <!-- Modern Obsidian Floating Pill Container -->
-        <Border Background="#EE12131A"
-            BorderBrush="{StaticResource GlassBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="22"
-            Padding="16,8"
-            HorizontalAlignment="Center"
+        <!-- Modern Obsidian Floating Pill Container (BorderThickness 0: No white borders) -->
+        <Border x:Name="BarBorder"
+            Background="#161722"
+            BorderThickness="0"
+            CornerRadius="16"
+            Padding="12,6"
+            HorizontalAlignment="Left"
             VerticalAlignment="Center">
 
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+            <StackPanel x:Name="BarContentPanel" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
                 <!-- Drag Grip Icon -->
-                <FontIcon Glyph="&#xE700;" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Opacity="0.6"/>
+                <FontIcon Glyph="&#xE700;" FontSize="11" Foreground="#8E8E9F" Opacity="0.6" Margin="2,0,2,0"/>
 
                 <!-- Pulsing Recording Dot & Status -->
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Ellipse x:Name="RecIndicator" Fill="#EF4444" Width="10" Height="10" />
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Grid Width="14" Height="14">
+                        <Ellipse x:Name="RecGlow" Fill="#EF4444" Width="14" Height="14" Opacity="0.5"/>
+                        <Ellipse x:Name="RecIndicator" Fill="#EF4444" Width="8" Height="8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
                     <TextBlock x:Name="StatusTextBlock" Text="KAYIT" FontSize="11" FontWeight="Bold"
                         Foreground="#EF4444" VerticalAlignment="Center" />
                 </StackPanel>
 
                 <!-- Live Timer Display -->
-                <Border Background="#44000000" CornerRadius="6" Padding="8,3" BorderBrush="#1AFFFFFF" BorderThickness="1">
+                <Border Background="#252736" CornerRadius="8" Padding="9,4" BorderThickness="0">
                     <TextBlock x:Name="TimerTextBlock" Text="00:00:00"
                         FontSize="13" FontWeight="Bold" FontFamily="Consolas"
                         Foreground="{StaticResource PrimaryAccentBrush}"
@@ -61,36 +78,48 @@
                 </Border>
 
                 <!-- Separator -->
-                <Rectangle Width="1" Height="18" Fill="{StaticResource GlassBorderBrush}" />
+                <Rectangle Width="1" Height="20" Fill="#2B2D3D" />
 
                 <!-- Pause / Resume Button -->
                 <Button x:Name="BtnPause" Click="OnPauseClicked"
                     Style="{StaticResource BarButtonStyle}"
                     ToolTipService.ToolTip="Duraklat / Devam Et">
-                    <FontIcon x:Name="PauseIcon" Glyph="&#xE769;" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <FontIcon x:Name="PauseIcon" Glyph="&#xE769;" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" />
                 </Button>
 
-                <!-- Stop & Edit Button (Primary highlight) -->
-                <Button Click="OnStopClicked"
-                    ToolTipService.ToolTip="Kaydı Tamamla ve Editörde Aç"
-                    CornerRadius="14" Padding="12,6" BorderThickness="0">
+                <!-- Modern Stop & Finish Button with Loading State (Pulsing "Loading...") -->
+                <Button x:Name="BtnStop" Click="OnStopClicked"
+                    ToolTipService.ToolTip="Kaydı Tamamla ve Düzenleyiciye Geç"
+                    CornerRadius="12" Padding="12,0" Height="36" BorderThickness="0"
+                    MinWidth="115">
                     <Button.Background>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                            <GradientStop Color="#DC2626" Offset="0"/>
-                            <GradientStop Color="#EF4444" Offset="1"/>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#DC2626" Offset="0.0"/>
+                            <GradientStop Color="#EF4444" Offset="1.0"/>
                         </LinearGradientBrush>
                     </Button.Background>
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE71A;" FontSize="12" Foreground="White" />
-                        <TextBlock Text="Bitir" FontSize="12" FontWeight="SemiBold" Foreground="White" />
-                    </StackPanel>
+                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <!-- Normal State: Stop Icon + "Kaydı Bitir" -->
+                        <StackPanel x:Name="StopNormalPanel" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                            <Border Width="16" Height="16" CornerRadius="4" Background="White" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE71A;" FontSize="9" Foreground="#DC2626" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Kaydı Bitir" FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <!-- Loading State: ProgressRing + Pulsing "Loading..." -->
+                        <StackPanel x:Name="StopLoadingPanel" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center" Visibility="Collapsed">
+                            <ProgressRing IsActive="True" Width="14" Height="14" Foreground="White" />
+                            <TextBlock Text="Loading..." FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
                 </Button>
 
                 <!-- Cancel Button -->
                 <Button Click="OnCancelClicked"
                     Style="{StaticResource BarButtonStyle}"
-                    ToolTipService.ToolTip="İptal Et">
-                    <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+                    ToolTipService.ToolTip="Kaydı İptal Et">
+                    <FontIcon Glyph="&#xE711;" FontSize="11" Foreground="#8E8E9F" />
                 </Button>
             </StackPanel>
         </Border>

@@ -924,7 +924,7 @@
                                 <Polygon
                                     x:Name="PlayheadTriangle"
                                     Fill="{StaticResource SecondaryBrush}"
-                                    Points="193,0 207,0 200,10"
+                                    Points="-7,0 7,0 0,12"
                                     Canvas.Left="0"
                                     Canvas.Top="0"/>
                             </Canvas>

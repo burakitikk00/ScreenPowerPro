@@ -27,6 +27,7 @@ public partial class App : Application
         services.AddSingleton<ZoomEngineService>();
         services.AddSingleton<InputTrackerService>();
         services.AddSingleton<ScreenRecorderService>();
+        services.AddSingleton<CursorRenderService>();
         services.AddSingleton<ExportService>();
         services.AddSingleton<AudioLevelMonitorService>();
         services.AddSingleton<AudioWaveformService>();

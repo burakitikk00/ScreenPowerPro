@@ -1048,10 +1048,55 @@ public partial class EditorViewModel : ObservableObject
 
     /// <summary>
     /// Belirli bir zamandaki canlı zoom transformunu hesaplamak için motordan faydalanır.
+    /// cursorX/cursorY: Kaynak video koordinatlarındaki fare konumu (fare takibi için).
     /// </summary>
-    public ZoomEngineService.ActiveZoomState? GetCurrentZoom()
+    public ZoomEngineService.ActiveZoomState? GetCurrentZoom(double cursorX = -1, double cursorY = -1)
     {
-        return _zoomEngineService.GetActiveZoomAtTime(ZoomEffects.ToList(), CurrentTimeSec);
+        if ((cursorX < 0 || cursorY < 0) && MouseMoves != null && MouseMoves.Count > 0)
+        {
+            var pt = ZoomEngineService.GetInterpolatedCursorPosition(MouseMoves, CurrentTimeSec);
+            if (pt.HasValue)
+            {
+                cursorX = pt.Value.X;
+                cursorY = pt.Value.Y;
+            }
+        }
+
+        double defW = VideoWidth > 0 ? VideoWidth : 1920.0;
+        double defH = VideoHeight > 0 ? VideoHeight : 1080.0;
+
+        return _zoomEngineService.GetActiveZoomAtTime(
+            ZoomEffects.ToList(),
+            CurrentTimeSec,
+            defaultCenterX: defW / 2.0,
+            defaultCenterY: defH / 2.0,
+            cursorX: cursorX,
+            cursorY: cursorY,
+            moves: MouseMoves);
+    }
+
+    /// <summary>
+    /// Projedeki fare tıklamalarına göre akıllı zoom efektlerini birleştirilmiş ve akıcı biçimde baştan hesaplar.
+    /// </summary>
+    public void AutoRegenerateZoomEffects()
+    {
+        if (MouseClicks == null || MouseClicks.Count == 0) return;
+
+        PushHistory();
+        var generated = _zoomEngineService.GenerateZoomEffectsFromClicks(
+            MouseClicks,
+            autoZoomMode: "smooth",
+            defaultScale: DefaultZoomScale > 1.0 ? DefaultZoomScale : 1.5,
+            maxVideoDurationSec: TotalDurationSec);
+
+        ZoomEffects.Clear();
+        foreach (var z in generated)
+        {
+            ZoomEffects.Add(z);
+        }
+
+        SelectedZoomEffect = ZoomEffects.FirstOrDefault();
+        SaveProject();
     }
 
     private void NotifyAllProperties()

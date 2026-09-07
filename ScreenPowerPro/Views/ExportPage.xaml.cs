@@ -14,7 +14,10 @@ public sealed partial class ExportPage : Page
 {
     public ExportViewModel ViewModel { get; }
 
-    private const double RingCircumference = 729.0;
+    private const double RingCircumference = 72.885;
+    private double _displayProgress = 0.0;
+    private double _targetProgress = 0.0;
+    private DispatcherTimer? _smoothProgressTimer;
     private string? _outputFolder;
     private readonly LocalizationService _loc;
 
@@ -24,22 +27,58 @@ public sealed partial class ExportPage : Page
         ViewModel = App.Current.Services.GetRequiredService<ExportViewModel>();
         _loc = App.Current.Services.GetRequiredService<LocalizationService>();
         DataContext = ViewModel;
+
+        _smoothProgressTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(25)
+        };
+        _smoothProgressTimer.Tick += OnSmoothProgressTick;
         
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         Loaded += (s, e) =>
         {
+            _smoothProgressTimer.Start();
             _loc.LanguageChanged += ApplyLocalization;
             ApplyLocalization();
         };
         Unloaded += (s, e) =>
         {
+            _smoothProgressTimer.Stop();
             _loc.LanguageChanged -= ApplyLocalization;
         };
     }
 
+    private void OnSmoothProgressTick(object? sender, object e)
+    {
+        if (Math.Abs(_displayProgress - _targetProgress) > 0.05)
+        {
+            // Yumuşak yaklaşım (lerp)
+            _displayProgress += (_targetProgress - _displayProgress) * 0.18;
+            if (_targetProgress >= 100.0 && _displayProgress > 99.5)
+            {
+                _displayProgress = 100.0;
+            }
+        }
+        else
+        {
+            _displayProgress = _targetProgress;
+        }
+
+        int pct = (int)Math.Round(_displayProgress);
+        TbPercentage.Text = $"{pct}%";
+
+        double offset = RingCircumference * (1.0 - (Math.Clamp(_displayProgress, 0.0, 100.0) / 100.0));
+        ProgressRingArc.StrokeDashOffset = offset;
+    }
+
     private void ApplyLocalization()
     {
-        if (ViewModel.IsCompleted)
+        if (ViewModel.HasError)
+        {
+            TbStatusTitle.Text = _loc["Export_FailedTitle"];
+            TbEstimatedTime.Text = "Hata oluştu";
+        }
+        else if (ViewModel.IsCompleted)
         {
             TbStatusTitle.Text = _loc["Export_SuccessTitle"];
             TbEstimatedTime.Text = _loc["Export_SuccessDesc"];
@@ -47,7 +86,7 @@ public sealed partial class ExportPage : Page
         else
         {
             TbStatusTitle.Text = _loc["Export_Title"];
-            TbEstimatedTime.Text = _loc["Export_Calculating"];
+            TbEstimatedTime.Text = ViewModel.EstimatedTimeRemaining;
         }
         TbEstimatedLabel.Text = _loc["Export_Desc"];
         TbFormatLabel.Text = _loc["Format"].ToUpperInvariant();
@@ -57,6 +96,8 @@ public sealed partial class ExportPage : Page
         TbDoneTitle.Text = _loc["Export_SuccessTitle"];
         TbBtnOpenFolderText.Text = _loc["Export_OpenFolder"];
         TbBtnBackToEditorText.Text = _loc["Export_BackToEditor"];
+        if (TbErrorTitle != null) TbErrorTitle.Text = _loc["Export_FailedTitle"];
+        if (TbBtnBackErrorText != null) TbBtnBackErrorText.Text = _loc["Export_BackToEditor"];
     }
 
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -65,20 +106,43 @@ public sealed partial class ExportPage : Page
         {
             if (e.PropertyName == nameof(ViewModel.ProgressPercent))
             {
-                int pct = (int)ViewModel.ProgressPercent;
-                TbPercentage.Text = $"{pct}%";
-
-                double offset = RingCircumference * (1.0 - (ViewModel.ProgressPercent / 100.0));
-                ProgressRingArc.StrokeDashOffset = offset;
+                _targetProgress = Math.Clamp(ViewModel.ProgressPercent, 0.0, 100.0);
+            }
+            else if (e.PropertyName == nameof(ViewModel.EstimatedTimeRemaining))
+            {
+                if (!ViewModel.IsCompleted && !ViewModel.HasError)
+                {
+                    TbEstimatedTime.Text = ViewModel.EstimatedTimeRemaining;
+                }
             }
             else if (e.PropertyName == nameof(ViewModel.StatusMessage))
             {
                 TbOperation.Text = ViewModel.StatusMessage;
             }
+            else if (e.PropertyName == nameof(ViewModel.HasError))
+            {
+                if (ViewModel.HasError)
+                {
+                    _smoothProgressTimer?.Stop();
+                    TbStatusTitle.Text = _loc["Export_FailedTitle"];
+                    TbEstimatedTime.Text = "Hata oluştu";
+                    TbOperation.Text = ViewModel.ErrorMessage;
+                    TbPercentage.Text = "!";
+                    BtnCancel.Visibility = Visibility.Collapsed;
+                    DoneState.Visibility = Visibility.Collapsed;
+                    ErrorState.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    ErrorState.Visibility = Visibility.Collapsed;
+                }
+            }
             else if (e.PropertyName == nameof(ViewModel.IsCompleted))
             {
                 if (ViewModel.IsCompleted)
                 {
+                    _targetProgress = 100.0;
+                    _displayProgress = 100.0;
                     _outputFolder = Path.GetDirectoryName(ViewModel.OutputPath);
                     TbPercentage.Text = "100%";
                     ProgressRingArc.StrokeDashOffset = 0;
@@ -86,6 +150,7 @@ public sealed partial class ExportPage : Page
                     TbStatusTitle.Text = _loc["Export_SuccessTitle"];
                     TbEstimatedTime.Text = _loc["Export_SuccessDesc"];
                     BtnCancel.Visibility = Visibility.Collapsed;
+                    ErrorState.Visibility = Visibility.Collapsed;
                     DoneState.Visibility = Visibility.Visible;
                 }
             }
@@ -115,8 +180,14 @@ public sealed partial class ExportPage : Page
 
     private void OnCancelClicked(object sender, RoutedEventArgs e)
     {
-        ViewModel.CancelExport();
-        MainWindow.CurrentInstance?.NavigateToEditor(ViewModel.ProjectDir);
+        string pDir = ViewModel.ProjectDir;
+        try
+        {
+            ViewModel.CancelExport();
+        }
+        catch { }
+
+        MainWindow.CurrentInstance?.NavigateToEditor(pDir);
     }
 
     private void OnOpenFolderClicked(object sender, RoutedEventArgs e)

@@ -57,16 +57,15 @@
                     Stroke="{StaticResource SurfaceHighBrush}"
                     StrokeDashOffset="0"/>
 
-                <!-- Progress ring — active (foreground) -->
-                <!-- Circumference = 2 * pi * 116 ≈ 729  -->
-                <!-- Dashoffset for 0%: 729; for 100%: 0 -->
+                <!-- Circumference = 2 * pi * 116 ≈ 728.85 px. In StrokeThickness(10px) units = 72.885 -->
+                <!-- Dashoffset for 0%: 72.885; for 100%: 0 -->
                 <Ellipse
                     x:Name="ProgressRingArc"
                     Width="232" Height="232"
                     StrokeThickness="10"
                     Fill="Transparent"
-                    StrokeDashArray="729"
-                    StrokeDashOffset="729"
+                    StrokeDashArray="72.885,1000"
+                    StrokeDashOffset="72.885"
                     RenderTransformOrigin="0.5,0.5">
                     <Ellipse.Stroke>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -226,6 +225,34 @@
                         </Button.Background>
                         <TextBlock x:Name="TbBtnBackToEditorText" Text="Editöre Dön" FontSize="13" FontWeight="Bold"
                             Foreground="#1000A9"/>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Error state (hidden initially) -->
+            <StackPanel
+                x:Name="ErrorState"
+                Visibility="Collapsed"
+                HorizontalAlignment="Center"
+                Spacing="12">
+                <FontIcon Glyph="&#xE783;" FontSize="48"
+                    Foreground="#EF4444"
+                    HorizontalAlignment="Center"/>
+                <TextBlock x:Name="TbErrorTitle" Text="Dışa Aktarma Başarısız Oldu"
+                    FontSize="22" FontWeight="SemiBold"
+                    Foreground="#EF4444"
+                    HorizontalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                    <Button x:Name="BtnBackFromError"
+                        Click="OnBackToEditorClicked"
+                        Background="{StaticResource SurfaceHighBrush}"
+                        BorderThickness="0" CornerRadius="8" Padding="18,8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE72B;" FontSize="14"
+                                Foreground="{StaticResource TextPrimaryBrush}"/>
+                            <TextBlock x:Name="TbBtnBackErrorText" Text="Editöre Dön" FontSize="13" FontWeight="SemiBold"
+                                Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
                     </Button>
                 </StackPanel>
             </StackPanel>

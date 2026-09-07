@@ -52,7 +52,46 @@ public class ProjectService
         if (!File.Exists(manifestPath)) return null;
 
         string json = File.ReadAllText(manifestPath);
-        return JsonSerializer.Deserialize<ProjectManifest>(json, JsonOptions);
+        var manifest = JsonSerializer.Deserialize<ProjectManifest>(json, JsonOptions);
+        if (manifest == null) return null;
+
+        if (manifest.Metadata == null)
+        {
+            manifest.Metadata = new RecordingMetadata();
+        }
+
+        // Metadata veya süre eksikse recording/metadata.json dosyasından tamamla
+        if (manifest.Metadata.DurationSeconds <= 0)
+        {
+            string metaJsonPath = Path.Combine(projectDir, "recording", "metadata.json");
+            if (File.Exists(metaJsonPath))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(File.ReadAllText(metaJsonPath));
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("duration", out var durProp) && durProp.TryGetDouble(out double d) && d > 0)
+                    {
+                        manifest.Metadata.DurationSeconds = d;
+                    }
+                    if (manifest.Metadata.Width <= 0 && root.TryGetProperty("width", out var wProp) && wProp.TryGetInt32(out int w))
+                    {
+                        manifest.Metadata.Width = w;
+                    }
+                    if (manifest.Metadata.Height <= 0 && root.TryGetProperty("height", out var hProp) && hProp.TryGetInt32(out int h))
+                    {
+                        manifest.Metadata.Height = h;
+                    }
+                    if (manifest.Metadata.Fps <= 0 && root.TryGetProperty("fps", out var fProp) && fProp.TryGetInt32(out int f))
+                    {
+                        manifest.Metadata.Fps = f;
+                    }
+                }
+                catch { }
+            }
+        }
+
+        return manifest;
     }
 
     public void SaveMouseClicks(string projectDir, List<MouseClickEvent> clicks)

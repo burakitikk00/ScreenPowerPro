@@ -30,10 +30,22 @@ public partial class ExportViewModel : ObservableObject
     private string _statusMessage = "Hazır";
 
     [ObservableProperty]
+    private string _estimatedTimeRemaining = "Hesaplanıyor...";
+
+    [ObservableProperty]
+    private double _renderSpeed = 1.0;
+
+    [ObservableProperty]
     private bool _isExporting;
 
     [ObservableProperty]
     private bool _isCompleted;
+
+    [ObservableProperty]
+    private bool _hasError;
+
+    [ObservableProperty]
+    private string _errorMessage = string.Empty;
 
     [ObservableProperty]
     private string _selectedResolution = "1080p";
@@ -56,23 +68,38 @@ public partial class ExportViewModel : ObservableObject
         _projectService = projectService;
         _settingsService = settingsService;
 
+        _exportService.ProgressUpdated += (report) =>
+        {
+            ProgressPercent = Math.Round(report.ProgressPercent, 1);
+            RenderSpeed = report.Speed;
+            EstimatedTimeRemaining = report.FormattedRemainingTime;
+            StatusMessage = report.Speed > 0
+                ? $"Render ediliyor: %{ProgressPercent:F0} ({report.Speed:F1}x)"
+                : $"Render ediliyor: %{ProgressPercent:F0}";
+        };
+
         _exportService.ProgressChanged += (pct) =>
         {
             ProgressPercent = Math.Round(pct, 1);
-            StatusMessage = $"Render ediliyor: %{ProgressPercent:F0}";
         };
 
         _exportService.ExportCompleted += (path) =>
         {
             IsExporting = false;
             IsCompleted = true;
+            HasError = false;
             ProgressPercent = 100;
+            EstimatedTimeRemaining = "00:00";
             StatusMessage = "Video başarıyla dışa aktarıldı!";
         };
 
         _exportService.ExportFailed += (err) =>
         {
+            if (_cts?.IsCancellationRequested == true) return;
             IsExporting = false;
+            HasError = true;
+            ErrorMessage = err;
+            EstimatedTimeRemaining = "Hata oluştu";
             StatusMessage = $"Hata: {err}";
         };
     }
@@ -81,7 +108,10 @@ public partial class ExportViewModel : ObservableObject
     {
         ProjectDir = projectDir;
         IsCompleted = false;
+        HasError = false;
+        ErrorMessage = string.Empty;
         ProgressPercent = 0;
+        EstimatedTimeRemaining = "Hesaplanıyor...";
         StatusMessage = "Hazır";
         TargetWidth = 1920;
         TargetHeight = 1080;
@@ -101,7 +131,10 @@ public partial class ExportViewModel : ObservableObject
         SelectedFps = options.TargetFps > 0 ? options.TargetFps : 60;
         SelectedResolution = $"{TargetWidth}×{TargetHeight}";
         IsCompleted = false;
+        HasError = false;
+        ErrorMessage = string.Empty;
         ProgressPercent = 0;
+        EstimatedTimeRemaining = "Hesaplanıyor...";
         StatusMessage = "Hazır";
     }
 
@@ -114,12 +147,17 @@ public partial class ExportViewModel : ObservableObject
         if (manifest == null)
         {
             StatusMessage = "Proje bulunamadı!";
+            HasError = true;
+            ErrorMessage = "Proje bulunamadı!";
             return;
         }
 
         IsExporting = true;
         IsCompleted = false;
+        HasError = false;
+        ErrorMessage = string.Empty;
         ProgressPercent = 0;
+        EstimatedTimeRemaining = "Hesaplanıyor...";
         StatusMessage = "Render başlatılıyor...";
 
         _cts = new CancellationTokenSource();
@@ -139,10 +177,20 @@ public partial class ExportViewModel : ObservableObject
         {
             StatusMessage = "Dışa aktarma iptal edildi.";
             IsExporting = false;
+            HasError = false;
         }
         catch (Exception ex)
         {
+            if (_cts?.IsCancellationRequested == true)
+            {
+                StatusMessage = "Dışa aktarma iptal edildi.";
+                IsExporting = false;
+                HasError = false;
+                return;
+            }
             StatusMessage = $"Hata: {ex.Message}";
+            HasError = true;
+            ErrorMessage = ex.Message;
             IsExporting = false;
         }
     }
@@ -150,9 +198,14 @@ public partial class ExportViewModel : ObservableObject
     [RelayCommand]
     public void CancelExport()
     {
-        _cts?.Cancel();
-        _exportService.CancelExport();
+        try
+        {
+            _cts?.Cancel();
+            _exportService.CancelExport();
+        }
+        catch { }
         IsExporting = false;
+        HasError = false;
         StatusMessage = "İptal edildi.";
     }
 

@@ -14,7 +14,19 @@ public class ProjectManifest
     public string Version { get; set; } = "1.0";
 
     [JsonPropertyName("projectName")]
-    public string ProjectName { get; set; } = "Yeni Kayıt";
+    public string ProjectName
+    {
+        get => _projectName;
+        set => _projectName = value;
+    }
+    private string _projectName = "Yeni Kayıt";
+
+    [JsonPropertyName("name")]
+    public string? NameAlias
+    {
+        get => _projectName;
+        set { if (!string.IsNullOrWhiteSpace(value)) _projectName = value; }
+    }
 
     [JsonPropertyName("createdAt")]
     public string CreatedAt { get; set; } = DateTime.UtcNow.ToString("o");
@@ -29,7 +41,19 @@ public class ProjectManifest
     /// Mikrofon ses kaydı konumu
     /// </summary>
     [JsonPropertyName("micAudioPath")]
-    public string? MicAudioPath { get; set; }
+    public string? MicAudioPath
+    {
+        get => _micAudioPath;
+        set => _micAudioPath = value;
+    }
+    private string? _micAudioPath;
+
+    [JsonPropertyName("microphonePath")]
+    public string? MicrophonePath
+    {
+        get => _micAudioPath;
+        set => _micAudioPath = value;
+    }
 
     /// <summary>
     /// Sistem ses kaydı konumu
@@ -321,7 +345,19 @@ public class RecordingMetadata
     public int Fps { get; set; } = 60;
 
     [JsonPropertyName("durationSeconds")]
-    public double DurationSeconds { get; set; }
+    public double DurationSeconds
+    {
+        get => _durationSeconds;
+        set => _durationSeconds = value;
+    }
+    private double _durationSeconds;
+
+    [JsonPropertyName("duration")]
+    public double? DurationAlias
+    {
+        get => _durationSeconds;
+        set { if (value.HasValue && value.Value > 0) _durationSeconds = value.Value; }
+    }
 
     [JsonPropertyName("originX")]
     public int OriginX { get; set; } = 0;

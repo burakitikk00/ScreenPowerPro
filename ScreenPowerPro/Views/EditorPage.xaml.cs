@@ -1348,6 +1348,7 @@ public sealed partial class EditorPage : Page
         try { _sysPlayer?.Pause(); } catch { }
 
         _playbackTimer?.Stop();
+        UpdatePlaybackCursor(_currentTimeSeconds);
     }
 
     private void OnPlaybackTimerTick(object? sender, object e)
@@ -1426,6 +1427,8 @@ public sealed partial class EditorPage : Page
 
         VideoContainer.Width = Math.Round(targetW);
         VideoContainer.Height = Math.Round(targetH);
+
+        UpdatePlaybackCursor(_currentTimeSeconds);
     }
 
     private Rect GetVideoContentRect()
@@ -1470,7 +1473,19 @@ public sealed partial class EditorPage : Page
 
     private void UpdateZoomSimulation()
     {
-        var activeZoom = ViewModel?.GetCurrentZoom();
+        // Mevcut fare konumunu telemetriden doğrudan kaynak video koordinatlarında al
+        double cursorSrcX = -1, cursorSrcY = -1;
+        if (ViewModel?.MouseMoves != null && ViewModel.MouseMoves.Count > 0)
+        {
+            var pt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, _currentTimeSeconds);
+            if (pt.HasValue)
+            {
+                cursorSrcX = pt.Value.X;
+                cursorSrcY = pt.Value.Y;
+            }
+        }
+
+        var activeZoom = ViewModel?.GetCurrentZoom(cursorSrcX, cursorSrcY);
         if (activeZoom != null)
         {
             ZoomLevelBadge.Text = $"{activeZoom.Scale:F1}x";
@@ -1481,16 +1496,20 @@ public sealed partial class EditorPage : Page
 
                 double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel?.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
                 double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel?.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
-                var vRect = GetVideoContentRect();
+                var rect = GetVideoContentRect();
 
                 double normCenterX = natW / 2.0;
                 double normCenterY = natH / 2.0;
 
-                double offsetX = (normCenterX - activeZoom.TargetX) * (vRect.Width / natW) * (activeZoom.Scale - 1.0);
-                double offsetY = (normCenterY - activeZoom.TargetY) * (vRect.Height / natH) * (activeZoom.Scale - 1.0);
+                // Zoom ölçeğine göre kenar boşlukları ve tam merkezleme ofseti hesabı
+                double maxOffsetX = (rect.Width * (activeZoom.Scale - 1.0)) / 2.0;
+                double maxOffsetY = (rect.Height * (activeZoom.Scale - 1.0)) / 2.0;
 
-                VideoTransform.TranslateX = Math.Clamp(offsetX, -vRect.Width / 2.0, vRect.Width / 2.0);
-                VideoTransform.TranslateY = Math.Clamp(offsetY, -vRect.Height / 2.0, vRect.Height / 2.0);
+                double offsetX = (normCenterX - activeZoom.TargetX) * (rect.Width / natW) * activeZoom.Scale;
+                double offsetY = (normCenterY - activeZoom.TargetY) * (rect.Height / natH) * activeZoom.Scale;
+
+                VideoTransform.TranslateX = Math.Clamp(offsetX, -maxOffsetX, maxOffsetX);
+                VideoTransform.TranslateY = Math.Clamp(offsetY, -maxOffsetY, maxOffsetY);
             }
         }
         else
@@ -1862,15 +1881,22 @@ public sealed partial class EditorPage : Page
         if (ViewModel == null) return;
         ViewModel.PushHistory();
 
+        var curPt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, _currentTimeSeconds);
+        double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
+        double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
+
+        double targetX = curPt.HasValue ? curPt.Value.X : (natW / 2.0);
+        double targetY = curPt.HasValue ? curPt.Value.Y : (natH / 2.0);
+
         var newZoom = new ZoomEffect
         {
             Id = Guid.NewGuid().ToString("N")[..8],
             Name = $"Zoom {ViewModel.ZoomEffects.Count + 1}",
             StartTime = Math.Round(_currentTimeSeconds, 2),
-            Duration = 3.0,
+            Duration = 2.5,
             Scale = ViewModel.DefaultZoomScale > 0 ? ViewModel.DefaultZoomScale : 1.5,
-            TargetX = 1920 / 2.0,
-            TargetY = 1080 / 2.0,
+            TargetX = Math.Round(targetX, 1),
+            TargetY = Math.Round(targetY, 1),
             Easing = "ease-in-out"
         };
         ViewModel.ZoomEffects.Add(newZoom);
@@ -2095,6 +2121,8 @@ public sealed partial class EditorPage : Page
 
     private void OnConfirmExportClicked(object sender, RoutedEventArgs e)
     {
+        ViewModel?.SaveProject();
+
         string outPath = TxtExportPath.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(outPath))
         {
@@ -2273,7 +2301,7 @@ public sealed partial class EditorPage : Page
 
         UpdateCursorVisual();
         UpdateCursorScale(ViewModel.CursorSize > 0 ? ViewModel.CursorSize / 100.0 : 1.0);
-        UpdateCursorPosition(_currentCursorX, _currentCursorY);
+        UpdatePlaybackCursor(_currentTimeSeconds);
     }
 
     private void SyncCursorButtons()
@@ -2304,7 +2332,7 @@ public sealed partial class EditorPage : Page
         if (CursorSizeSlider != null)
         {
             double val = ViewModel.CursorSize > 0 ? ViewModel.CursorSize / 100.0 : 1.0;
-            CursorSizeSlider.Value = Math.Clamp(val, 1.0, 5.0);
+            CursorSizeSlider.Value = Math.Clamp(val, 0.2, 5.0);
             if (TbCursorSizeVal != null) TbCursorSizeVal.Text = $"{CursorSizeSlider.Value:F1}x";
         }
         if (TsShowCursor != null) TsShowCursor.IsOn = ViewModel.CursorVisible;
@@ -2406,7 +2434,7 @@ public sealed partial class EditorPage : Page
     {
         if (_cursorTransform != null)
         {
-            double safeScale = Math.Clamp(scale, 0.5, 5.0);
+            double safeScale = Math.Clamp(scale, 0.2, 5.0);
             _cursorTransform.ScaleX = safeScale;
             _cursorTransform.ScaleY = safeScale;
         }
@@ -2465,16 +2493,6 @@ public sealed partial class EditorPage : Page
         }
 
         _cursorVisualRoot.Opacity = 1.0;
-    }
-
-    private void OnVideoPointerMoved(object sender, PointerRoutedEventArgs e)
-    {
-        if (VideoClickOverlay == null || _isPlaying) return;
-        var pt = e.GetCurrentPoint(VideoClickOverlay).Position;
-        _currentCursorX = pt.X;
-        _currentCursorY = pt.Y;
-        _lastMouseMoveTimestamp = _currentTimeSeconds;
-        UpdateCursorPosition(pt.X, pt.Y);
     }
 
     /// <summary>

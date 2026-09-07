@@ -290,7 +290,7 @@
                                             Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextMutedBrush}"
                                             Click="OnResetCursorSizeClicked"/>
                                     </Grid>
-                                    <Slider x:Name="CursorSizeSlider" Minimum="1.0" Maximum="5.0" Value="1.0" StepFrequency="0.1"
+                                    <Slider x:Name="CursorSizeSlider" Minimum="0.2" Maximum="5.0" Value="1.0" StepFrequency="0.1"
                                         ValueChanged="OnCursorSizeSliderChanged"/>
                                 </StackPanel>
                             </Border>
@@ -1299,8 +1299,7 @@
                                 BorderThickness="0"
                                 HorizontalAlignment="Stretch"
                                 VerticalAlignment="Stretch"
-                                Click="OnVideoCanvasClicked"
-                                PointerMoved="OnVideoPointerMoved"/>
+                                Click="OnVideoCanvasClicked"/>
 
                             <!-- Hover play button -->
                             <Border

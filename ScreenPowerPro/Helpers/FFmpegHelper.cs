@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -23,13 +24,12 @@ public static class FFmpegHelper
         if (!string.IsNullOrEmpty(_cachedFfmpegPath) && File.Exists(_cachedFfmpegPath))
             return _cachedFfmpegPath;
 
-        // Olası FFmpeg kurulum yolları
         string[] candidates =
         [
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.1-essentials_build\bin\ffmpeg.exe"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\ffmpeg\bin\ffmpeg.exe"),
             @"C:\ffmpeg\bin\ffmpeg.exe",
-            "ffmpeg.exe" // Sistem PATH ortam değişkeninde
+            "ffmpeg.exe"
         ];
 
         foreach (var p in candidates)
@@ -41,7 +41,6 @@ public static class FFmpegHelper
             }
         }
 
-        // WinGet paketleri klasörünü derinlemesine ara
         string wingetPkgs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\WinGet\Packages");
         if (Directory.Exists(wingetPkgs))
         {
@@ -58,7 +57,50 @@ public static class FFmpegHelper
     }
 
     /// <summary>
-    /// Proje manifestosu, zoom efektleri ve ses kanallarını birleştiren
+    /// Medya dosyası yolunu (.mp4, .webm, .wav gibi uzantıları ve göreceli yolları) akıllıca çözümler.
+    /// </summary>
+    public static string ResolveMediaPath(string? projectDir, string? rawPath, string defaultFileName)
+    {
+        if (string.IsNullOrEmpty(rawPath) && string.IsNullOrEmpty(projectDir))
+            return string.Empty;
+
+        if (!string.IsNullOrEmpty(rawPath) && Path.IsPathRooted(rawPath) && File.Exists(rawPath))
+        {
+            return rawPath;
+        }
+
+        if (!string.IsNullOrEmpty(projectDir))
+        {
+            if (!string.IsNullOrEmpty(rawPath))
+            {
+                string trimmed = rawPath.TrimStart('.', '/', '\\');
+                string combined = Path.GetFullPath(Path.Combine(projectDir, trimmed));
+                if (File.Exists(combined))
+                {
+                    return combined;
+                }
+            }
+
+            string defaultPath = Path.Combine(projectDir, "recording", defaultFileName);
+            if (File.Exists(defaultPath))
+            {
+                return defaultPath;
+            }
+
+            string baseNoExt = Path.Combine(projectDir, "recording", Path.GetFileNameWithoutExtension(defaultFileName));
+            string[] possibleExts = [".webm", ".mp4", ".wav", ".mkv"];
+            foreach (var ext in possibleExts)
+            {
+                string candidate = baseNoExt + ext;
+                if (File.Exists(candidate)) return candidate;
+            }
+        }
+
+        return rawPath ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Proje manifestosu, zoom efektleri, sanal imleç katmanı, filigran ve ses kanallarını birleştiren
     /// tam uyumlu FFmpeg video işleme CLI argümanlarını üretir.
     /// </summary>
     public static string BuildRenderCommand(
@@ -67,117 +109,199 @@ public static class FFmpegHelper
         string? projectDir = null,
         int targetWidth = 1920,
         int targetHeight = 1080,
-        int targetFps = 60)
+        int targetFps = 60,
+        string? cursorOverlayPath = null)
     {
         var sb = new StringBuilder();
+        var settings = manifest.Timeline?.Settings ?? new TimelineSettings();
 
-        // 1. Dosya yollarını mutlak yola çözümle (göreceli yollar için proje dizini referans alınır)
-        string videoPath = manifest.VideoPath;
-        if (!Path.IsPathRooted(videoPath) && !string.IsNullOrEmpty(projectDir))
-        {
-            videoPath = Path.GetFullPath(Path.Combine(projectDir, videoPath.TrimStart('.', '/', '\\')));
-        }
-
-        string? micPath = manifest.MicAudioPath;
-        if (!string.IsNullOrEmpty(micPath) && !Path.IsPathRooted(micPath) && !string.IsNullOrEmpty(projectDir))
-        {
-            micPath = Path.GetFullPath(Path.Combine(projectDir, micPath.TrimStart('.', '/', '\\')));
-        }
-
-        string? sysPath = manifest.SystemAudioPath;
-        if (!string.IsNullOrEmpty(sysPath) && !Path.IsPathRooted(sysPath) && !string.IsNullOrEmpty(projectDir))
-        {
-            sysPath = Path.GetFullPath(Path.Combine(projectDir, sysPath.TrimStart('.', '/', '\\')));
-        }
+        // 1. Dosya yollarını mutlak yola çözümle
+        string videoPath = ResolveMediaPath(projectDir, manifest.VideoPath, "display-0.mp4");
+        string micPath = ResolveMediaPath(projectDir, manifest.MicAudioPath ?? manifest.MicrophonePath, "microphone-0.wav");
+        string sysPath = ResolveMediaPath(projectDir, manifest.SystemAudioPath, "system_audio-0.wav");
 
         // 2. Girdi dosyaları
+        // Input 0: Ana Video
         sb.Append($"-y -i \"{videoPath}\" ");
-        bool hasMic = !string.IsNullOrEmpty(micPath) && File.Exists(micPath);
-        bool hasSys = !string.IsNullOrEmpty(sysPath) && File.Exists(sysPath);
 
+        int nextInputIndex = 1;
+        int cursorInputIndex = -1;
+
+        // Input: Sanal İmleç Katmanı (.mov)
+        bool hasCursorOverlay = !string.IsNullOrEmpty(cursorOverlayPath) && File.Exists(cursorOverlayPath) && new FileInfo(cursorOverlayPath).Length > 1000;
+        if (hasCursorOverlay)
+        {
+            sb.Append($"-i \"{cursorOverlayPath}\" ");
+            cursorInputIndex = nextInputIndex++;
+        }
+
+        // Input: Ses Dosyaları
+        bool hasMic = !settings.MicMuted && !string.IsNullOrEmpty(micPath) && File.Exists(micPath) && new FileInfo(micPath).Length > 200;
+        int micInputIndex = -1;
         if (hasMic)
         {
             sb.Append($"-i \"{micPath}\" ");
+            micInputIndex = nextInputIndex++;
         }
+
+        bool hasSys = !string.IsNullOrEmpty(sysPath) && File.Exists(sysPath) && new FileInfo(sysPath).Length > 200;
+        int sysInputIndex = -1;
         if (hasSys)
         {
             sb.Append($"-i \"{sysPath}\" ");
+            sysInputIndex = nextInputIndex++;
         }
 
-        // 3. Zoom ve Pan video filtre zinciri (ZoomEngineService kullanarak)
+        // 3. Video Filtre Zinciri (Filter Complex)
         var filterComplex = new StringBuilder();
-        var zoomEffects = manifest.Timeline.ZoomEffects;
+        string currentVideoStream = "[0:v]";
 
+        // 3.1. Sanal İmleç Overlay (Zoom'dan önce uygulanır; böylece zoom yapıldığında imleç de zoomlanır)
+        if (hasCursorOverlay && cursorInputIndex > 0)
+        {
+            filterComplex.Append($"[0:v][{cursorInputIndex}:v]overlay=0:0[vwithcursor]");
+            currentVideoStream = "[vwithcursor]";
+        }
+
+        // 3.2. Zoom ve Pan Filtresi (ZoomEngineService kullanarak yumuşak geçişler)
+        var zoomEffects = manifest.Timeline?.ZoomEffects ?? new List<ZoomEffect>();
         if (zoomEffects.Count > 0)
         {
             var zoomEngine = new ZoomEngineService();
             string zoompanFilter = zoomEngine.BuildZoompanFilter(zoomEffects, targetWidth, targetHeight, targetFps);
-            filterComplex.Append($"[0:v]{zoompanFilter}[vfiltered]");
+            if (filterComplex.Length > 0) filterComplex.Append(';');
+            filterComplex.Append($"{currentVideoStream}{zoompanFilter}[vzoomed]");
+            currentVideoStream = "[vzoomed]";
         }
         else
         {
-            filterComplex.Append($"[0:v]scale={targetWidth}:{targetHeight}[vfiltered]");
+            if (filterComplex.Length > 0) filterComplex.Append(';');
+            filterComplex.Append($"{currentVideoStream}scale={targetWidth}:{targetHeight}[vscaled]");
+            currentVideoStream = "[vscaled]";
         }
 
-        // 4. Ses miksajı
+        // 3.3. Filigran (Watermark)
+        if (settings.Watermark && !string.IsNullOrWhiteSpace(settings.WatermarkText))
+        {
+            string safeText = settings.WatermarkText.Replace("'", "\\'").Replace(":", "\\:");
+            if (filterComplex.Length > 0) filterComplex.Append(';');
+            filterComplex.Append($"{currentVideoStream}drawtext=text='{safeText}':x=w-tw-36:y=h-th-30:fontsize=26:fontcolor=white@0.75:box=1:boxcolor=black@0.35:boxborderw=6[vwatermark]");
+            currentVideoStream = "[vwatermark]";
+        }
+
+        // 4. Ses Filtresi ve Miksaj
+        string currentAudioStream = "[aout]";
+        var audioFilters = new List<string>();
+
+        // Ses Düzeyleri ve Geliştirmeleri
+        double micVol = Math.Clamp((settings.MicVolume / 100.0) * (settings.VolumeEnhancement > 0 ? settings.VolumeEnhancement : 1.0), 0.0, 3.0);
+        double sysVol = Math.Clamp(settings.SysVolume / 100.0, 0.0, 3.0);
+
+        string micVolFilter = micVol != 1.0 ? $"volume={micVol.ToString("F2", CultureInfo.InvariantCulture)}" : "";
+        string sysVolFilter = sysVol != 1.0 ? $"volume={sysVol.ToString("F2", CultureInfo.InvariantCulture)}" : "";
+
+        if (settings.AudioNoiseReduction)
+        {
+            micVolFilter = string.IsNullOrEmpty(micVolFilter) ? "afftdn=nf=-25" : $"{micVolFilter},afftdn=nf=-25";
+        }
+
         if (hasMic && hasSys)
         {
-            filterComplex.Append(";[1:a][2:a]amix=inputs=2:duration=first[aout]");
-            sb.Append($"-filter_complex \"{filterComplex}\" -map \"[vfiltered]\" -map \"[aout]\" ");
+            string mFilter = string.IsNullOrEmpty(micVolFilter) ? $"[{micInputIndex}:a]anull[amic]" : $"[{micInputIndex}:a]{micVolFilter}[amic]";
+            string sFilter = string.IsNullOrEmpty(sysVolFilter) ? $"[{sysInputIndex}:a]anull[asys]" : $"[{sysInputIndex}:a]{sysVolFilter}[asys]";
+            if (filterComplex.Length > 0) filterComplex.Append(';');
+            filterComplex.Append($"{mFilter};{sFilter};[amic][asys]amix=inputs=2:duration=longest[aout]");
         }
         else if (hasMic)
         {
-            sb.Append($"-filter_complex \"{filterComplex}\" -map \"[vfiltered]\" -map 1:a ");
+            if (filterComplex.Length > 0) filterComplex.Append(';');
+            if (!string.IsNullOrEmpty(micVolFilter))
+                filterComplex.Append($"[{micInputIndex}:a]{micVolFilter}[aout]");
+            else
+                filterComplex.Append($"[{micInputIndex}:a]anull[aout]");
         }
         else if (hasSys)
         {
-            sb.Append($"-filter_complex \"{filterComplex}\" -map \"[vfiltered]\" -map 1:a ");
+            if (filterComplex.Length > 0) filterComplex.Append(';');
+            if (!string.IsNullOrEmpty(sysVolFilter))
+                filterComplex.Append($"[{sysInputIndex}:a]{sysVolFilter}[aout]");
+            else
+                filterComplex.Append($"[{sysInputIndex}:a]anull[aout]");
         }
         else
         {
-            sb.Append($"-filter_complex \"{filterComplex}\" -map \"[vfiltered]\" ");
+            // Ayrı ses yoksa ana videonun sesini kullan (varsa)
+            currentAudioStream = "0:a?";
         }
 
-        // 5. Video codec & bitiş parametreleri
-        sb.Append($"-c:v libx264 -preset faster -crf 18 -pix_fmt yuv420p -r {targetFps} -c:a aac -b:a 192k \"{outputPath}\"");
+        // 5. Parametreleri StringBuilder'a ekle
+        sb.Append($"-filter_complex \"{filterComplex}\" -map \"{currentVideoStream}\" ");
+
+        if (currentAudioStream == "[aout]")
+        {
+            sb.Append($"-map \"[aout]\" -c:a aac -b:a 192k ");
+        }
+        else
+        {
+            sb.Append($"-map 0:a? -c:a aac -b:a 192k ");
+        }
+
+        // 6. Video codec ve ilerleme izleme (pipe:1)
+        sb.Append($"-c:v libx264 -preset faster -crf 18 -pix_fmt yuv420p -r {targetFps} -progress pipe:1 \"{outputPath}\"");
 
         return sb.ToString();
     }
 
     /// <summary>
-    /// FFprobe veya FFmpeg kullanarak video dosyasının süresini (saniye cinsinden) okur.
+    /// FFprobe veya FFmpeg kullanarak video dosyasının gerçek süresini (saniye cinsinden) kesin olarak okur.
     /// </summary>
     public static double GetVideoDuration(string videoPath)
     {
         try
         {
             if (!File.Exists(videoPath)) return 0;
+
             string ffmpegExe = FindFFmpeg();
-            var psi = new System.Diagnostics.ProcessStartInfo
+
+            // 1. Doğrudan FFmpeg stream taraması ile gerçek süreyi bul
+            var probePsi = new ProcessStartInfo
             {
                 FileName = ffmpegExe,
-                Arguments = $"-i \"{videoPath}\"",
+                Arguments = $"-i \"{videoPath}\" -f null -c copy -",
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            using var proc = System.Diagnostics.Process.Start(psi);
-            if (proc == null) return 0;
-            string output = proc.StandardError.ReadToEnd();
-            proc.WaitForExit(3000);
-
-            // "Duration: 00:01:23.45"
-            int durIdx = output.IndexOf("Duration: ", StringComparison.OrdinalIgnoreCase);
-            if (durIdx != -1)
+            using var probeProc = Process.Start(probePsi);
+            if (probeProc != null)
             {
-                string part = output.Substring(durIdx + 10, 11);
-                if (TimeSpan.TryParse(part, out var ts))
+                string probeOut = probeProc.StandardError.ReadToEnd();
+                probeProc.WaitForExit(4000);
+
+                var matches = System.Text.RegularExpressions.Regex.Matches(probeOut, @"time=(\d+):(\d+):(\d+\.\d+)");
+                if (matches.Count > 0)
                 {
-                    return ts.TotalSeconds;
+                    var match = matches[^1]; // Son time değerini al
+                    int h = int.Parse(match.Groups[1].Value);
+                    int m = int.Parse(match.Groups[2].Value);
+                    double s = double.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture);
+                    double calculated = h * 3600 + m * 60 + s;
+                    if (calculated > 0) return calculated;
+                }
+
+                int durIdx = probeOut.IndexOf("Duration: ", StringComparison.OrdinalIgnoreCase);
+                if (durIdx != -1)
+                {
+                    string part = probeOut.Substring(durIdx + 10, 11);
+                    if (TimeSpan.TryParse(part, out var ts) && ts.TotalSeconds > 0)
+                    {
+                        return ts.TotalSeconds;
+                    }
                 }
             }
         }
         catch { }
+
         return 0;
     }
 }

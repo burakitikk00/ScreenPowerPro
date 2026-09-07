@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using ScreenPowerPro.Helpers;
 using ScreenPowerPro.Models;
@@ -21,11 +23,13 @@ public class ScreenRecorderService : IDisposable
     private readonly SettingsService _settingsService;
     private Process? _ffmpegProcess;
 #pragma warning disable CS0618
-    private WasapiLoopbackCapture? _loopbackCapture;
-    private WaveFileWriter? _loopbackWriter;
-    private WaveIn? _micCapture;
-    private WaveFileWriter? _micWriter;
+    private WasapiLoopbackCapture? _legacyLoopbackCapture;
+    private WaveIn? _legacyMicCapture;
 #pragma warning restore CS0618
+    private WasapiRecorder? _loopbackRecorder;
+    private WasapiRecorder? _micRecorder;
+    private WaveFileWriter? _loopbackWriter;
+    private WaveFileWriter? _micWriter;
 
     private System.Timers.Timer? _durationTimer;
     private Stopwatch? _recordStopwatch;
@@ -83,20 +87,34 @@ public class ScreenRecorderService : IDisposable
             {
                 try
                 {
-#pragma warning disable CS0618
-                    _micCapture = new WaveIn
+                    var micBuilder = new WasapiRecorderBuilder();
+                    if (!string.IsNullOrEmpty(settings.SelectedMicDevice))
                     {
-                        WaveFormat = new WaveFormat(44100, 1) // 44.1kHz mono
-                    };
-#pragma warning restore CS0618
-                    _micWriter = new WaveFileWriter(_currentMicPath, _micCapture.WaveFormat);
-                    _micCapture.DataAvailable += (s, e) =>
+                        using var enumerator = new MMDeviceEnumerator();
+                        var dev = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active)
+                                            .FirstOrDefault(d => d.ID == settings.SelectedMicDevice || d.FriendlyName == settings.SelectedMicDevice);
+                        if (dev != null) micBuilder.WithDevice(dev);
+                    }
+                    _micRecorder = micBuilder.Build();
+                    _micWriter = new WaveFileWriter(_currentMicPath, _micRecorder.WaveFormat);
+                    _micRecorder.DataAvailable += (buffer, flags, dev, qpc) =>
                     {
-                        _micWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                        _micWriter?.Write(buffer.ToArray(), 0, buffer.Length);
                     };
-                    _micCapture.StartRecording();
+                    _micRecorder.StartRecording();
                 }
-                catch { }
+                catch
+                {
+                    // Fallback to WaveIn
+                    try
+                    {
+                        _legacyMicCapture = new WaveIn { WaveFormat = new WaveFormat(44100, 1) };
+                        _micWriter = new WaveFileWriter(_currentMicPath, _legacyMicCapture.WaveFormat);
+                        _legacyMicCapture.DataAvailable += (s, e) => _micWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                        _legacyMicCapture.StartRecording();
+                    }
+                    catch { }
+                }
             }
 
             // 3. Start System Audio loopback recording if enabled
@@ -104,15 +122,68 @@ public class ScreenRecorderService : IDisposable
             {
                 try
                 {
-                    _loopbackCapture = new WasapiLoopbackCapture();
-                    _loopbackWriter = new WaveFileWriter(_currentSystemAudioPath, _loopbackCapture.WaveFormat);
-                    _loopbackCapture.DataAvailable += (s, e) =>
+                    if (settings.OnlyAppAudioEnabled && settings.SelectedAppAudioProcesses != null && settings.SelectedAppAudioProcesses.Count > 0)
                     {
-                        _loopbackWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                        uint targetPid = 0;
+                        foreach (var pStr in settings.SelectedAppAudioProcesses)
+                        {
+                            if (uint.TryParse(pStr, out uint pid))
+                            {
+                                targetPid = pid;
+                                break;
+                            }
+                            var p = Process.GetProcessesByName(pStr).FirstOrDefault();
+                            if (p != null)
+                            {
+                                targetPid = (uint)p.Id;
+                                break;
+                            }
+                        }
+
+                        if (targetPid > 0)
+                        {
+#pragma warning disable CA1416
+                            var procBuilder = new WasapiRecorderBuilder()
+                                .WithProcessLoopback(targetPid, ProcessLoopbackMode.IncludeTargetProcessTree);
+                            _loopbackRecorder = procBuilder.BuildAsync().GetAwaiter().GetResult();
+#pragma warning restore CA1416
+                        }
+                    }
+
+                    if (_loopbackRecorder == null)
+                    {
+                        var loopBuilder = new WasapiRecorderBuilder().WithLoopbackCapture();
+                        if (!string.IsNullOrEmpty(settings.SelectedSpeakerDevice))
+                        {
+                            using var enumerator = new MMDeviceEnumerator();
+                            var dev = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active)
+                                                .FirstOrDefault(d => d.ID == settings.SelectedSpeakerDevice || d.FriendlyName == settings.SelectedSpeakerDevice);
+                            if (dev != null) loopBuilder.WithDevice(dev);
+                        }
+                        _loopbackRecorder = loopBuilder.Build();
+                    }
+
+                    _loopbackWriter = new WaveFileWriter(_currentSystemAudioPath, _loopbackRecorder.WaveFormat);
+                    _loopbackRecorder.DataAvailable += (buffer, flags, dev, qpc) =>
+                    {
+                        _loopbackWriter?.Write(buffer.ToArray(), 0, buffer.Length);
                     };
-                    _loopbackCapture.StartRecording();
+                    _loopbackRecorder.StartRecording();
                 }
-                catch { }
+                catch
+                {
+                    // Fallback to legacy WasapiLoopbackCapture
+                    try
+                    {
+#pragma warning disable CS0618
+                        _legacyLoopbackCapture = new WasapiLoopbackCapture();
+#pragma warning restore CS0618
+                        _loopbackWriter = new WaveFileWriter(_currentSystemAudioPath, _legacyLoopbackCapture.WaveFormat);
+                        _legacyLoopbackCapture.DataAvailable += (s, e) => _loopbackWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                        _legacyLoopbackCapture.StartRecording();
+                    }
+                    catch { }
+                }
             }
 
             // 4. Start FFmpeg Screen Grabber
@@ -182,11 +253,17 @@ public class ScreenRecorderService : IDisposable
         // Stop Audio
         try
         {
-            if (_micCapture != null)
+            if (_micRecorder != null)
             {
-                _micCapture.StopRecording();
-                _micCapture.Dispose();
-                _micCapture = null;
+                _micRecorder.StopRecording();
+                _micRecorder.Dispose();
+                _micRecorder = null;
+            }
+            if (_legacyMicCapture != null)
+            {
+                _legacyMicCapture.StopRecording();
+                _legacyMicCapture.Dispose();
+                _legacyMicCapture = null;
             }
             if (_micWriter != null)
             {
@@ -198,11 +275,17 @@ public class ScreenRecorderService : IDisposable
 
         try
         {
-            if (_loopbackCapture != null)
+            if (_loopbackRecorder != null)
             {
-                _loopbackCapture.StopRecording();
-                _loopbackCapture.Dispose();
-                _loopbackCapture = null;
+                _loopbackRecorder.StopRecording();
+                _loopbackRecorder.Dispose();
+                _loopbackRecorder = null;
+            }
+            if (_legacyLoopbackCapture != null)
+            {
+                _legacyLoopbackCapture.StopRecording();
+                _legacyLoopbackCapture.Dispose();
+                _legacyLoopbackCapture = null;
             }
             if (_loopbackWriter != null)
             {
@@ -217,7 +300,8 @@ public class ScreenRecorderService : IDisposable
         {
             try
             {
-                _ffmpegProcess.StandardInput.WriteLine("q");
+                _ffmpegProcess.StandardInput.Write('q');
+                _ffmpegProcess.StandardInput.Flush();
                 await Task.Run(() => _ffmpegProcess.WaitForExit(4000));
                 if (!_ffmpegProcess.HasExited)
                 {

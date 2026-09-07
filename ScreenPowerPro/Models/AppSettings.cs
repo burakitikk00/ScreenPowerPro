@@ -4,59 +4,169 @@ using System.Text.Json.Serialization;
 
 namespace ScreenPowerPro.Models;
 
+/// <summary>
+/// Özel bölge kırpma koordinatları ve boyutları.
+/// </summary>
+public class CropBounds
+{
+    [JsonPropertyName("x")]
+    public int X { get; set; }
+
+    [JsonPropertyName("y")]
+    public int Y { get; set; }
+
+    [JsonPropertyName("width")]
+    public int Width { get; set; }
+
+    [JsonPropertyName("height")]
+    public int Height { get; set; }
+}
+
+/// <summary>
+/// ScreenPowerPro genel uygulama yapılandırması ve kullanıcı tercihleri modeli.
+/// Electron mimarisindeki AppSettings yapısıyla tam uyumludur.
+/// </summary>
 public class AppSettings
 {
+    /// <summary>
+    /// Kaydedilen projelerin saklanacağı varsayılan dizin.
+    /// </summary>
     [JsonPropertyName("projectSaveLocation")]
     public string ProjectSaveLocation { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         "ScreenPowerPro Projects"
     );
 
+    /// <summary>
+    /// Render edilen nihai videoların dışa aktarılacağı dizin.
+    /// </summary>
     [JsonPropertyName("exportLocation")]
     public string ExportLocation { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
         "ScreenPowerPro Exports"
     );
 
-    [JsonPropertyName("autoZoom")]
-    public bool AutoZoom { get; set; } = true;
+    /// <summary>
+    /// Otomatik zoom modu: "none" (kapalı), "smooth" (yumuşak geçişli), "instant" (anlık sıçrama).
+    /// </summary>
+    [JsonPropertyName("autoZoomMode")]
+    public string AutoZoomMode { get; set; } = "smooth";
 
+    /// <summary>
+    /// Geriye dönük uyumluluk için boolean AutoZoom özelliği.
+    /// </summary>
+    [JsonPropertyName("autoZoom")]
+    public bool AutoZoom
+    {
+        get => !string.Equals(AutoZoomMode, "none", StringComparison.OrdinalIgnoreCase);
+        set => AutoZoomMode = value ? "smooth" : "none";
+    }
+
+    /// <summary>
+    /// Kayıt esnasında masaüstü simgelerini gizleme tercihi.
+    /// </summary>
     [JsonPropertyName("hideDesktopIcons")]
     public bool HideDesktopIcons { get; set; } = false;
 
+    /// <summary>
+    /// Kayıt esnasında Windows görev çubuğunu gizleme tercihi.
+    /// </summary>
     [JsonPropertyName("hideTaskbar")]
     public bool HideTaskbar { get; set; } = false;
 
+    /// <summary>
+    /// Ham video kaydında fare imlecini gizleme (imleç sonradan efektli çizdirilecekse).
+    /// </summary>
     [JsonPropertyName("hideMouseCursor")]
     public bool HideMouseCursor { get; set; } = false;
 
+    /// <summary>
+    /// Kayıt çözünürlüğü: "720p", "1080p", "4K"
+    /// </summary>
     [JsonPropertyName("resolution")]
-    public string Resolution { get; set; } = "1080p"; // 720p, 1080p, 4K
+    public string Resolution { get; set; } = "1080p";
 
+    /// <summary>
+    /// Kayıt öncesi görsel geri sayım süresi (saniye): 0 (kapalı), 3, 5, 10
+    /// </summary>
     [JsonPropertyName("countdownSeconds")]
     public int CountdownSeconds { get; set; } = 3;
 
+    /// <summary>
+    /// Hedef kare hızı (FPS): 30, 60
+    /// </summary>
     [JsonPropertyName("fps")]
     public int Fps { get; set; } = 60;
 
+    /// <summary>
+    /// Dışa aktarım dosya formatı: "mp4", "webm"
+    /// </summary>
     [JsonPropertyName("exportFormat")]
     public string ExportFormat { get; set; } = "mp4";
 
+    /// <summary>
+    /// Dışa aktarım çözünürlüğü: "720p", "1080p", "4k"
+    /// </summary>
+    [JsonPropertyName("exportResolution")]
+    public string ExportResolution { get; set; } = "1080p";
+
+    /// <summary>
+    /// Mikrofon sesi kaydı aktif mi?
+    /// </summary>
     [JsonPropertyName("micAudioEnabled")]
     public bool MicAudioEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Bilgisayar sistem sesi (loopback) kaydı aktif mi?
+    /// </summary>
     [JsonPropertyName("systemAudioEnabled")]
     public bool SystemAudioEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Kamera (webcam) overlay penceresi açık mı?
+    /// </summary>
     [JsonPropertyName("cameraEnabled")]
     public bool CameraEnabled { get; set; } = false;
 
+    /// <summary>
+    /// Seçilen mikrofon aygıt kimliği veya adı.
+    /// </summary>
     [JsonPropertyName("selectedMicDevice")]
     public string? SelectedMicDevice { get; set; }
 
+    /// <summary>
+    /// Seçilen hoparlör / ses çıkış aygıtı.
+    /// </summary>
+    [JsonPropertyName("selectedSpeakerDevice")]
+    public string? SelectedSpeakerDevice { get; set; }
+
+    /// <summary>
+    /// Seçilen web kamerası aygıtı.
+    /// </summary>
     [JsonPropertyName("selectedCameraDevice")]
     public string? SelectedCameraDevice { get; set; }
 
+    /// <summary>
+    /// Özel bölge kaydı için belirlenen kırpma sınırları.
+    /// </summary>
+    [JsonPropertyName("customCropBounds")]
+    public CropBounds? CustomCropBounds { get; set; }
+
+    /// <summary>
+    /// Yalnızca belirli uygulamaların seslerini kaydetme modu aktif mi?
+    /// </summary>
+    [JsonPropertyName("onlyAppAudioEnabled")]
+    public bool OnlyAppAudioEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Only App Audio modunda sesi kaydedilecek seçili işlem (process) kimlikleri veya isimleri.
+    /// </summary>
+    [JsonPropertyName("selectedAppAudioProcesses")]
+    public List<string> SelectedAppAudioProcesses { get; set; } = new();
+
+    /// <summary>
+    /// Windows API aracılığıyla ScreenPowerPro penceresinin kendi kaydında görünmesini engeller.
+    /// </summary>
     [JsonPropertyName("excludeAppFromRecording")]
-    public bool ExcludeAppFromRecording { get; set; } = true; // Uses WDA_EXCLUDEFROMCAPTURE
+    public bool ExcludeAppFromRecording { get; set; } = true;
 }

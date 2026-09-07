@@ -7,6 +7,11 @@ using Windows.Graphics;
 
 namespace ScreenPowerPro;
 
+/// <summary>
+/// ScreenPowerPro ana uygulama penceresi. Başlık çubuğu özelleştirmelerini,
+/// sayfalar arası navigasyonu (Dashboard, Library, Editor, Export) ve
+/// pencere boyutu yönetimini koordine eder.
+/// </summary>
 public sealed partial class MainWindow : Window
 {
     public static MainWindow? CurrentInstance { get; private set; }
@@ -19,7 +24,7 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         AppWindow.SetIcon("Assets/AppIcon.ico");
 
-        // Custom Titlebar colors
+        // Özel başlık çubuğu renkleri
         if (AppWindowTitleBar.IsCustomizationSupported())
         {
             var titleBar = AppWindow.TitleBar;
@@ -30,19 +35,10 @@ public sealed partial class MainWindow : Window
             titleBar.ButtonForegroundColor = Microsoft.UI.Colors.White;
         }
 
-        // Set initial window size (1180 x 820)
-        AppWindow.Resize(new SizeInt32(1180, 820));
+        // Başlangıç pencere boyutu (1160 x 310) - Kompakt ve sabit boyutlu
+        ResizeForDashboard();
 
-        // Center on screen
-        var displayArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
-        if (displayArea != null)
-        {
-            int x = (displayArea.WorkArea.Width - 1180) / 2;
-            int y = (displayArea.WorkArea.Height - 820) / 2;
-            AppWindow.Move(new PointInt32(Math.Max(0, x), Math.Max(0, y)));
-        }
-
-        // Navigate to Dashboard initially
+        // İlk sayfa olarak Dashboard'a yönlendir
         RootFrame.Navigate(typeof(DashboardPage));
     }
 
@@ -51,13 +47,58 @@ public sealed partial class MainWindow : Window
         return WinRT.Interop.WindowNative.GetWindowHandle(this);
     }
 
+    public void ResizeAndCenter(int width, int height)
+    {
+        AppWindow.Resize(new SizeInt32(width, height));
+        var displayArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
+        if (displayArea != null)
+        {
+            int x = (displayArea.WorkArea.Width - width) / 2;
+            int y = (displayArea.WorkArea.Height - height) / 2;
+            AppWindow.Move(new PointInt32(Math.Max(0, x), Math.Max(0, y)));
+        }
+    }
+
+    /// <summary>
+    /// Dashboard moduna göre pencereyi optimize eder. Boyutlandırmayı kapatır ve sabit tutar.
+    /// </summary>
+    public void ResizeForDashboard()
+    {
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.IsResizable = false;
+            presenter.IsMaximizable = false;
+        }
+        ResizeAndCenter(1160, 315);
+    }
+
+    /// <summary>
+    /// Video düzenleyici modu için geniş çalışma alanına geçer.
+    /// </summary>
+    public void ResizeForEditor()
+    {
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.IsResizable = true;
+            presenter.IsMaximizable = true;
+        }
+        ResizeAndCenter(1280, 850);
+    }
+
     public void NavigateToDashboard()
     {
+        ResizeForDashboard();
         RootFrame.Navigate(typeof(DashboardPage));
+    }
+
+    public void NavigateToLibrary()
+    {
+        RootFrame.Navigate(typeof(LibraryPage));
     }
 
     public void NavigateToEditor(string projectDir)
     {
+        ResizeForEditor();
         RootFrame.Navigate(typeof(EditorPage), projectDir);
     }
 

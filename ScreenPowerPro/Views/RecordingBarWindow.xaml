@@ -6,41 +6,91 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="Kayıt Kontrol">
+    Title="Kayıt Kontrol Paneli">
 
-    <Grid Background="Transparent" PointerPressed="OnPointerPressed" PointerMoved="OnPointerMoved" PointerReleased="OnPointerReleased">
+    <Grid Background="Transparent"
+        PointerPressed="OnPointerPressed"
+        PointerMoved="OnPointerMoved"
+        PointerReleased="OnPointerReleased">
+
         <Grid.Resources>
             <Storyboard x:Name="PulseStoryboard" RepeatBehavior="Forever">
-                <DoubleAnimation Storyboard.TargetName="RecIndicator" 
-                                 Storyboard.TargetProperty="Opacity" 
+                <DoubleAnimation Storyboard.TargetName="RecIndicator"
+                                 Storyboard.TargetProperty="Opacity"
                                  From="1.0" To="0.2" Duration="0:0:1" AutoReverse="True"/>
             </Storyboard>
+
+            <Style x:Key="BarButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="Width" Value="32" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+            </Style>
         </Grid.Resources>
-        
-        <!-- Floating Pill Container -->
-        <Border Background="#E61E1F27" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="28" Padding="20,10" HorizontalAlignment="Center" VerticalAlignment="Center"
-                Shadow="{ThemeResource SharedShadow}">
-            
-            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
-                <!-- Red Pulse Recording Indicator -->
-                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+
+        <!-- Modern Obsidian Floating Pill Container -->
+        <Border Background="#EE12131A"
+            BorderBrush="{StaticResource GlassBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="22"
+            Padding="16,8"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center">
+
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <!-- Drag Grip Icon -->
+                <FontIcon Glyph="&#xE700;" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Opacity="0.6"/>
+
+                <!-- Pulsing Recording Dot & Status -->
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Ellipse x:Name="RecIndicator" Fill="#EF4444" Width="10" Height="10" />
-                    <TextBlock Text="Kayıt Ediliyor" FontSize="12" FontWeight="SemiBold" Foreground="#E3E1EC" VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusTextBlock" Text="KAYIT" FontSize="11" FontWeight="Bold"
+                        Foreground="#EF4444" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <!-- Timer Display -->
-                <TextBlock x:Name="TimerTextBlock" Text="00:00:00" FontSize="14" FontWeight="Bold" FontFamily="Consolas" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center" Margin="4,0" />
+                <!-- Live Timer Display -->
+                <Border Background="#44000000" CornerRadius="6" Padding="8,3" BorderBrush="#1AFFFFFF" BorderThickness="1">
+                    <TextBlock x:Name="TimerTextBlock" Text="00:00:00"
+                        FontSize="13" FontWeight="Bold" FontFamily="Consolas"
+                        Foreground="{StaticResource PrimaryAccentBrush}"
+                        VerticalAlignment="Center" />
+                </Border>
 
                 <!-- Separator -->
-                <Border Width="1" Height="20" Background="#33FFFFFF" />
+                <Rectangle Width="1" Height="18" Fill="{StaticResource GlassBorderBrush}" />
 
-                <!-- Stop Recording Button -->
-                <Button Click="OnStopClicked" ToolTipService.ToolTip="Kaydı Durdur ve Düzenle" 
-                        Background="Transparent" BorderThickness="0" CornerRadius="16" Padding="8"
-                        Foreground="#EF4444">
-                    <Button.Content>
-                        <FontIcon Glyph="&#xE71A;" FontSize="18" Foreground="#EF4444" />
-                    </Button.Content>
+                <!-- Pause / Resume Button -->
+                <Button x:Name="BtnPause" Click="OnPauseClicked"
+                    Style="{StaticResource BarButtonStyle}"
+                    ToolTipService.ToolTip="Duraklat / Devam Et">
+                    <FontIcon x:Name="PauseIcon" Glyph="&#xE769;" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                </Button>
+
+                <!-- Stop & Edit Button (Primary highlight) -->
+                <Button Click="OnStopClicked"
+                    ToolTipService.ToolTip="Kaydı Tamamla ve Editörde Aç"
+                    CornerRadius="14" Padding="12,6" BorderThickness="0">
+                    <Button.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#DC2626" Offset="0"/>
+                            <GradientStop Color="#EF4444" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Button.Background>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE71A;" FontSize="12" Foreground="White" />
+                        <TextBlock Text="Bitir" FontSize="12" FontWeight="SemiBold" Foreground="White" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Cancel Button -->
+                <Button Click="OnCancelClicked"
+                    Style="{StaticResource BarButtonStyle}"
+                    ToolTipService.ToolTip="İptal Et">
+                    <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
                 </Button>
             </StackPanel>
         </Border>

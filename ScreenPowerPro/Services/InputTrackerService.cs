@@ -160,43 +160,21 @@ public class InputTrackerService : IDisposable
         return Win32Helper.CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
     }
 
-    public List<ZoomEffect> GenerateAutoZoomEffects(double maxVideoDurationSec = 0)
+    /// <summary>
+    /// Kayıt esnasında toplanan fare tıklamalarından akıllı zoom efektleri üretir.
+    /// ZoomEngineService kullanarak kümeleme (clustering) ve yumuşak geçiş hesaplamalarını uygular.
+    /// </summary>
+    public List<ZoomEffect> GenerateAutoZoomEffects(
+        double maxVideoDurationSec = 0,
+        string autoZoomMode = "smooth",
+        double defaultScale = 1.5)
     {
-        var effects = new List<ZoomEffect>();
-        double lastZoomEnd = 0;
-        int zoomIndex = 1;
-
-        foreach (var click in Clicks)
-        {
-            if (click.Type != "left_down") continue;
-
-            // Avoid overlapping zooms: require at least 2.5 seconds distance
-            if (click.Timestamp < lastZoomEnd + 0.5) continue;
-
-            double startTime = Math.Max(0, click.Timestamp - 0.3);
-            double duration = 2.0;
-
-            if (maxVideoDurationSec > 0 && startTime + duration > maxVideoDurationSec)
-            {
-                duration = Math.Max(0.5, maxVideoDurationSec - startTime);
-            }
-
-            effects.Add(new ZoomEffect
-            {
-                Id = Guid.NewGuid().ToString("N")[..8],
-                Name = $"Zoom {zoomIndex++}",
-                StartTime = Math.Round(startTime, 2),
-                Duration = Math.Round(duration, 2),
-                TargetX = click.X,
-                TargetY = click.Y,
-                Scale = 1.5,
-                Easing = "ease-in-out"
-            });
-
-            lastZoomEnd = startTime + duration;
-        }
-
-        return effects;
+        var zoomEngine = new ZoomEngineService();
+        return zoomEngine.GenerateZoomEffectsFromClicks(
+            Clicks,
+            autoZoomMode: autoZoomMode,
+            defaultScale: defaultScale,
+            maxVideoDurationSec: maxVideoDurationSec);
     }
 
     public void Dispose()

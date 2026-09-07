@@ -21,11 +21,12 @@ public class ExportService
     public async Task<string> ExportVideoAsync(
         ProjectManifest manifest,
         string outputPath,
+        string? projectDir = null,
         int targetFps = 60,
         CancellationToken cancellationToken = default)
     {
         string ffmpegPath = FFmpegHelper.FindFFmpeg();
-        string args = FFmpegHelper.BuildRenderCommand(manifest, outputPath, targetFps: targetFps);
+        string args = FFmpegHelper.BuildRenderCommand(manifest, outputPath, projectDir, targetFps: targetFps);
 
         double totalDuration = manifest.Metadata.DurationSeconds > 0 ? manifest.Metadata.DurationSeconds : 10.0;
 
@@ -33,6 +34,7 @@ public class ExportService
         {
             FileName = ffmpegPath,
             Arguments = args,
+            WorkingDirectory = !string.IsNullOrEmpty(projectDir) ? projectDir : AppContext.BaseDirectory,
             UseShellExecute = false,
             RedirectStandardError = true,
             CreateNoWindow = true

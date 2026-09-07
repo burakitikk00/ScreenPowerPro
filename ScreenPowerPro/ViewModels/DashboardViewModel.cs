@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -16,8 +17,22 @@ public partial class DashboardViewModel : ObservableObject
     private readonly ScreenRecorderService _recorderService;
     private readonly InputTrackerService _inputTracker;
 
+    public DeviceManagerService DeviceManager { get; }
+
     [ObservableProperty]
     private RecordingMode _selectedMode = RecordingMode.FullScreen;
+
+    [ObservableProperty]
+    private string _activeModeName = "FullScreen";
+
+    [ObservableProperty]
+    private string _cameraDisplayName = "None";
+
+    [ObservableProperty]
+    private string _micDisplayName = "None";
+
+    [ObservableProperty]
+    private string _speakerDisplayName = "None";
 
     [ObservableProperty]
     private bool _isMicEnabled;
@@ -49,22 +64,86 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<ProjectInfo> _recentProjects = new();
 
+    public int LastCropX { get; private set; }
+    public int LastCropY { get; private set; }
+    public int LastCropWidth { get; private set; }
+    public int LastCropHeight { get; private set; }
+
     public event Action<string>? RequestStartRecording; // passes projectDir
 
     public DashboardViewModel(
         SettingsService settingsService,
         ProjectService projectService,
         ScreenRecorderService recorderService,
-        InputTrackerService inputTracker)
+        InputTrackerService inputTracker,
+        DeviceManagerService deviceManager)
     {
         _settingsService = settingsService;
         _projectService = projectService;
         _recorderService = recorderService;
         _inputTracker = inputTracker;
+        DeviceManager = deviceManager;
+
+        DeviceManager.DevicesUpdated += UpdateDeviceDisplayNames;
+        DeviceManager.AudioAppsUpdated += UpdateDeviceDisplayNames;
 
         LoadSettings();
         RefreshWindows();
         RefreshRecentProjects();
+    }
+
+    public async Task InitializeDevicesAsync()
+    {
+        await DeviceManager.RefreshAllDevicesAsync();
+        UpdateDeviceDisplayNames();
+    }
+
+    public void UpdateDeviceDisplayNames()
+    {
+        // 1. Camera Name
+        if (DeviceManager.SelectedCamera != null && !DeviceManager.SelectedCamera.IsNone)
+        {
+            string name = DeviceManager.SelectedCamera.Name;
+            CameraDisplayName = name.Length > 16 ? name.Substring(0, 14) + "..." : name;
+            IsCameraEnabled = true;
+        }
+        else
+        {
+            CameraDisplayName = "None";
+            IsCameraEnabled = false;
+        }
+
+        // 2. Microphone Name
+        if (DeviceManager.SelectedMicrophone != null && !DeviceManager.SelectedMicrophone.IsNone)
+        {
+            string name = DeviceManager.SelectedMicrophone.Name;
+            MicDisplayName = name.Length > 16 ? name.Substring(0, 14) + "..." : name;
+            IsMicEnabled = true;
+        }
+        else
+        {
+            MicDisplayName = "None";
+            IsMicEnabled = false;
+        }
+
+        // 3. Speaker / App Audio Name
+        if (DeviceManager.IsOnlyAppAudioSelected)
+        {
+            int count = DeviceManager.GetSelectedAppCount();
+            SpeakerDisplayName = $"Only App ({count})";
+            IsSystemAudioEnabled = true;
+        }
+        else if (DeviceManager.SelectedSpeaker != null && !DeviceManager.SelectedSpeaker.IsNone)
+        {
+            string name = DeviceManager.SelectedSpeaker.Name;
+            SpeakerDisplayName = name.Length > 16 ? name.Substring(0, 14) + "..." : name;
+            IsSystemAudioEnabled = true;
+        }
+        else
+        {
+            SpeakerDisplayName = "None";
+            IsSystemAudioEnabled = false;
+        }
     }
 
     private void LoadSettings()
@@ -117,6 +196,33 @@ public partial class DashboardViewModel : ObservableObject
         _settingsService.Save();
     }
 
+    public string ImportVideo(string sourcePath)
+    {
+        string projectDir = _projectService.ImportVideoProject(sourcePath);
+        RefreshRecentProjects();
+        return projectDir;
+    }
+
+    public bool DeleteProject(string projectDir)
+    {
+        bool success = _projectService.DeleteProject(projectDir);
+        if (success)
+        {
+            RefreshRecentProjects();
+        }
+        return success;
+    }
+
+    public bool RenameProject(string projectDir, string newName)
+    {
+        bool success = _projectService.RenameProject(projectDir, newName);
+        if (success)
+        {
+            RefreshRecentProjects();
+        }
+        return success;
+    }
+
     [RelayCommand]
     public async Task StartRecordingAsync()
     {
@@ -144,6 +250,11 @@ public partial class DashboardViewModel : ObservableObject
             // Ensure even numbers for video dimensions (FFmpeg x264 requirement)
             if (cropW % 2 != 0) cropW++;
             if (cropH % 2 != 0) cropH++;
+
+            LastCropX = cropX;
+            LastCropY = cropY;
+            LastCropWidth = cropW;
+            LastCropHeight = cropH;
         }
 
         // 1. Create project dir

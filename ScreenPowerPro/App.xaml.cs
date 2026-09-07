@@ -21,14 +21,18 @@ public partial class App : Application
 
         // Register Services
         services.AddSingleton<SettingsService>();
+        services.AddSingleton<DeviceManagerService>();
         services.AddSingleton<ProjectService>();
+        services.AddSingleton<ZoomEngineService>();
         services.AddSingleton<InputTrackerService>();
         services.AddSingleton<ScreenRecorderService>();
         services.AddSingleton<ExportService>();
+        services.AddSingleton<AudioLevelMonitorService>();
 
         // Register ViewModels
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<RecordingBarViewModel>();
+        services.AddSingleton<LibraryViewModel>();
         services.AddSingleton<EditorViewModel>();
         services.AddSingleton<ExportViewModel>();
         services.AddSingleton<SettingsViewModel>();

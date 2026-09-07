@@ -103,7 +103,7 @@ public partial class ExportViewModel : ObservableObject
 
         try
         {
-            await _exportService.ExportVideoAsync(manifest, OutputPath, SelectedFps, _cts.Token);
+            await _exportService.ExportVideoAsync(manifest, OutputPath, ProjectDir, SelectedFps, _cts.Token);
         }
         catch (OperationCanceledException)
         {

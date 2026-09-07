@@ -120,19 +120,71 @@ public class ProjectService
 
         return list.OrderByDescending(p => p.CreatedAt).ToList();
     }
-}
 
-public class ProjectInfo
-{
-    public string Name { get; set; } = string.Empty;
-    public string FolderPath { get; set; } = string.Empty;
-    public string ManifestPath { get; set; } = string.Empty;
-    public string VideoPath { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-    public double DurationSeconds { get; set; }
-    public int ZoomCount { get; set; }
-    public string ZoomBadgeText => $"{ZoomCount} Zoom";
+    /// <summary>
+    /// Belirtilen proje klasörünü ve tüm içeriğini diskten kalıcı olarak siler.
+    /// </summary>
+    public bool DeleteProject(string projectDir)
+    {
+        try
+        {
+            if (Directory.Exists(projectDir))
+            {
+                Directory.Delete(projectDir, true);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
 
-    public string FormattedDuration => TimeSpan.FromSeconds(DurationSeconds).ToString(@"mm\:ss");
-    public string FormattedDate => CreatedAt.ToString("dd.MM.yyyy HH:mm");
+    /// <summary>
+    /// Projenin manifestosundaki adını günceller.
+    /// </summary>
+    public bool RenameProject(string projectDir, string newName)
+    {
+        try
+        {
+            var manifest = LoadProject(projectDir);
+            if (manifest != null)
+            {
+                manifest.ProjectName = newName;
+                SaveProject(projectDir, manifest);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Var olan bir video dosyasını yeni bir proje olarak içe aktarır.
+    /// </summary>
+    public string ImportVideoProject(string sourceVideoPath)
+    {
+        string fileName = Path.GetFileNameWithoutExtension(sourceVideoPath);
+        string projectDir = CreateNewProjectDirectory($"Imported_{fileName}_{DateTime.Now:yyyyMMdd_HHmmss}");
+        string targetVideoPath = Path.Combine(projectDir, "recording", "display-0.mp4");
+
+        File.Copy(sourceVideoPath, targetVideoPath, true);
+
+        double duration = Helpers.FFmpegHelper.GetVideoDuration(targetVideoPath);
+
+        var manifest = new ProjectManifest
+        {
+            ProjectName = fileName,
+            VideoPath = "./recording/display-0.mp4",
+            CreatedAt = DateTime.UtcNow.ToString("o"),
+            Metadata = new RecordingMetadata
+            {
+                DurationSeconds = duration > 0 ? duration : 60,
+                Width = 1920,
+                Height = 1080,
+                Fps = 60
+            }
+        };
+
+        SaveProject(projectDir, manifest);
+        return projectDir;
+    }
 }

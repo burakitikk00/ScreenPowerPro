@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,11 +10,15 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Xaml.Shapes;
 using ScreenPowerPro.Models;
 using ScreenPowerPro.Services;
 using ScreenPowerPro.ViewModels;
 using Windows.Foundation;
+using Windows.Media.Core;
+using Windows.Media.Playback;
+using Windows.Storage;
 using Windows.UI;
 
 namespace ScreenPowerPro.Views;
@@ -30,6 +35,10 @@ public sealed partial class EditorPage : Page
     private ZoomEffect? _selectedZoom = null;
     private DispatcherTimer? _playbackTimer;
 
+    private Windows.Media.Playback.MediaPlayer? _micPlayer;
+    private Windows.Media.Playback.MediaPlayer? _sysPlayer;
+    private bool _isDraggingPlayhead = false;
+
     public EditorPage()
     {
         InitializeComponent();
@@ -38,17 +47,48 @@ public sealed partial class EditorPage : Page
         Loaded += OnPageLoaded;
     }
 
-    protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
-        if (e.Parameter is string projectDir)
+
+        string? projectDir = e.Parameter as string;
+        if (string.IsNullOrEmpty(projectDir))
+        {
+            var projectService = App.Current.Services.GetRequiredService<ProjectService>();
+            var recents = projectService.GetRecentProjects();
+            if (recents.Count > 0)
+            {
+                projectDir = recents[0].FolderPath;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(projectDir))
         {
             _projectDir = projectDir;
             ViewModel.LoadProject(projectDir);
+            UpdateFromViewModel();
+            RenderTimeline();
+            await LoadVideoAsync();
         }
     }
 
-    private void OnPageLoaded(object sender, RoutedEventArgs e)
+    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    {
+        base.OnNavigatedFrom(e);
+        PausePlayback();
+        _playbackTimer?.Stop();
+
+        try
+        {
+            _micPlayer?.Dispose();
+            _micPlayer = null;
+            _sysPlayer?.Dispose();
+            _sysPlayer = null;
+        }
+        catch { }
+    }
+
+    private async void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         _playbackTimer = new DispatcherTimer
         {
@@ -63,6 +103,161 @@ public sealed partial class EditorPage : Page
         {
             TimelineScrollViewer.PointerWheelChanged += OnTimelineWheelChanged;
         }
+
+        // ViewModel seek bildirimlerini dinle ve video oynatıcısını senkronize et
+        ViewModel.PropertyChanged += (s, args) =>
+        {
+            if (args.PropertyName == nameof(EditorViewModel.SeekVersion))
+            {
+                SeekToTime(ViewModel.CurrentTimeSec);
+            }
+            else if (args.PropertyName == nameof(EditorViewModel.TotalDurationSec))
+            {
+                _totalDurationSeconds = ViewModel.TotalDurationSec;
+                UpdateFromViewModel();
+                RenderTimeline();
+            }
+        };
+
+        ViewModel.NavigateToExport += OnNavigateToExport;
+
+        // Video henüz yüklenmediyse yükle
+        if (VideoPlayer.Source == null && !string.IsNullOrEmpty(ViewModel.VideoPath))
+        {
+            await LoadVideoAsync();
+        }
+    }
+
+    private void OnNavigateToExport(string projectDir)
+    {
+        PausePlayback();
+        MainWindow.CurrentInstance?.NavigateToExport(projectDir);
+    }
+
+    public async Task LoadVideoAsync()
+    {
+        if (string.IsNullOrEmpty(ViewModel.VideoPath)) return;
+
+        string videoPath = ViewModel.VideoPath;
+
+        if (!File.Exists(videoPath))
+        {
+            if (NoVideoMessage != null)
+            {
+                NoVideoMessage.Visibility = Visibility.Visible;
+                TbMissingVideoPath.Text = videoPath;
+            }
+            return;
+        }
+
+        if (NoVideoMessage != null)
+        {
+            NoVideoMessage.Visibility = Visibility.Collapsed;
+        }
+
+        try
+        {
+            var storageFile = await StorageFile.GetFileFromPathAsync(videoPath);
+            var mediaSource = MediaSource.CreateFromStorageFile(storageFile);
+            VideoPlayer.Source = mediaSource;
+
+            var player = VideoPlayer.MediaPlayer;
+            if (player != null)
+            {
+                player.AutoPlay = false;
+                player.MediaEnded -= OnMediaPlayerEnded;
+                player.MediaEnded += OnMediaPlayerEnded;
+                player.MediaOpened -= OnMediaPlayerOpened;
+                player.MediaOpened += OnMediaPlayerOpened;
+                player.MediaFailed -= OnMediaPlayerFailed;
+                player.MediaFailed += OnMediaPlayerFailed;
+
+                if (player.PlaybackSession != null)
+                {
+                    player.PlaybackSession.PlaybackRate = ViewModel.VideoSpeed > 0 ? ViewModel.VideoSpeed : 1.0;
+                }
+            }
+
+            await SetupAudioPlayersAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[EditorPage] Video yüklenirken hata: {ex.Message}");
+            if (NoVideoMessage != null)
+            {
+                NoVideoMessage.Visibility = Visibility.Visible;
+                TbMissingVideoPath.Text = $"Hata: {ex.Message}\n{videoPath}";
+            }
+        }
+    }
+
+    private async Task SetupAudioPlayersAsync()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(ViewModel.MicAudioPath) && File.Exists(ViewModel.MicAudioPath))
+            {
+                var micFile = await StorageFile.GetFileFromPathAsync(ViewModel.MicAudioPath);
+                _micPlayer = new Windows.Media.Playback.MediaPlayer
+                {
+                    Source = MediaSource.CreateFromStorageFile(micFile),
+                    AutoPlay = false,
+                    Volume = ViewModel.MicVolume / 100.0
+                };
+            }
+        }
+        catch { }
+
+        try
+        {
+            if (!string.IsNullOrEmpty(ViewModel.SystemAudioPath) && File.Exists(ViewModel.SystemAudioPath))
+            {
+                var sysFile = await StorageFile.GetFileFromPathAsync(ViewModel.SystemAudioPath);
+                _sysPlayer = new Windows.Media.Playback.MediaPlayer
+                {
+                    Source = MediaSource.CreateFromStorageFile(sysFile),
+                    AutoPlay = false,
+                    Volume = ViewModel.SysVolume / 100.0
+                };
+            }
+        }
+        catch { }
+    }
+
+    private void OnMediaPlayerOpened(Windows.Media.Playback.MediaPlayer sender, object args)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (sender.PlaybackSession != null && sender.PlaybackSession.NaturalDuration > TimeSpan.Zero)
+            {
+                double realDuration = sender.PlaybackSession.NaturalDuration.TotalSeconds;
+                if (realDuration > 0 && Math.Abs(_totalDurationSeconds - realDuration) > 0.2)
+                {
+                    _totalDurationSeconds = realDuration;
+                    ViewModel.TotalDurationSec = realDuration;
+                    UpdateFromViewModel();
+                    RenderTimeline();
+                }
+            }
+        });
+    }
+
+    private void OnMediaPlayerEnded(Windows.Media.Playback.MediaPlayer sender, object args)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            PausePlayback();
+            SeekToTime(0);
+        });
+    }
+
+    private void OnMediaPlayerFailed(Windows.Media.Playback.MediaPlayer sender, MediaPlayerFailedEventArgs args)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            PausePlayback();
+            System.Diagnostics.Debug.WriteLine($"[EditorPage] Medya oynatılamadı: {args.ErrorMessage}");
+        });
     }
 
     private void OnTimelineWheelChanged(object sender, PointerRoutedEventArgs e)
@@ -89,10 +284,13 @@ public sealed partial class EditorPage : Page
 
     private void OnMuteClicked(object sender, RoutedEventArgs e)
     {
-        if (MainPlayer.MediaPlayer != null)
+        if (VideoPlayer.MediaPlayer != null)
         {
-            MainPlayer.MediaPlayer.IsMuted = !MainPlayer.MediaPlayer.IsMuted;
-            MuteIcon.Glyph = MainPlayer.MediaPlayer.IsMuted ? "\uE74F" : "\uE767"; // E74F is Mute, E767 is Volume
+            bool newMuted = !VideoPlayer.MediaPlayer.IsMuted;
+            VideoPlayer.MediaPlayer.IsMuted = newMuted;
+            if (_micPlayer != null) _micPlayer.IsMuted = newMuted;
+            if (_sysPlayer != null) _sysPlayer.IsMuted = newMuted;
+            MuteIcon.Glyph = newMuted ? "\uE74F" : "\uE767"; // E74F is Mute, E767 is Volume
         }
     }
 
@@ -252,8 +450,7 @@ public sealed partial class EditorPage : Page
             {
                 Width = 8,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Background = new SolidColorBrush(Colors.Transparent),
-                Cursor = new Microsoft.UI.Input.InputCursor(Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast)
+                Background = new SolidColorBrush(Colors.Transparent)
             };
             grid.Children.Add(resizeHandle);
             
@@ -404,9 +601,19 @@ public sealed partial class EditorPage : Page
 
     private void StartPlayback()
     {
+        if (_currentTimeSeconds >= _totalDurationSeconds - 0.1 && _totalDurationSeconds > 0)
+        {
+            SeekToTime(0);
+        }
+
         _isPlaying = true;
         PlayPauseIcon.Glyph = "\uE769";
+        if (PlayOverlay != null) PlayOverlay.Opacity = 0;
+
         VideoPlayer?.MediaPlayer?.Play();
+        _micPlayer?.Play();
+        _sysPlayer?.Play();
+
         _playbackTimer?.Start();
     }
 
@@ -414,7 +621,12 @@ public sealed partial class EditorPage : Page
     {
         _isPlaying = false;
         PlayPauseIcon.Glyph = "\uE768";
+        if (PlayOverlay != null) PlayOverlay.Opacity = 1;
+
         VideoPlayer?.MediaPlayer?.Pause();
+        _micPlayer?.Pause();
+        _sysPlayer?.Pause();
+
         _playbackTimer?.Stop();
     }
 
@@ -423,30 +635,205 @@ public sealed partial class EditorPage : Page
         if (VideoPlayer?.MediaPlayer == null) return;
         var pos = VideoPlayer.MediaPlayer.Position;
         _currentTimeSeconds = pos.TotalSeconds;
+
+        if (_currentTimeSeconds >= _totalDurationSeconds && _totalDurationSeconds > 0)
+        {
+            PausePlayback();
+            SeekToTime(0);
+            return;
+        }
+
+        // Ses kanallarını video ile senkron tut
+        if (_isPlaying)
+        {
+            if (_micPlayer != null && Math.Abs((_micPlayer.Position - pos).TotalMilliseconds) > 150)
+            {
+                _micPlayer.Position = pos;
+            }
+            if (_sysPlayer != null && Math.Abs((_sysPlayer.Position - pos).TotalMilliseconds) > 150)
+            {
+                _sysPlayer.Position = pos;
+            }
+        }
+
+        ViewModel.CurrentTimeSec = _currentTimeSeconds;
         TbCurrentTime.Text = FormatTime(_currentTimeSeconds);
         TbTimelineCurrent.Text = FormatTime(_currentTimeSeconds);
         UpdatePlayhead();
+        UpdateZoomSimulation();
+    }
 
-        var activeZoom = ViewModel?.ZoomEffects?
-            .FirstOrDefault(z => z.StartTime <= _currentTimeSeconds && (z.StartTime + z.Duration) >= _currentTimeSeconds);
-        ZoomLevelBadge.Text = activeZoom != null ? $"{activeZoom.Scale:F1}x" : "1.0x";
+    /// <summary>
+    /// Video oynatımı veya timeline üzerinde gezinirken aktif keyframe tabanlı
+    /// zoom/pan durumunu hesaplar ve VideoPlayer üzerine canlı CompositeTransform olarak uygular.
+    /// </summary>
+    private void UpdateZoomSimulation()
+    {
+        var activeZoom = ViewModel?.GetCurrentZoom();
+        if (activeZoom != null)
+        {
+            ZoomLevelBadge.Text = $"{activeZoom.Scale:F1}x";
+            if (VideoTransform != null)
+            {
+                VideoTransform.ScaleX = activeZoom.Scale;
+                VideoTransform.ScaleY = activeZoom.Scale;
+
+                // Hedef tıklama koordinatını merkeze getiren pan ötelemesi
+                double renderWidth = VideoPlayer?.ActualWidth > 0 ? VideoPlayer.ActualWidth : 880;
+                double renderHeight = VideoPlayer?.ActualHeight > 0 ? VideoPlayer.ActualHeight : 495;
+
+                double normCenterX = 1920.0 / 2.0;
+                double normCenterY = 1080.0 / 2.0;
+
+                double offsetX = (normCenterX - activeZoom.TargetX) * (renderWidth / 1920.0) * (activeZoom.Scale - 1.0);
+                double offsetY = (normCenterY - activeZoom.TargetY) * (renderHeight / 1080.0) * (activeZoom.Scale - 1.0);
+
+                VideoTransform.TranslateX = Math.Clamp(offsetX, -renderWidth / 2.0, renderWidth / 2.0);
+                VideoTransform.TranslateY = Math.Clamp(offsetY, -renderHeight / 2.0, renderHeight / 2.0);
+            }
+        }
+        else
+        {
+            ZoomLevelBadge.Text = "1.0x";
+            if (VideoTransform != null)
+            {
+                VideoTransform.ScaleX = 1.0;
+                VideoTransform.ScaleY = 1.0;
+                VideoTransform.TranslateX = 0;
+                VideoTransform.TranslateY = 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Zaman çizelgesi cetveline veya video parçasına tıklandığında oynatma kafasını belirtilen saniyeye sarar.
+    /// </summary>
+    private void OnTimelinePointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is UIElement element)
+        {
+            element.CapturePointer(e.Pointer);
+            _isDraggingPlayhead = true;
+            var ptr = e.GetCurrentPoint(element);
+            double clickSec = Math.Max(0, (ptr.Position.X - 40) / _timelineScale);
+            SeekToTime(clickSec);
+        }
+    }
+
+    private void OnTimelinePointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (_isDraggingPlayhead && sender is UIElement element)
+        {
+            var ptr = e.GetCurrentPoint(element);
+            double clickSec = Math.Max(0, (ptr.Position.X - 40) / _timelineScale);
+            SeekToTime(clickSec);
+        }
+    }
+
+    private void OnTimelinePointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (_isDraggingPlayhead && sender is UIElement element)
+        {
+            element.ReleasePointerCapture(e.Pointer);
+            _isDraggingPlayhead = false;
+        }
+    }
+
+    public void SeekToTime(double time)
+    {
+        _currentTimeSeconds = Math.Clamp(time, 0, _totalDurationSeconds);
+        var ts = TimeSpan.FromSeconds(_currentTimeSeconds);
+
+        if (VideoPlayer?.MediaPlayer != null)
+        {
+            VideoPlayer.MediaPlayer.Position = ts;
+        }
+        if (_micPlayer != null)
+        {
+            _micPlayer.Position = ts;
+        }
+        if (_sysPlayer != null)
+        {
+            _sysPlayer.Position = ts;
+        }
+
+        ViewModel.CurrentTimeSec = _currentTimeSeconds;
+        TbCurrentTime.Text = FormatTime(_currentTimeSeconds);
+        TbTimelineCurrent.Text = FormatTime(_currentTimeSeconds);
+        UpdatePlayhead();
+        UpdateZoomSimulation();
+    }
+
+    private void OnPageKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        var focused = FocusManager.GetFocusedElement(this.XamlRoot);
+        if (focused is TextBox || focused is NumberBox) return;
+
+        var ctrlState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+        bool isCtrl = (ctrlState & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+
+        switch (e.Key)
+        {
+            case Windows.System.VirtualKey.Space:
+                e.Handled = true;
+                if (_isPlaying) PausePlayback();
+                else StartPlayback();
+                break;
+
+            case Windows.System.VirtualKey.Left:
+                e.Handled = true;
+                SeekToTime(_currentTimeSeconds - (isCtrl ? 5.0 : 1.0));
+                break;
+
+            case Windows.System.VirtualKey.Right:
+                e.Handled = true;
+                SeekToTime(_currentTimeSeconds + (isCtrl ? 5.0 : 1.0));
+                break;
+
+            case Windows.System.VirtualKey.Home:
+                e.Handled = true;
+                SeekToTime(0);
+                break;
+
+            case Windows.System.VirtualKey.End:
+                e.Handled = true;
+                SeekToTime(_totalDurationSeconds);
+                break;
+
+            case Windows.System.VirtualKey.Z when isCtrl:
+                e.Handled = true;
+                OnUndoClicked(this, new RoutedEventArgs());
+                break;
+
+            case Windows.System.VirtualKey.Y when isCtrl:
+                e.Handled = true;
+                OnRedoClicked(this, new RoutedEventArgs());
+                break;
+
+            case Windows.System.VirtualKey.Delete:
+            case Windows.System.VirtualKey.Back:
+                if (_selectedZoom != null)
+                {
+                    e.Handled = true;
+                    DeleteZoom(_selectedZoom);
+                }
+                break;
+
+            case Windows.System.VirtualKey.S when !isCtrl:
+                e.Handled = true;
+                OnSplitClicked(this, new RoutedEventArgs());
+                break;
+        }
     }
 
     private void OnSkipPrevClicked(object sender, RoutedEventArgs e)
     {
-        _currentTimeSeconds = 0;
-        VideoPlayer?.MediaPlayer?.PlaybackSession?.let(s => s.Position = TimeSpan.Zero);
-        UpdatePlayhead();
-        TbCurrentTime.Text = FormatTime(0);
-        TbTimelineCurrent.Text = FormatTime(0);
+        SeekToTime(0);
     }
 
     private void OnSkipNextClicked(object sender, RoutedEventArgs e)
     {
-        _currentTimeSeconds = _totalDurationSeconds;
-        UpdatePlayhead();
-        TbCurrentTime.Text = FormatTime(_currentTimeSeconds);
-        TbTimelineCurrent.Text = FormatTime(_currentTimeSeconds);
+        SeekToTime(_totalDurationSeconds);
     }
 
     private void OnVideoCanvasClicked(object sender, RoutedEventArgs e)
@@ -465,18 +852,44 @@ public sealed partial class EditorPage : Page
     {
         if (TbZoomLevel != null)
             TbZoomLevel.Text = $"{(int)e.NewValue}%";
+        if (ViewModel != null)
+            ViewModel.DefaultZoomScale = e.NewValue / 100.0;
     }
 
     private void OnMotionBlurChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
         if (TbMotionBlur != null)
             TbMotionBlur.Text = $"{(int)e.NewValue}%";
+        if (ViewModel != null)
+            ViewModel.MotionBlurAmount = e.NewValue;
     }
 
     private void OnOpacityChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
         if (TbOpacity != null)
             TbOpacity.Text = $"{(int)e.NewValue}%";
+        if (ViewModel != null)
+            ViewModel.BackgroundOpacity = e.NewValue;
+    }
+
+    private void OnMicVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (TbMicVolVal != null)
+            TbMicVolVal.Text = $"{(int)e.NewValue}%";
+        if (ViewModel != null)
+            ViewModel.MicVolume = e.NewValue;
+        if (_micPlayer != null)
+            _micPlayer.Volume = e.NewValue / 100.0;
+    }
+
+    private void OnSysVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (TbSysVolVal != null)
+            TbSysVolVal.Text = $"{(int)e.NewValue}%";
+        if (ViewModel != null)
+            ViewModel.SysVolume = e.NewValue;
+        if (_sysPlayer != null)
+            _sysPlayer.Volume = e.NewValue / 100.0;
     }
 
     private void OnSelectedZoomFactorChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -485,6 +898,7 @@ public sealed partial class EditorPage : Page
         _selectedZoom.Scale = e.NewValue;
         TbSelectedZoomFactor.Text = $"{e.NewValue:F1}x";
         RenderZoomPills();
+        UpdateZoomSimulation();
     }
 
     private void OnSpeedSelected(object sender, RoutedEventArgs e)
@@ -495,6 +909,29 @@ public sealed partial class EditorPage : Page
         ResetSpeedButton(BtnSpeedFast);
         btn.Background = new SolidColorBrush(Color.FromArgb(255, 13, 14, 21));
         btn.Foreground = new SolidColorBrush(Color.FromArgb(255, 192, 193, 255));
+
+        if (ViewModel != null)
+        {
+            double speed = btn.Tag switch
+            {
+                "Slow" => 0.5,
+                "Fast" => 1.5,
+                _ => 1.0
+            };
+            ViewModel.VideoSpeed = speed;
+            if (VideoPlayer?.MediaPlayer?.PlaybackSession != null)
+            {
+                VideoPlayer.MediaPlayer.PlaybackSession.PlaybackRate = speed;
+            }
+            if (_micPlayer?.PlaybackSession != null)
+            {
+                _micPlayer.PlaybackSession.PlaybackRate = speed;
+            }
+            if (_sysPlayer?.PlaybackSession != null)
+            {
+                _sysPlayer.PlaybackSession.PlaybackRate = speed;
+            }
+        }
     }
 
     private void ResetSpeedButton(Button btn)
@@ -505,20 +942,42 @@ public sealed partial class EditorPage : Page
 
     private void OnBgColorSelected(object sender, TappedRoutedEventArgs e)
     {
+        if (sender is Border border && border.Tag is string tag && ViewModel != null)
+        {
+            switch (tag)
+            {
+                case "Black":
+                    ViewModel.CanvasBackground = "#000000";
+                    ViewModel.BackgroundStyle = "dark";
+                    break;
+                case "DarkGray":
+                    ViewModel.CanvasBackground = "#1A1A1A";
+                    ViewModel.BackgroundStyle = "gradient-1";
+                    break;
+                case "Purple":
+                    ViewModel.CanvasBackground = "#1E1B4B";
+                    ViewModel.BackgroundStyle = "gradient-2";
+                    break;
+            }
+            ViewModel.SaveProject();
+        }
     }
 
     private void OnAddZoomClicked(object sender, RoutedEventArgs e)
     {
         if (ViewModel == null) return;
+        ViewModel.PushHistory();
+
         var newZoom = new ZoomEffect
         {
             Id = Guid.NewGuid().ToString("N")[..8],
             Name = $"Zoom {ViewModel.ZoomEffects.Count + 1}",
-            StartTime = _currentTimeSeconds,
+            StartTime = Math.Round(_currentTimeSeconds, 2),
             Duration = 3.0,
-            Scale = 1.5,
-            TargetX = 1920 / 2,
-            TargetY = 1080 / 2
+            Scale = ViewModel.DefaultZoomScale,
+            TargetX = 1920 / 2.0,
+            TargetY = 1080 / 2.0,
+            Easing = "ease-in-out"
         };
         ViewModel.ZoomEffects.Add(newZoom);
         SelectZoom(newZoom);
@@ -532,18 +991,29 @@ public sealed partial class EditorPage : Page
 
     private void OnUndoClicked(object sender, RoutedEventArgs e)
     {
+        ViewModel?.Undo();
+        UpdateFromViewModel();
+        RenderTimeline();
+        UpdateZoomSimulation();
     }
 
     private void OnRedoClicked(object sender, RoutedEventArgs e)
     {
+        ViewModel?.Redo();
+        UpdateFromViewModel();
+        RenderTimeline();
+        UpdateZoomSimulation();
     }
 
     private void OnSplitClicked(object sender, RoutedEventArgs e)
     {
+        ViewModel?.CutAtPlayhead();
+        RenderTimeline();
     }
 
     private void OnBackClicked(object sender, RoutedEventArgs e)
     {
+        PausePlayback();
         MainWindow.CurrentInstance?.NavigateToDashboard();
     }
 
@@ -554,7 +1024,12 @@ public sealed partial class EditorPage : Page
 
     private void OnExportClicked(object sender, RoutedEventArgs e)
     {
-        ViewModel?.Export();
+        PausePlayback();
+        ViewModel?.SaveProject();
+        if (!string.IsNullOrEmpty(ViewModel?.ProjectDir))
+        {
+            MainWindow.CurrentInstance?.NavigateToExport(ViewModel.ProjectDir);
+        }
     }
 
     private static string FormatTime(double seconds)

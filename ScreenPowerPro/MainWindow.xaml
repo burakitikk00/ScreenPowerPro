@@ -14,17 +14,7 @@
     </Window.SystemBackdrop>
 
     <Grid Background="{StaticResource AppBgBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="40" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <!-- Custom App Title Bar -->
-        <Grid x:Name="AppTitleBar" Grid.Row="0" Background="Transparent">
-            <!-- The drag region will be set in code-behind -->
-        </Grid>
-
-        <!-- Main Content Frame -->
-        <Frame x:Name="RootFrame" Grid.Row="1" />
+        <!-- Main Content Frame occupying full window canvas -->
+        <Frame x:Name="RootFrame" />
     </Grid>
 </Window>

@@ -4,12 +4,15 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:ScreenPowerPro"
+    xmlns:helpers="using:ScreenPowerPro.Helpers"
     RequestedTheme="Dark">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+
+            <helpers:BoolToVisibilityConverter x:Key="BoolToVisConverter" />
 
             <!-- =============================================
                  OBSIDIAN FLUX DARK - Design System Colors

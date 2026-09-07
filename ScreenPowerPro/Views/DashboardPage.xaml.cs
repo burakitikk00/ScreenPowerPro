@@ -1,155 +1,494 @@
 using System;
-using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Windowing;
+using ScreenPowerPro.Models;
 using ScreenPowerPro.Services;
 using ScreenPowerPro.ViewModels;
+using Windows.Graphics;
+using Windows.Storage.Pickers;
 
 namespace ScreenPowerPro.Views;
 
 public sealed partial class DashboardPage : Page
 {
     public DashboardViewModel ViewModel { get; }
+    private readonly AudioLevelMonitorService _audioMonitor;
 
-    private string _selectedMode = "FullScreen";
+    private string _activeMode = "FullScreen";
 
     public DashboardPage()
     {
         InitializeComponent();
         ViewModel = App.Current.Services.GetRequiredService<DashboardViewModel>();
+        _audioMonitor = App.Current.Services.GetRequiredService<AudioLevelMonitorService>();
         DataContext = ViewModel;
 
         ViewModel.RequestStartRecording += OnRecordingStarted;
         Loaded += OnPageLoaded;
+        Unloaded += OnPageUnloaded;
     }
 
-    private void OnPageLoaded(object sender, RoutedEventArgs e)
+    private async void OnPageLoaded(object sender, RoutedEventArgs e)
     {
-        SelectModeCard("FullScreen");
-        LoadRecentRecordings();
-        LoadDeviceNames();
+        MainWindow.CurrentInstance?.SetTitleBar(TitleBarDragArea);
+        UpdateTitleBarLayout();
+        if (XamlRoot != null)
+        {
+            XamlRoot.Changed += OnXamlRootChanged;
+        }
+
+        SelectMode("FullScreen");
+        await ViewModel.InitializeDevicesAsync();
+        UpdateOnlyAppMenuText();
+
+        _audioMonitor.AudioLevelsChanged += OnAudioLevelsChanged;
+        _audioMonitor.StartMonitoring();
     }
 
-    private void LoadDeviceNames()
+    private void OnPageUnloaded(object sender, RoutedEventArgs e)
     {
-        TbMicName.Text = "Default Microphone";
-        TbAudioName.Text = "Default";
-        TbCameraName.Text = "No Camera";
+        if (XamlRoot != null)
+        {
+            XamlRoot.Changed -= OnXamlRootChanged;
+        }
+        _audioMonitor.AudioLevelsChanged -= OnAudioLevelsChanged;
+        _audioMonitor.StopMonitoring();
     }
 
-    private void LoadRecentRecordings()
+    private void OnXamlRootChanged(XamlRoot sender, XamlRootChangedEventArgs args)
+    {
+        UpdateTitleBarLayout();
+    }
+
+    private void UpdateTitleBarLayout()
+    {
+        if (MainWindow.CurrentInstance != null && AppWindowTitleBar.IsCustomizationSupported())
+        {
+            var titleBar = MainWindow.CurrentInstance.AppWindow.TitleBar;
+            double scale = XamlRoot?.RasterizationScale ?? 1.0;
+            double rightInset = titleBar.RightInset > 0 ? (titleBar.RightInset / scale) : 96.0;
+            CaptionSpacerColumn.Width = new GridLength(Math.Max(rightInset, 90.0));
+        }
+    }
+
+    private void OnAudioLevelsChanged(float micLevel, float speakerLevel)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            // Mikrofon alttan yukarıya sese duyarlı dolgu ve pill göstergesi
+            MicAudioLevelFill.Height = Math.Clamp(micLevel * 30.0, 0.0, 30.0);
+            MicAudioPillBar.Height = Math.Clamp(micLevel * 14.0, 0.0, 14.0);
+
+            // Hoparlör alttan yukarıya sese duyarlı dolgu ve pill göstergesi
+            SpeakerAudioLevelFill.Height = Math.Clamp(speakerLevel * 30.0, 0.0, 30.0);
+            SpeakerAudioPillBar.Height = Math.Clamp(speakerLevel * 14.0, 0.0, 14.0);
+        });
+    }
+
+    #region Recording Mode Cards
+
+    private void OnModeCardClicked(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border card && card.Tag is string mode)
+        {
+            SelectMode(mode);
+        }
+    }
+
+    private void SelectMode(string mode)
+    {
+        _activeMode = mode;
+
+        // Reset all card borders to inactive
+        ResetCardBorder(BorderCardFullScreen);
+        ResetCardBorder(BorderCardCustom);
+        ResetCardBorder(BorderCardWindow);
+        ResetCardBorder(BorderCardDevice);
+
+        // Highlight selected
+        Border selectedCard = mode switch
+        {
+            "FullScreen" => BorderCardFullScreen,
+            "CustomArea" => BorderCardCustom,
+            "Window" => BorderCardWindow,
+            "Device" => BorderCardDevice,
+            _ => BorderCardFullScreen
+        };
+
+        selectedCard.BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 37, 99, 235)); // #2563EB Vivid Blue
+        selectedCard.BorderThickness = new Thickness(2);
+
+        // Update ViewModel Mode
+        switch (mode)
+        {
+            case "FullScreen":
+                ViewModel.SelectedMode = RecordingMode.FullScreen;
+                break;
+            case "CustomArea":
+                ViewModel.SelectedMode = RecordingMode.Region;
+                break;
+            case "Window":
+                ViewModel.SelectedMode = RecordingMode.Window;
+                ViewModel.RefreshWindows();
+                break;
+            case "Device":
+                ViewModel.SelectedMode = RecordingMode.FullScreen;
+                break;
+        }
+    }
+
+    private void ResetCardBorder(Border card)
+    {
+        card.BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 31, 32, 43)); // #1F202B
+        card.BorderThickness = new Thickness(1);
+    }
+
+    #endregion
+
+    #region Device Dropdowns & Selection
+
+    private void OnCameraDropdownClicked(object sender, RoutedEventArgs e)
+    {
+        CameraItemsList.ItemsSource = ViewModel.DeviceManager.Cameras;
+        CameraPopupOverlay.Visibility = Visibility.Visible;
+        MicPopupOverlay.Visibility = Visibility.Collapsed;
+        SpeakerPopupOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnSelectCameraItem(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is DeviceItem item)
+        {
+            ViewModel.DeviceManager.SelectCamera(item.Id);
+            CameraPopupOverlay.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnMicDropdownClicked(object sender, RoutedEventArgs e)
+    {
+        MicItemsList.ItemsSource = ViewModel.DeviceManager.Microphones;
+        MicPopupOverlay.Visibility = Visibility.Visible;
+        CameraPopupOverlay.Visibility = Visibility.Collapsed;
+        SpeakerPopupOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnSelectMicItem(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is DeviceItem item)
+        {
+            ViewModel.DeviceManager.SelectMicrophone(item.Id);
+            MicPopupOverlay.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnSpeakerDropdownClicked(object sender, RoutedEventArgs e)
+    {
+        SpeakerItemsList.ItemsSource = ViewModel.DeviceManager.Speakers;
+        AudioAppItemsList.ItemsSource = ViewModel.DeviceManager.OpenAudioApps;
+        UpdateOnlyAppMenuText();
+
+        SpeakerPopupOverlay.Visibility = Visibility.Visible;
+        CameraPopupOverlay.Visibility = Visibility.Collapsed;
+        MicPopupOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnSelectSpeakerItem(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is DeviceItem item)
+        {
+            ViewModel.DeviceManager.SelectSpeaker(item.Id);
+            SpeakerPopupOverlay.Visibility = Visibility.Collapsed;
+            OnlyAppSubFlyout.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnToggleOnlyAppSubFlyout(object sender, RoutedEventArgs e)
+    {
+        ViewModel.DeviceManager.RefreshOpenAudioApps();
+        AudioAppItemsList.ItemsSource = ViewModel.DeviceManager.OpenAudioApps;
+
+        OnlyAppSubFlyout.Visibility = OnlyAppSubFlyout.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    private void OnAppAudioCheckChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox cb && cb.Tag is AudioAppItem app)
+        {
+            ViewModel.DeviceManager.ToggleAppAudioSelection(app, cb.IsChecked == true);
+            UpdateOnlyAppMenuText();
+        }
+    }
+
+    private void UpdateOnlyAppMenuText()
+    {
+        int count = ViewModel.DeviceManager.GetSelectedAppCount();
+        TbOnlyAppMenuText.Text = $"Only App Audio ({count})";
+    }
+
+    private void OnClosePopupOverlay(object sender, PointerRoutedEventArgs e)
+    {
+        CameraPopupOverlay.Visibility = Visibility.Collapsed;
+        MicPopupOverlay.Visibility = Visibility.Collapsed;
+        SpeakerPopupOverlay.Visibility = Visibility.Collapsed;
+        OnlyAppSubFlyout.Visibility = Visibility.Collapsed;
+    }
+
+    #endregion
+
+    #region Teleprompter
+
+    private void OnTeleprompterClicked(object sender, RoutedEventArgs e)
+    {
+        var teleprompter = new TeleprompterWindow();
+        teleprompter.Activate();
+    }
+
+    #endregion
+
+    #region File Menu & History Modal
+
+    private void OnFileHistoryClicked(object sender, RoutedEventArgs e)
     {
         ViewModel.RefreshRecentProjects();
-        var projects = ViewModel.RecentProjects;
+        RefreshHistoryProjectsList();
+        FileHistoryModalOverlay.Visibility = Visibility.Visible;
+    }
 
+    private void OnCloseFileHistory(object sender, RoutedEventArgs e)
+    {
+        FileHistoryModalOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void RefreshHistoryProjectsList()
+    {
+        var projects = ViewModel.RecentProjects;
         if (projects == null || !projects.Any())
         {
-            EmptyRecordingsState.Visibility = Visibility.Visible;
-            RecentRecordingsList.ItemsSource = null;
+            TbHistoryEmpty.Visibility = Visibility.Visible;
+            HistoryProjectsList.ItemsSource = null;
         }
         else
         {
-            EmptyRecordingsState.Visibility = Visibility.Collapsed;
-            RecentRecordingsList.ItemsSource = projects.Take(3);
+            TbHistoryEmpty.Visibility = Visibility.Collapsed;
+            HistoryProjectsList.ItemsSource = projects;
         }
     }
 
-    private void OnModeSelected(object sender, RoutedEventArgs e)
+    private void OnTabProjectHistoryClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is Button btn && btn.Tag is string mode)
-        {
-            SelectModeCard(mode);
-            _selectedMode = mode;
+        BtnTabProjectHistory.Background = new SolidColorBrush(ColorHelper.FromArgb(255, 30, 58, 138));
+        BtnTabProjectHistory.BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 59, 130, 246));
+        BtnTabProjectHistory.BorderThickness = new Thickness(1);
 
-            switch (mode)
+        BtnTabSharingHistory.Background = new SolidColorBrush(ColorHelper.FromArgb(255, 26, 27, 36));
+        BtnTabSharingHistory.BorderThickness = new Thickness(0);
+
+        RefreshHistoryProjectsList();
+    }
+
+    private void OnTabSharingHistoryClicked(object sender, RoutedEventArgs e)
+    {
+        BtnTabSharingHistory.Background = new SolidColorBrush(ColorHelper.FromArgb(255, 30, 58, 138));
+        BtnTabSharingHistory.BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 59, 130, 246));
+        BtnTabSharingHistory.BorderThickness = new Thickness(1);
+
+        BtnTabProjectHistory.Background = new SolidColorBrush(ColorHelper.FromArgb(255, 26, 27, 36));
+        BtnTabProjectHistory.BorderThickness = new Thickness(0);
+
+        // Sharing history empty placeholder
+        TbHistoryEmpty.Text = "No sharing history available.";
+        TbHistoryEmpty.Visibility = Visibility.Visible;
+        HistoryProjectsList.ItemsSource = null;
+    }
+
+    private void OnOpenProjectFromHistory(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is ProjectInfo project)
+        {
+            FileHistoryModalOverlay.Visibility = Visibility.Collapsed;
+            MainWindow.CurrentInstance?.NavigateToEditor(project.FolderPath);
+        }
+    }
+
+    private async void OnRenameProjectClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is ProjectInfo project)
+        {
+            var textBox = new TextBox
             {
-                case "FullScreen": ViewModel.SelectedMode = RecordingMode.FullScreen; break;
-                case "CustomArea": ViewModel.SelectedMode = RecordingMode.Region; break;
-                case "Window":
-                    ViewModel.SelectedMode = RecordingMode.Window;
-                    ViewModel.RefreshWindows();
-                    break;
-                case "Camera": ViewModel.SelectedMode = RecordingMode.FullScreen; break;
+                Text = project.Name,
+                PlaceholderText = "Yeni proje adı girin",
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = "Projeyi Yeniden Adlandır",
+                Content = textBox,
+                PrimaryButtonText = "Kaydet",
+                CloseButtonText = "İptal",
+                XamlRoot = XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(textBox.Text))
+            {
+                ViewModel.RenameProject(project.FolderPath, textBox.Text.Trim());
+                RefreshHistoryProjectsList();
             }
         }
     }
 
-    private void SelectModeCard(string mode)
+    private void OnRevealProjectClicked(object sender, RoutedEventArgs e)
     {
-        // Reset all cards to default
-        ResetCardStyle(BtnFullScreen);
-        ResetCardStyle(BtnCustomArea);
-        ResetCardStyle(BtnWindow);
-        ResetCardStyle(BtnCamera);
-
-        // Highlight selected
-        var selected = mode switch
+        if (sender is Button btn && btn.Tag is ProjectInfo project)
         {
-            "FullScreen" => BtnFullScreen,
-            "CustomArea" => BtnCustomArea,
-            "Window" => BtnWindow,
-            "Camera" => BtnCamera,
-            _ => BtnFullScreen
-        };
-
-        selected.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(51, 192, 193, 255)); // primary/20
-        selected.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(128, 192, 193, 255)); // primary/50
-
-        // Update icon color inside selected
-        UpdateCardIconColor(selected, (Windows.UI.Color)App.Current.Resources["PrimaryColor"]);
-    }
-
-    private void ResetCardStyle(Button card)
-    {
-        card.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(13, 255, 255, 255)); // white/5
-        card.BorderBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(26, 255, 255, 255)); // white/10
-        UpdateCardIconColor(card, (Windows.UI.Color)App.Current.Resources["TextSecondaryColor"]);
-    }
-
-    private void UpdateCardIconColor(Button card, Windows.UI.Color color)
-    {
-        if (card.Content is Border border &&
-            border.Child is StackPanel sp)
-        {
-            foreach (var child in sp.Children)
+            try
             {
-                if (child is Border iconBorder && iconBorder.Child is FontIcon icon)
-                    icon.Foreground = new SolidColorBrush(color);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{project.FolderPath}\"",
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        }
+    }
+
+    private async void OnDeleteProjectClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is ProjectInfo project)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Projeyi Sil",
+                Content = $"\"{project.Name}\" projesini ve tüm kayıt dosyalarını kalıcı olarak silmek istediğinizden emin misiniz?",
+                PrimaryButtonText = "Sil",
+                CloseButtonText = "İptal",
+                XamlRoot = XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary)
+            {
+                ViewModel.DeleteProject(project.FolderPath);
+                RefreshHistoryProjectsList();
             }
         }
     }
 
-    private void OnCameraDeviceClicked(object sender, RoutedEventArgs e)
+    private async void OnImportVideoClicked(object sender, RoutedEventArgs e)
     {
-        // Device picker flyout — future implementation
+        try
+        {
+            var picker = new FileOpenPicker();
+            picker.ViewMode = PickerViewMode.Thumbnail;
+            picker.SuggestedStartLocation = PickerLocationId.VideosLibrary;
+            picker.FileTypeFilter.Add(".mp4");
+            picker.FileTypeFilter.Add(".mov");
+            picker.FileTypeFilter.Add(".mkv");
+            picker.FileTypeFilter.Add(".avi");
+            picker.FileTypeFilter.Add(".webm");
+
+            IntPtr hwnd = MainWindow.CurrentInstance?.GetWindowHandle() ?? IntPtr.Zero;
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+            var file = await picker.PickSingleFileAsync();
+            if (file != null)
+            {
+                string projectDir = ViewModel.ImportVideo(file.Path);
+                MainWindow.CurrentInstance?.NavigateToEditor(projectDir);
+            }
+        }
+        catch { }
     }
 
-    private void OnMicDeviceClicked(object sender, RoutedEventArgs e)
+    #endregion
+
+    #region Navigation & Recording
+
+    private void OnSettingsClicked(object sender, RoutedEventArgs e)
     {
-        // Mic device picker — future implementation
+        Frame.Navigate(typeof(SettingsPage));
     }
 
-    private void OnAudioDeviceClicked(object sender, RoutedEventArgs e)
+    private void OnStartRecordingClicked(object sender, RoutedEventArgs e)
     {
-        // Audio device picker — future implementation
-    }
+        var settingsService = App.Current.Services.GetRequiredService<SettingsService>();
+        int countdown = settingsService.Current.CountdownSeconds;
 
-    private async void OnStartRecording(object sender, RoutedEventArgs e)
-    {
-        ViewModel.IsHideCursorEnabled = TsHideCursor.IsOn;
-        ViewModel.IsSystemAudioEnabled = TsRecordAudio.IsOn;
-        await ViewModel.StartRecordingAsync();
+        if (countdown > 0)
+        {
+            if (MainWindow.CurrentInstance != null)
+            {
+                var appWin = MainWindow.CurrentInstance.AppWindow;
+                if (appWin.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+                {
+                    presenter.Minimize();
+                }
+            }
+
+            var countdownWindow = new CountdownWindow(countdown, async () =>
+            {
+                await ViewModel.StartRecordingAsync();
+            });
+            countdownWindow.Activate();
+        }
+        else
+        {
+            if (MainWindow.CurrentInstance != null)
+            {
+                var appWin = MainWindow.CurrentInstance.AppWindow;
+                if (appWin.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+                {
+                    presenter.Minimize();
+                }
+            }
+            _ = ViewModel.StartRecordingAsync();
+        }
     }
 
     private void OnRecordingStarted(string projectDir)
     {
+        // 1. Floating Recording Bar
         var recordingBar = new RecordingBarWindow(projectDir);
         recordingBar.Activate();
 
         var settingsService = App.Current.Services.GetRequiredService<SettingsService>();
+
+        // 2. Camera overlay if enabled and not "none"
+        if (settingsService.Current.CameraEnabled &&
+            !string.IsNullOrEmpty(settingsService.Current.SelectedCameraDevice) &&
+            settingsService.Current.SelectedCameraDevice != "none")
+        {
+            var cameraOverlay = new CameraOverlayWindow();
+            cameraOverlay.Activate();
+        }
+
+        // 3. Mask overlay if region recording
+        if (ViewModel.SelectedMode == RecordingMode.Region && ViewModel.LastCropWidth > 0 && ViewModel.LastCropHeight > 0)
+        {
+            var maskOverlay = new MaskOverlayWindow(
+                ViewModel.LastCropX,
+                ViewModel.LastCropY,
+                ViewModel.LastCropWidth,
+                ViewModel.LastCropHeight);
+            maskOverlay.Activate();
+        }
+
+        // 4. Window exclusion from capture
         if (settingsService.Current.ExcludeAppFromRecording && MainWindow.CurrentInstance != null)
         {
             Helpers.Win32Helper.SetWindowDisplayAffinity(
@@ -159,16 +498,5 @@ public sealed partial class DashboardPage : Page
         }
     }
 
-    private void OnViewAllClicked(object sender, RoutedEventArgs e)
-    {
-        // MainWindow.CurrentInstance?.NavigateToLibrary();
-    }
-
-    private void OnOpenRecentRecording(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is string projectDir)
-        {
-            MainWindow.CurrentInstance?.NavigateToEditor(projectDir);
-        }
-    }
+    #endregion
 }

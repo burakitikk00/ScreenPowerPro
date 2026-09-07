@@ -8,6 +8,10 @@ using ScreenPowerPro.Services;
 
 namespace ScreenPowerPro.ViewModels;
 
+/// <summary>
+/// Kayıt sırasında ekranda kalan küçük kontrol çubuğunun (RecordingBar) ViewModel'ı.
+/// Süre gösterimi, duraklatma/devam etme ve kaydı sonlandırıp projeyi oluşturma mantığını yönetir.
+/// </summary>
 public partial class RecordingBarViewModel : ObservableObject
 {
     private readonly ScreenRecorderService _recorderService;
@@ -20,6 +24,9 @@ public partial class RecordingBarViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isRecording;
+
+    [ObservableProperty]
+    private bool _isPaused;
 
     private string? _activeProjectDir;
 
@@ -47,9 +54,25 @@ public partial class RecordingBarViewModel : ObservableObject
     {
         _activeProjectDir = projectDir;
         IsRecording = true;
+        IsPaused = false;
         ElapsedTime = "00:00:00";
     }
 
+    /// <summary>
+    /// Kaydı duraklatır veya duraklatılmış kaydı devam ettirir.
+    /// </summary>
+    [RelayCommand]
+    public void TogglePause()
+    {
+        if (!IsRecording) return;
+        IsPaused = !IsPaused;
+        // İleride FFmpeg pause/resume sinyali genişletilebilir
+    }
+
+    /// <summary>
+    /// Kaydı sonlandırır, fare/klavye olaylarını kaydeder, otomatik zoom efektlerini
+    /// hesaplar ve göreceli dosya yollarıyla proje manifestosunu kaydeder.
+    /// </summary>
     [RelayCommand]
     public async Task StopRecordingAsync()
     {
@@ -57,36 +80,75 @@ public partial class RecordingBarViewModel : ObservableObject
 
         IsRecording = false;
 
-        // 1. Stop video recording
+        // 1. Video kaydını ve FFmpeg sürecini durdur
         await _recorderService.StopRecordingAsync();
 
-        // 2. Stop input tracking
+        // 2. Win32 Low-Level Hook giriş takibini durdur
         _inputTracker.StopTracking();
 
-        // 3. Save raw input logs
+        // 3. Ham giriş verilerini proje klasörüne JSON olarak kaydet
         _projectService.SaveMouseClicks(_activeProjectDir, _inputTracker.Clicks);
         _projectService.SaveMouseMoves(_activeProjectDir, _inputTracker.Moves);
         _projectService.SaveKeystrokes(_activeProjectDir, _inputTracker.Keystrokes);
 
-        // 4. Generate Auto Zoom Effects if enabled
+        double duration = _recorderService.ElapsedSeconds;
+
+        // 4. Proje manifestosunu göreceli yollarla oluştur (Taşınabilirlik için kritik)
         var manifest = new ProjectManifest
         {
             ProjectName = Path.GetFileName(_activeProjectDir),
-            VideoPath = Path.Combine(_activeProjectDir, "recording", "display-0.mp4"),
-            MicAudioPath = Path.Combine(_activeProjectDir, "recording", "microphone-0.wav"),
-            SystemAudioPath = Path.Combine(_activeProjectDir, "recording", "system_audio-0.wav"),
+            VideoPath = "./recording/display-0.mp4",
+            MicAudioPath = _settingsService.Current.MicAudioEnabled ? "./recording/microphone-0.wav" : null,
+            SystemAudioPath = _settingsService.Current.SystemAudioEnabled ? "./recording/system_audio-0.wav" : null,
             Metadata = new RecordingMetadata
             {
-                DurationSeconds = _recorderService.ElapsedSeconds,
+                DurationSeconds = duration,
                 Fps = _settingsService.Current.Fps,
                 HasMicAudio = _settingsService.Current.MicAudioEnabled,
                 HasSystemAudio = _settingsService.Current.SystemAudioEnabled
             }
         };
 
+        // 5. Otomatik zoom efektlerini ZoomEngineService ve kümeleme ile hesapla
         if (_settingsService.Current.AutoZoom)
         {
-            manifest.Timeline.ZoomEffects = _inputTracker.GenerateAutoZoomEffects(_recorderService.ElapsedSeconds);
+            manifest.Timeline.ZoomEffects = _inputTracker.GenerateAutoZoomEffects(
+                maxVideoDurationSec: duration,
+                autoZoomMode: _settingsService.Current.AutoZoomMode);
+        }
+
+        // 6. İlk tam boy klip segmentlerini oluştur
+        if (duration > 0)
+        {
+            manifest.Timeline.VideoTrack.Clips.Add(new ClipSegment
+            {
+                Id = $"clip-video-{Guid.NewGuid():N}",
+                SourceStart = 0,
+                SourceEnd = duration,
+                TrackOffset = 0
+            });
+
+            if (_settingsService.Current.MicAudioEnabled)
+            {
+                manifest.Timeline.MicTrack.Clips.Add(new ClipSegment
+                {
+                    Id = $"clip-mic-{Guid.NewGuid():N}",
+                    SourceStart = 0,
+                    SourceEnd = duration,
+                    TrackOffset = 0
+                });
+            }
+
+            if (_settingsService.Current.SystemAudioEnabled)
+            {
+                manifest.Timeline.SysTrack.Clips.Add(new ClipSegment
+                {
+                    Id = $"clip-sys-{Guid.NewGuid():N}",
+                    SourceStart = 0,
+                    SourceEnd = duration,
+                    TrackOffset = 0
+                });
+            }
         }
 
         _projectService.SaveProject(_activeProjectDir, manifest);

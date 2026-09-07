@@ -5,455 +5,834 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:ScreenPowerPro.Models"
+    xmlns:services="using:ScreenPowerPro.Services"
     mc:Ignorable="d"
-    Background="{StaticResource AppBgBrush}">
+    Background="#0E0F14">
 
     <Page.Resources>
-        <!-- Mode card hover style -->
-        <Style x:Key="ModeCardStyle" TargetType="Button">
-            <Setter Property="Background" Value="#0DFFFFFF" />
-            <Setter Property="BorderBrush" Value="#1AFFFFFF" />
+        <!-- Device dropdown button style -->
+        <Style x:Key="DeviceDropdownButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#171821" />
+            <Setter Property="BorderBrush" Value="#252733" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="20" />
-            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="8,0" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="VerticalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="VerticalContentAlignment" Value="Stretch" />
         </Style>
-        <Style x:Key="DevicePillSectionStyle" TargetType="Button">
+
+        <!-- Device icon box style -->
+        <Style x:Key="DeviceIconBoxStyle" TargetType="Border">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Background" Value="#171821" />
+            <Setter Property="BorderBrush" Value="#252733" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <!-- Dropdown Menu Item Style -->
+        <Style x:Key="DropdownItemButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="16,10" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="CornerRadius" Value="6" />
         </Style>
     </Page.Resources>
 
     <Grid>
-        <!-- Atmospheric background glow -->
-        <Ellipse
-            Width="600" Height="600"
-            HorizontalAlignment="Center" VerticalAlignment="Center"
-            Margin="0,-100,0,0">
-            <Ellipse.Fill>
-                <RadialGradientBrush>
-                    <GradientStop Color="#1AC0C1FF" Offset="0" />
-                    <GradientStop Color="#00000000" Offset="1" />
-                </RadialGradientBrush>
-            </Ellipse.Fill>
-        </Ellipse>
+        <!-- Main Dashboard Content -->
+        <Grid Padding="24,6,24,12">
+            <Grid.RowDefinitions>
+                <!-- 1. Header Bar -->
+                <RowDefinition Height="Auto" />
+                <!-- 2. Spacer -->
+                <RowDefinition Height="8" />
+                <!-- 3. Subtitle / Instruction -->
+                <RowDefinition Height="Auto" />
+                <!-- 4. Spacer -->
+                <RowDefinition Height="8" />
+                <!-- 5. Main Area (4 Cards + Device Column) -->
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-        <!-- Main content centered -->
-        <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="600" Margin="0,0,0,0">
-            
-            <!-- Glassmorphism Card -->
-            <Border
-                CornerRadius="24"
-                BorderBrush="{StaticResource GlassBorderBrush}"
-                BorderThickness="1"
-                Padding="40,36">
-                <Border.Background>
-                    <AcrylicBrush
-                        TintColor="#1E1F27"
-                        TintOpacity="0.85"
-                        FallbackColor="#CC1E1F27" />
-                </Border.Background>
+            <!-- ====================================================
+                 1. TOP HEADER BAR
+                 ==================================================== -->
+            <Grid Grid.Row="0" Height="36">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition x:Name="CaptionSpacerColumn" Width="96" />
+                </Grid.ColumnDefinitions>
 
-                <StackPanel Spacing="28">
+                <!-- Left: Logo & File Menu -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <!-- Brand Swirl Icon -->
+                    <Border Width="24" Height="24" CornerRadius="12">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#00D2FF" Offset="0.0"/>
+                                <GradientStop Color="#9B51E0" Offset="0.6"/>
+                                <GradientStop Color="#FF007A" Offset="1.0"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <FontIcon Glyph="&#xE768;" FontSize="11" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
 
-                    <!-- Header -->
-                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                        <TextBlock
-                            Text="Ready to Record"
-                            FontSize="32"
-                            FontWeight="SemiBold"
-                            Foreground="{StaticResource TextPrimaryBrush}"
-                            HorizontalAlignment="Center"
-                            CharacterSpacing="-20"/>
-                        <TextBlock
-                            Text="Select your recording mode and configure devices."
-                            FontSize="16"
-                            Foreground="{StaticResource TextSecondaryBrush}"
-                            HorizontalAlignment="Center"/>
-                    </StackPanel>
+                    <!-- App Title -->
+                    <TextBlock Text="ScreenPowerPro" FontSize="14" FontWeight="Bold" Foreground="#F5F5FA" VerticalAlignment="Center"/>
 
-                    <!-- Recording Mode 4-Grid -->
-                    <Grid ColumnSpacing="14" RowSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+                    <!-- File Dropdown Button -->
+                    <Button x:Name="BtnFileMenu"
+                        Background="#171821" BorderBrush="#252733" BorderThickness="1"
+                        CornerRadius="6" Padding="10,4" Margin="4,0,0,0">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuFlyoutItem Text="History" Click="OnFileHistoryClicked">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE81C;" FontSize="13" Foreground="#C0C1FF"/>
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Import Video to Create Project" Click="OnImportVideoClicked">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE8B9;" FontSize="13" Foreground="#00D2FF"/>
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xED25;" FontSize="12" Foreground="#C7C4D7"/>
+                            <TextBlock Text="File" FontSize="12" FontWeight="Medium" Foreground="#E3E1EC"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
 
-                        <!-- Full Screen -->
-                        <Button x:Name="BtnFullScreen"
-                            Grid.Column="0" Grid.Row="0"
-                            Style="{StaticResource ModeCardStyle}"
-                            Click="OnModeSelected"
-                            Tag="FullScreen">
-                            <Border CornerRadius="20" Padding="24,28">
-                                <StackPanel Spacing="14" HorizontalAlignment="Center">
-                                    <Border
-                                        Width="64" Height="64" CornerRadius="32"
-                                        Background="{StaticResource SurfaceContainerBrush}"
-                                        BorderBrush="#1AFFFFFF" BorderThickness="1"
-                                        HorizontalAlignment="Center">
-                                        <FontIcon Glyph="&#xE7F4;" FontSize="28"
-                                            Foreground="{StaticResource TextSecondaryBrush}"
-                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Full Screen" FontSize="15" FontWeight="SemiBold"
-                                        Foreground="{StaticResource TextPrimaryBrush}"
-                                        HorizontalAlignment="Center"/>
-                                </StackPanel>
+                <!-- Center: Window Drag Area -->
+                <Border x:Name="TitleBarDragArea" Grid.Column="1" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+
+                <!-- Right: Referral & Action Icons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <!-- Referral Badge -->
+                    <Border Background="#211F35" BorderBrush="#50458C" BorderThickness="1"
+                        CornerRadius="12" Padding="10,4" Margin="0,0,4,0">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE7BF;" FontSize="11" Foreground="#C0C1FF"/>
+                            <TextBlock Text="Referral" FontSize="11" FontWeight="SemiBold" Foreground="#C0C1FF"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Feedback Button -->
+                    <Button Background="Transparent" BorderThickness="0" CornerRadius="6" Width="28" Height="28" Padding="0"
+                        ToolTipService.ToolTip="Feedback">
+                        <FontIcon Glyph="&#xE939;" FontSize="13" Foreground="#8E8E9F"/>
+                    </Button>
+
+                    <!-- Settings Button -->
+                    <Button Click="OnSettingsClicked"
+                        Background="Transparent" BorderThickness="0" CornerRadius="6" Width="28" Height="28" Padding="0"
+                        ToolTipService.ToolTip="Settings">
+                        <FontIcon Glyph="&#xE713;" FontSize="13" Foreground="#8E8E9F"/>
+                    </Button>
+
+                    <!-- Store / Cart Button -->
+                    <Button Background="Transparent" BorderThickness="0" CornerRadius="6" Width="28" Height="28" Padding="0"
+                        ToolTipService.ToolTip="Pro Store">
+                        <FontIcon Glyph="&#xE7BF;" FontSize="13" Foreground="#E68A2E"/>
+                    </Button>
+
+                    <!-- Profile Circle Button -->
+                    <Border Width="24" Height="24" CornerRadius="12" Background="#E68A2E" Margin="2,0,0,0">
+                        <TextBlock Text="b" FontSize="11" FontWeight="Bold" Foreground="White"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </StackPanel>
+
+                <!-- Far Right: Space reserved for Window Minimize & Close Caption Buttons -->
+                <Border Grid.Column="3" Width="96" Background="Transparent" />
+            </Grid>
+
+            <!-- ====================================================
+                 3. SUBTITLE / INSTRUCTION
+                 ==================================================== -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="260" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                    Text="Please select the recording mode"
+                    FontSize="13" FontWeight="SemiBold" Foreground="#9595A5" VerticalAlignment="Center"/>
+
+                <TextBlock Grid.Column="1"
+                    Text="Device &amp; Tool"
+                    FontSize="12" FontWeight="SemiBold" Foreground="#8E8E9F" VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- ====================================================
+                 5. MAIN RECORDING MODE CARDS (SQUARE) & DEVICE COLUMN
+                 ==================================================== -->
+            <Grid Grid.Row="4" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="260" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: 4 Horizontal Mode Cards (SQUARE) -->
+                <Grid Grid.Column="0" ColumnSpacing="12" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Card 1: Full Screen (Square 125x125) -->
+                    <Border x:Name="BorderCardFullScreen" Grid.Column="0"
+                        Width="125" Height="125"
+                        CornerRadius="14"
+                        Background="#121319"
+                        BorderBrush="#2563EB"
+                        BorderThickness="2"
+                        PointerPressed="OnModeCardClicked"
+                        Tag="FullScreen">
+                        <Grid Padding="8,8" RowSpacing="6">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Preview Thumbnail (Full Screen Wallpaper) -->
+                            <Border Grid.Row="0" CornerRadius="8" Background="#0A0B10" BorderBrush="#1F202B" BorderThickness="1">
+                                <Border CornerRadius="7">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#0F2042" Offset="0"/>
+                                            <GradientStop Color="#1E3A8A" Offset="0.5"/>
+                                            <GradientStop Color="#2563EB" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Grid>
+                                        <Ellipse Width="64" Height="44" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Ellipse.Fill>
+                                                <RadialGradientBrush>
+                                                    <GradientStop Color="#60A5FA" Offset="0"/>
+                                                    <GradientStop Color="#002563EB" Offset="1"/>
+                                                </RadialGradientBrush>
+                                            </Ellipse.Fill>
+                                        </Ellipse>
+                                        <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="#93C5FD" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.9"/>
+                                    </Grid>
+                                </Border>
                             </Border>
-                        </Button>
 
-                        <!-- Custom Area -->
-                        <Button x:Name="BtnCustomArea"
-                            Grid.Column="1" Grid.Row="0"
-                            Style="{StaticResource ModeCardStyle}"
-                            Click="OnModeSelected"
-                            Tag="CustomArea">
-                            <Border CornerRadius="20" Padding="24,28">
-                                <StackPanel Spacing="14" HorizontalAlignment="Center">
-                                    <Border
-                                        Width="64" Height="64" CornerRadius="32"
-                                        Background="{StaticResource SurfaceContainerBrush}"
-                                        BorderBrush="#1AFFFFFF" BorderThickness="1"
-                                        HorizontalAlignment="Center">
-                                        <FontIcon Glyph="&#xE7C3;" FontSize="28"
-                                            Foreground="{StaticResource TextSecondaryBrush}"
-                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Custom Area" FontSize="15" FontWeight="SemiBold"
-                                        Foreground="{StaticResource TextPrimaryBrush}"
-                                        HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
-                        </Button>
-
-                        <!-- Window -->
-                        <Button x:Name="BtnWindow"
-                            Grid.Column="0" Grid.Row="1"
-                            Style="{StaticResource ModeCardStyle}"
-                            Click="OnModeSelected"
-                            Tag="Window">
-                            <Border CornerRadius="20" Padding="24,28">
-                                <StackPanel Spacing="14" HorizontalAlignment="Center">
-                                    <Border
-                                        Width="64" Height="64" CornerRadius="32"
-                                        Background="{StaticResource SurfaceContainerBrush}"
-                                        BorderBrush="#1AFFFFFF" BorderThickness="1"
-                                        HorizontalAlignment="Center">
-                                        <FontIcon Glyph="&#xE737;" FontSize="28"
-                                            Foreground="{StaticResource TextSecondaryBrush}"
-                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Window" FontSize="15" FontWeight="SemiBold"
-                                        Foreground="{StaticResource TextPrimaryBrush}"
-                                        HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
-                        </Button>
-
-                        <!-- Camera Only -->
-                        <Button x:Name="BtnCamera"
-                            Grid.Column="1" Grid.Row="1"
-                            Style="{StaticResource ModeCardStyle}"
-                            Click="OnModeSelected"
-                            Tag="Camera">
-                            <Border CornerRadius="20" Padding="24,28">
-                                <StackPanel Spacing="14" HorizontalAlignment="Center">
-                                    <Border
-                                        Width="64" Height="64" CornerRadius="32"
-                                        Background="{StaticResource SurfaceContainerBrush}"
-                                        BorderBrush="#1AFFFFFF" BorderThickness="1"
-                                        HorizontalAlignment="Center">
-                                        <FontIcon Glyph="&#xE722;" FontSize="28"
-                                            Foreground="{StaticResource TextSecondaryBrush}"
-                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Camera Only" FontSize="15" FontWeight="SemiBold"
-                                        Foreground="{StaticResource TextPrimaryBrush}"
-                                        HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
-                        </Button>
-                    </Grid>
-
-                    <!-- Device Setup Pill -->
-                    <Border
-                        CornerRadius="999"
-                        Background="{StaticResource SurfaceHighBrush}"
-                        BorderBrush="#1AFFFFFF"
-                        BorderThickness="1"
-                        Padding="6">
-                        <Grid ColumnSpacing="0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Camera -->
-                            <Button Grid.Column="0"
-                                x:Name="BtnCameraDevice"
-                                Style="{StaticResource DevicePillSectionStyle}"
-                                CornerRadius="999"
-                                HorizontalAlignment="Stretch"
-                                Click="OnCameraDeviceClicked">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Grid.Column="0" Glyph="&#xE714;" FontSize="18"
-                                        Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <StackPanel Grid.Column="1" Spacing="1">
-                                        <TextBlock Text="CAMERA" FontSize="10" FontWeight="Bold"
-                                            CharacterSpacing="50"
-                                            Foreground="{StaticResource TextMutedBrush}"/>
-                                        <TextBlock x:Name="TbCameraName" Text="No Camera"
-                                            FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"
-                                            TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                    <FontIcon Grid.Column="2" Glyph="&#xE70D;" FontSize="14"
-                                        Foreground="{StaticResource TextMutedBrush}"/>
-                                </Grid>
-                            </Button>
-
-                            <!-- Divider -->
-                            <Rectangle Grid.Column="1" Width="1" Fill="#1AFFFFFF" Margin="0,8"/>
-
-                            <!-- Microphone -->
-                            <Button Grid.Column="2"
-                                x:Name="BtnMicDevice"
-                                Style="{StaticResource DevicePillSectionStyle}"
-                                CornerRadius="999"
-                                HorizontalAlignment="Stretch"
-                                Click="OnMicDeviceClicked">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Grid.Column="0" Glyph="&#xE720;" FontSize="18"
-                                        Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <StackPanel Grid.Column="1" Spacing="1">
-                                        <TextBlock Text="MICROPHONE" FontSize="10" FontWeight="Bold"
-                                            CharacterSpacing="50"
-                                            Foreground="{StaticResource TextMutedBrush}"/>
-                                        <TextBlock x:Name="TbMicName" Text="Default"
-                                            FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"
-                                            TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                    <FontIcon Grid.Column="2" Glyph="&#xE70D;" FontSize="14"
-                                        Foreground="{StaticResource TextMutedBrush}"/>
-                                </Grid>
-                            </Button>
-
-                            <!-- Divider -->
-                            <Rectangle Grid.Column="3" Width="1" Fill="#1AFFFFFF" Margin="0,8"/>
-
-                            <!-- System Audio -->
-                            <Button Grid.Column="4"
-                                x:Name="BtnAudioDevice"
-                                Style="{StaticResource DevicePillSectionStyle}"
-                                CornerRadius="999"
-                                HorizontalAlignment="Stretch"
-                                Click="OnAudioDeviceClicked">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Grid.Column="0" Glyph="&#xE767;" FontSize="18"
-                                        Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <StackPanel Grid.Column="1" Spacing="1">
-                                        <TextBlock Text="SYSTEM AUDIO" FontSize="10" FontWeight="Bold"
-                                            CharacterSpacing="50"
-                                            Foreground="{StaticResource TextMutedBrush}"/>
-                                        <TextBlock x:Name="TbAudioName" Text="Default"
-                                            FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"
-                                            TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Button>
+                            <!-- Card Title -->
+                            <TextBlock Grid.Row="1" Text="Full Screen" FontSize="12" FontWeight="SemiBold"
+                                Foreground="White" HorizontalAlignment="Center"/>
                         </Grid>
                     </Border>
 
-                    <!-- Options Row (Cursor Hide + Audio toggle) -->
-                    <Grid ColumnSpacing="16">
+                    <!-- Card 2: Custom Area (Square 125x125) -->
+                    <Border x:Name="BorderCardCustom" Grid.Column="1"
+                        Width="125" Height="125"
+                        CornerRadius="14"
+                        Background="#121319"
+                        BorderBrush="#1F202B"
+                        BorderThickness="1"
+                        PointerPressed="OnModeCardClicked"
+                        Tag="CustomArea">
+                        <Grid Padding="8,8" RowSpacing="6">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Preview Thumbnail (Dashed Crop Area) -->
+                            <Border Grid.Row="0" CornerRadius="8" Background="#0A0B10" BorderBrush="#1F202B" BorderThickness="1">
+                                <Grid>
+                                    <Border CornerRadius="7">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#0A152E" Offset="0"/>
+                                                <GradientStop Color="#172554" Offset="0.6"/>
+                                                <GradientStop Color="#1D4ED8" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <Border Margin="10,8" CornerRadius="5"
+                                        BorderBrush="#38BDF8" BorderThickness="1.5"
+                                        Background="#2638BDF8">
+                                        <FontIcon Glyph="&#xE7C3;" FontSize="18" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Card Title -->
+                            <TextBlock Grid.Row="1" Text="Custom" FontSize="12" FontWeight="SemiBold"
+                                Foreground="#CCCCCC" HorizontalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Card 3: Window (Square 125x125) -->
+                    <Border x:Name="BorderCardWindow" Grid.Column="2"
+                        Width="125" Height="125"
+                        CornerRadius="14"
+                        Background="#121319"
+                        BorderBrush="#1F202B"
+                        BorderThickness="1"
+                        PointerPressed="OnModeCardClicked"
+                        Tag="Window">
+                        <Grid Padding="8,8" RowSpacing="6">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Preview Thumbnail (Window Frame Mockup) -->
+                            <Border Grid.Row="0" CornerRadius="8" Background="#0A0B10" BorderBrush="#1F202B" BorderThickness="1">
+                                <Grid>
+                                    <Border CornerRadius="7">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#0A152E" Offset="0"/>
+                                                <GradientStop Color="#1E3A8A" Offset="0.8"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <Border Margin="10,8" CornerRadius="5" Background="#B31E293B" BorderBrush="#60A5FA" BorderThickness="1">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="10"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="3" Margin="4,2,0,0">
+                                                <Ellipse Width="3" Height="3" Fill="#EF4444"/>
+                                                <Ellipse Width="3" Height="3" Fill="#F59E0B"/>
+                                                <Ellipse Width="3" Height="3" Fill="#10B981"/>
+                                            </StackPanel>
+                                            <FontIcon Grid.Row="1" Glyph="&#xE737;" FontSize="15" Foreground="#93C5FD" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Card Title -->
+                            <TextBlock Grid.Row="1" Text="Window" FontSize="12" FontWeight="SemiBold"
+                                Foreground="#CCCCCC" HorizontalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Card 4: Device (Square 125x125) -->
+                    <Border x:Name="BorderCardDevice" Grid.Column="3"
+                        Width="125" Height="125"
+                        CornerRadius="14"
+                        Background="#121319"
+                        BorderBrush="#1F202B"
+                        BorderThickness="1"
+                        PointerPressed="OnModeCardClicked"
+                        Tag="Device">
+                        <Grid Padding="8,8" RowSpacing="6">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Preview Thumbnail (Phone Mockup) -->
+                            <Border Grid.Row="0" CornerRadius="8" Background="#0A0B10" BorderBrush="#1F202B" BorderThickness="1">
+                                <Grid>
+                                    <Border CornerRadius="7">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#0A152E" Offset="0"/>
+                                                <GradientStop Color="#1E3A8A" Offset="0.8"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <Border Width="30" Height="48" CornerRadius="6" Background="#CC0F172A" BorderBrush="#94A3B8" BorderThickness="1.5"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Grid>
+                                            <Rectangle Width="10" Height="1.5" Fill="#E2E8F0" RadiusX="0.75" RadiusY="0.75"
+                                                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                                            <FontIcon Glyph="&#xE8EA;" FontSize="12" Foreground="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Card Title -->
+                            <TextBlock Grid.Row="1" Text="Device" FontSize="12" FontWeight="SemiBold"
+                                Foreground="#CCCCCC" HorizontalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Right: Device & Tool Column (Kompakt ve Sese Duyarlı) -->
+                <StackPanel Grid.Column="2" Spacing="5" VerticalAlignment="Center">
+
+                    <!-- 1. Camera Row -->
+                    <Grid ColumnSpacing="6">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="{StaticResource SurfaceContainerBrush}"
-                            CornerRadius="12" Padding="16,12"
-                            BorderBrush="#1AFFFFFF" BorderThickness="1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Spacing="3">
-                                    <TextBlock Text="Hide Cursor" FontSize="13" FontWeight="SemiBold"
-                                        Foreground="{StaticResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="Mouse will not appear in video"
-                                        FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
-                                </StackPanel>
-                                <ToggleSwitch x:Name="TsHideCursor" Grid.Column="1"
-                                    IsOn="True" OnContent="" OffContent=""
-                                    VerticalAlignment="Center" Margin="0"/>
-                            </Grid>
+                        <!-- Camera Icon Box -->
+                        <Border Grid.Column="0" Style="{StaticResource DeviceIconBoxStyle}">
+                            <FontIcon Glyph="&#xE714;" FontSize="12" Foreground="#A0A0B0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
 
-                        <Border Grid.Column="1" Background="{StaticResource SurfaceContainerBrush}"
-                            CornerRadius="12" Padding="16,12"
-                            BorderBrush="#1AFFFFFF" BorderThickness="1">
+                        <!-- Camera Dropdown Pill Button -->
+                        <Button Grid.Column="1" x:Name="BtnCameraDropdown"
+                            Style="{StaticResource DeviceDropdownButtonStyle}"
+                            Click="OnCameraDropdownClicked">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Spacing="3">
-                                    <TextBlock Text="Record Audio" FontSize="13" FontWeight="SemiBold"
-                                        Foreground="{StaticResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="Capture system and mic audio"
-                                        FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
-                                </StackPanel>
-                                <ToggleSwitch x:Name="TsRecordAudio" Grid.Column="1"
-                                    IsOn="True" OnContent="" OffContent=""
-                                    VerticalAlignment="Center" Margin="0"/>
+                                <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.CameraDisplayName, Mode=OneWay}"
+                                    FontSize="11" Foreground="#E3E1EC" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                <FontIcon Grid.Column="1" Glyph="&#xE70D;" FontSize="9" Foreground="#8E8E9F" VerticalAlignment="Center"/>
                             </Grid>
-                        </Border>
+                        </Button>
                     </Grid>
 
-                    <!-- Start Recording Button -->
-                    <Button
-                        x:Name="BtnStartRecording"
-                        Click="OnStartRecording"
-                        HorizontalAlignment="Center"
-                        Height="56"
-                        CornerRadius="28"
-                        Padding="48,0"
-                        BorderThickness="1"
-                        BorderBrush="#33FFFFFF">
-                        <Button.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                <GradientStop Color="#DC2626" Offset="0.0"/>
-                                <GradientStop Color="#EA580C" Offset="1.0"/>
-                            </LinearGradientBrush>
-                        </Button.Background>
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Ellipse Width="12" Height="12" Fill="White">
-                                <Ellipse.RenderTransform>
-                                    <ScaleTransform/>
-                                </Ellipse.RenderTransform>
-                            </Ellipse>
-                            <TextBlock Text="Start Recording"
-                                FontSize="18" FontWeight="SemiBold"
-                                Foreground="White"/>
-                        </StackPanel>
-                    </Button>
+                    <!-- 2. Microphone Row (Sese Duyarlı Alttan Yukarıya Gösterge) -->
+                    <Grid ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
 
-                    <!-- Recent Recordings (quick access) -->
-                    <StackPanel Spacing="10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="RECENT RECORDINGS"
-                                FontSize="10" FontWeight="Bold"
-                                CharacterSpacing="60"
-                                Foreground="{StaticResource TextMutedBrush}"
-                                VerticalAlignment="Center"/>
-                            <Button Grid.Column="1" Content="View All"
-                                Background="Transparent" BorderThickness="0"
-                                Foreground="{StaticResource PrimaryAccentBrush}"
-                                FontSize="12" Padding="8,4"
-                                Click="OnViewAllClicked"/>
-                        </Grid>
+                        <!-- Microphone Icon Box with Dynamic Sound-Reactive Fill (Bottom to Top) -->
+                        <Border Grid.Column="0" Style="{StaticResource DeviceIconBoxStyle}">
+                            <Grid CornerRadius="6">
+                                <!-- Sound-reactive fill from bottom to top -->
+                                <Border x:Name="MicAudioLevelFill"
+                                        VerticalAlignment="Bottom"
+                                        Height="0"
+                                        CornerRadius="0,0,6,6"
+                                        Opacity="0.9">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0.5,1" EndPoint="0.5,0">
+                                            <GradientStop Color="#10B981" Offset="0"/>
+                                            <GradientStop Color="#00D2FF" Offset="0.7"/>
+                                            <GradientStop Color="#3B82F6" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
 
-                        <ItemsControl x:Name="RecentRecordingsList">
+                                <!-- Microphone Icon -->
+                                <FontIcon Glyph="&#xE720;" FontSize="12" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Microphone Dropdown Pill Button -->
+                        <Button Grid.Column="1" x:Name="BtnMicDropdown"
+                            Style="{StaticResource DeviceDropdownButtonStyle}"
+                            Click="OnMicDropdownClicked">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.MicDisplayName, Mode=OneWay}"
+                                    FontSize="11" Foreground="#E3E1EC" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+
+                                <!-- Mini Sound-Reactive VU Level Bar inside Pill -->
+                                <Border Grid.Column="1" Width="3" Height="14" CornerRadius="1.5" Background="#252733" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <Border x:Name="MicAudioPillBar" VerticalAlignment="Bottom" Height="0" CornerRadius="1.5">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0.5,1" EndPoint="0.5,0">
+                                                <GradientStop Color="#10B981" Offset="0"/>
+                                                <GradientStop Color="#00D2FF" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                </Border>
+
+                                <FontIcon Grid.Column="2" Glyph="&#xE70D;" FontSize="9" Foreground="#8E8E9F" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Button>
+                    </Grid>
+
+                    <!-- 3. Speaker Row (Sese Duyarlı Alttan Yukarıya Gösterge) -->
+                    <Grid ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Speaker Icon Box with Dynamic Sound-Reactive Fill (Bottom to Top) -->
+                        <Border Grid.Column="0" Style="{StaticResource DeviceIconBoxStyle}">
+                            <Grid CornerRadius="6">
+                                <!-- Sound-reactive fill from bottom to top -->
+                                <Border x:Name="SpeakerAudioLevelFill"
+                                        VerticalAlignment="Bottom"
+                                        Height="0"
+                                        CornerRadius="0,0,6,6"
+                                        Opacity="0.9">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0.5,1" EndPoint="0.5,0">
+                                            <GradientStop Color="#10B981" Offset="0"/>
+                                            <GradientStop Color="#00D2FF" Offset="0.7"/>
+                                            <GradientStop Color="#A078FF" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+
+                                <!-- Speaker Icon -->
+                                <FontIcon Glyph="&#xE767;" FontSize="12" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Speaker Dropdown Pill Button -->
+                        <Button Grid.Column="1" x:Name="BtnSpeakerDropdown"
+                            Style="{StaticResource DeviceDropdownButtonStyle}"
+                            Click="OnSpeakerDropdownClicked">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.SpeakerDisplayName, Mode=OneWay}"
+                                    FontSize="11" Foreground="#E3E1EC" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+
+                                <!-- Mini Sound-Reactive VU Level Bar inside Pill -->
+                                <Border Grid.Column="1" Width="3" Height="14" CornerRadius="1.5" Background="#252733" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <Border x:Name="SpeakerAudioPillBar" VerticalAlignment="Bottom" Height="0" CornerRadius="1.5">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0.5,1" EndPoint="0.5,0">
+                                                <GradientStop Color="#10B981" Offset="0"/>
+                                                <GradientStop Color="#A078FF" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                </Border>
+
+                                <FontIcon Grid.Column="2" Glyph="&#xE70D;" FontSize="9" Foreground="#8E8E9F" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Button>
+                    </Grid>
+
+                    <!-- 4. Tool & Start Recording Compact Action Bar -->
+                    <Grid Margin="0,2,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Teleprompter Tool Button -->
+                        <Button Grid.Column="0" Click="OnTeleprompterClicked"
+                            Background="#171821" BorderBrush="#252733" BorderThickness="1"
+                            CornerRadius="7" Height="32" Padding="8,0" Margin="0,0,6,0"
+                            ToolTipService.ToolTip="Teleprompter">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Border Width="16" Height="16" CornerRadius="3" Background="#33C0C1FF">
+                                    <TextBlock Text="A" FontSize="9" FontWeight="Bold" Foreground="#C0C1FF"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Prompter" FontSize="11" FontWeight="SemiBold" Foreground="#E3E1EC"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Start Recording Action Button -->
+                        <Button Grid.Column="1" Click="OnStartRecordingClicked"
+                            Height="32" CornerRadius="7"
+                            HorizontalAlignment="Stretch"
+                            BorderThickness="0">
+                            <Button.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#DC2626" Offset="0.0"/>
+                                    <GradientStop Color="#EA580C" Offset="1.0"/>
+                                </LinearGradientBrush>
+                            </Button.Background>
+                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                <Ellipse Width="8" Height="8" Fill="White"/>
+                                <TextBlock Text="Start Recording" FontSize="12" FontWeight="Bold" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- ====================================================
+             CAMERA SELECTION POPUP / FLYOUT HOST
+             ==================================================== -->
+        <Border x:Name="CameraPopupOverlay" Visibility="Collapsed"
+            Background="#66000000" PointerPressed="OnClosePopupOverlay">
+            <Border Width="260" CornerRadius="12" Background="#161720" BorderBrush="#2B2D3D" BorderThickness="1"
+                Padding="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,46,24,0" MaxHeight="240">
+                <StackPanel Spacing="3">
+                    <TextBlock Text="Select Camera" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E9F" Margin="6,2,6,6"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="190">
+                        <ItemsControl x:Name="CameraItemsList">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button
-                                        Tag="{Binding}"
-                                        Click="OnOpenRecentRecording"
-                                        HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Stretch"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Padding="12,10"
-                                        CornerRadius="10"
-                                        Margin="0,0,0,4">
-                                        <Grid ColumnSpacing="12">
+                                <DataTemplate x:DataType="services:DeviceItem">
+                                    <Button Click="OnSelectCameraItem" Tag="{x:Bind}" Style="{StaticResource DropdownItemButtonStyle}">
+                                        <Grid ColumnSpacing="8">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="18" />
+                                                <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Border Grid.Column="0" Width="36" Height="36"
-                                                CornerRadius="8"
-                                                Background="{StaticResource SurfaceHighBrush}">
-                                                <FontIcon Glyph="&#xE714;" FontSize="16"
-                                                    Foreground="{StaticResource PrimaryAccentBrush}"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"/>
-                                            </Border>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                                                <TextBlock Text="{Binding Name}"
-                                                    FontSize="13" FontWeight="SemiBold"
-                                                    Foreground="{StaticResource TextPrimaryBrush}"
-                                                    TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding DateDisplay}"
-                                                    FontSize="11"
-                                                    Foreground="{StaticResource TextMutedBrush}"/>
-                                            </StackPanel>
-                                            <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="14"
-                                                Foreground="{StaticResource TextMutedBrush}"
-                                                VerticalAlignment="Center"/>
+                                            <FontIcon Grid.Column="0" Glyph="&#xE73E;" FontSize="11" Foreground="#38BDF8"
+                                                Visibility="{x:Bind IsSelected, Converter={StaticResource BoolToVisConverter}}"/>
+                                            <TextBlock Grid.Column="1" Text="{x:Bind Name}" FontSize="12" Foreground="#E3E1EC"
+                                                TextTrimming="CharacterEllipsis"/>
                                         </Grid>
                                     </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+        </Border>
 
-                        <!-- Empty state -->
-                        <Border x:Name="EmptyRecordingsState"
-                            Background="{StaticResource SurfaceContainerBrush}"
-                            CornerRadius="12" Padding="20"
-                            BorderBrush="#1AFFFFFF" BorderThickness="1"
-                            Visibility="Collapsed">
-                            <StackPanel HorizontalAlignment="Center" Spacing="8">
-                                <FontIcon Glyph="&#xE714;" FontSize="28"
-                                    Foreground="{StaticResource TextMutedBrush}"
-                                    HorizontalAlignment="Center"/>
-                                <TextBlock Text="No recordings yet"
-                                    FontSize="14" FontWeight="SemiBold"
-                                    Foreground="{StaticResource TextSecondaryBrush}"
-                                    HorizontalAlignment="Center"/>
-                                <TextBlock Text="Start your first recording above"
-                                    FontSize="12"
-                                    Foreground="{StaticResource TextMutedBrush}"
-                                    HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
+        <!-- ====================================================
+             MICROPHONE SELECTION POPUP / FLYOUT HOST
+             ==================================================== -->
+        <Border x:Name="MicPopupOverlay" Visibility="Collapsed"
+            Background="#66000000" PointerPressed="OnClosePopupOverlay">
+            <Border Width="260" CornerRadius="12" Background="#161720" BorderBrush="#2B2D3D" BorderThickness="1"
+                Padding="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,50,24,0" MaxHeight="240">
+                <StackPanel Spacing="3">
+                    <TextBlock Text="Select Microphone" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E9F" Margin="6,2,6,6"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="190">
+                        <ItemsControl x:Name="MicItemsList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="services:DeviceItem">
+                                    <Button Click="OnSelectMicItem" Tag="{x:Bind}" Style="{StaticResource DropdownItemButtonStyle}">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="18" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Grid.Column="0" Glyph="&#xE73E;" FontSize="11" Foreground="#38BDF8"
+                                                Visibility="{x:Bind IsSelected, Converter={StaticResource BoolToVisConverter}}"/>
+                                            <TextBlock Grid.Column="1" Text="{x:Bind Name}" FontSize="12" Foreground="#E3E1EC"
+                                                TextTrimming="CharacterEllipsis"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- ====================================================
+             SPEAKER / ONLY APP AUDIO SELECTION POPUP HOST (IMAGE 5)
+             ==================================================== -->
+        <Border x:Name="SpeakerPopupOverlay" Visibility="Collapsed"
+            Background="#66000000" PointerPressed="OnClosePopupOverlay">
+            <Grid HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,54,24,0" MaxHeight="240">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Sub-flyout: Only App Audio Checkbox List (Image 5 right side) -->
+                <Border x:Name="OnlyAppSubFlyout" Grid.Column="0" Visibility="Collapsed"
+                    Width="240" CornerRadius="12" Background="#161720" BorderBrush="#2B2D3D" BorderThickness="1"
+                    Padding="8" Margin="0,0,8,0" MaxHeight="230">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="Select Running Applications" FontSize="11" FontWeight="SemiBold"
+                            Foreground="#8E8E9F" Margin="6,2,6,6"/>
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="AudioAppItemsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="services:AudioAppItem">
+                                        <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
+                                            Checked="OnAppAudioCheckChanged" Unchecked="OnAppAudioCheckChanged"
+                                            Tag="{x:Bind}" Margin="4,2" MinWidth="0">
+                                            <TextBlock Text="{x:Bind DisplayName}" FontSize="12" Foreground="#E3E1EC"
+                                                TextTrimming="CharacterEllipsis" MaxWidth="170"/>
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <!-- Main Speaker Menu (Image 5 left side) -->
+                <Border Grid.Column="1" Width="260" CornerRadius="12" Background="#161720" BorderBrush="#2B2D3D" BorderThickness="1"
+                    Padding="8" MaxHeight="230">
+                    <StackPanel Spacing="3">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="160">
+                            <!-- Speaker Devices List -->
+                            <ItemsControl x:Name="SpeakerItemsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="services:DeviceItem">
+                                        <Button Click="OnSelectSpeakerItem" Tag="{x:Bind}" Style="{StaticResource DropdownItemButtonStyle}">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="18" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <FontIcon Grid.Column="0" Glyph="&#xE73E;" FontSize="11" Foreground="#38BDF8"
+                                                    Visibility="{x:Bind IsSelected, Converter={StaticResource BoolToVisConverter}}"/>
+                                                <TextBlock Grid.Column="1" Text="{x:Bind Name}" FontSize="12" Foreground="#E3E1EC"
+                                                    TextTrimming="CharacterEllipsis"/>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <!-- Divider -->
+                        <Rectangle Height="1" Fill="#252733" Margin="2,2"/>
+
+                        <!-- Only App Audio Option with Chevron Right -->
+                        <Button Click="OnToggleOnlyAppSubFlyout" Style="{StaticResource DropdownItemButtonStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="18" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE73E;" FontSize="11" Foreground="#38BDF8"
+                                    Visibility="{x:Bind ViewModel.DeviceManager.IsOnlyAppAudioSelected, Mode=OneWay, Converter={StaticResource BoolToVisConverter}}"/>
+                                <TextBlock Grid.Column="1" x:Name="TbOnlyAppMenuText" Text="Only App Audio (0)" FontSize="12" Foreground="#E3E1EC"/>
+                                <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="10" Foreground="#8E8E9F"/>
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ====================================================
+             FILE HISTORY MODAL DIALOG (IMAGE 3)
+             ==================================================== -->
+        <Grid x:Name="FileHistoryModalOverlay" Visibility="Collapsed" Background="#B3000000">
+            <Border Width="640" Height="480" CornerRadius="18" Background="#14151E" BorderBrush="#252736" BorderThickness="1"
+                Padding="24,20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid RowSpacing="16">
+                    <Grid.RowDefinitions>
+                        <!-- Header -->
+                        <RowDefinition Height="Auto" />
+                        <!-- Tabs -->
+                        <RowDefinition Height="Auto" />
+                        <!-- Project List Area -->
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Header with Title & Close button -->
+                    <Grid Grid.Row="0">
+                        <TextBlock Text="File History" FontSize="17" FontWeight="Bold" Foreground="#F5F5FA"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Button Click="OnCloseFileHistory"
+                            Background="Transparent" BorderThickness="0" CornerRadius="6" Width="30" Height="30" Padding="0"
+                            HorizontalAlignment="Right">
+                            <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="#CCCCCC"/>
+                        </Button>
+                    </Grid>
+
+                    <!-- Tabs: Project History & Sharing History -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="BtnTabProjectHistory" Click="OnTabProjectHistoryClicked"
+                            Background="#1E3A8A" BorderBrush="#3B82F6" BorderThickness="1"
+                            CornerRadius="8" Padding="16,8">
+                            <TextBlock Text="Project History" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                        </Button>
+                        <Button x:Name="BtnTabSharingHistory" Click="OnTabSharingHistoryClicked"
+                            Background="#1A1B24" BorderThickness="0"
+                            CornerRadius="8" Padding="16,8">
+                            <TextBlock Text="Sharing History" FontSize="13" FontWeight="Normal" Foreground="#8E8E9F"/>
+                        </Button>
                     </StackPanel>
 
-                </StackPanel>
+                    <!-- Projects List -->
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="8">
+                            <!-- Empty message -->
+                            <TextBlock x:Name="TbHistoryEmpty" Text="No recorded projects found."
+                                FontSize="13" Foreground="#7A7B8C" HorizontalAlignment="Center" Margin="0,40,0,0"
+                                Visibility="Collapsed"/>
+
+                            <ItemsControl x:Name="HistoryProjectsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ProjectInfo">
+                                        <Border Background="#1A1B25" CornerRadius="10" Padding="14,10" Margin="0,0,0,4">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Project Icon (Swirl) -->
+                                                <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16">
+                                                    <Border.Background>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                            <GradientStop Color="#00D2FF" Offset="0.0"/>
+                                                            <GradientStop Color="#9B51E0" Offset="0.6"/>
+                                                            <GradientStop Color="#FF007A" Offset="1.0"/>
+                                                        </LinearGradientBrush>
+                                                    </Border.Background>
+                                                    <FontIcon Glyph="&#xE768;" FontSize="13" Foreground="White"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+
+                                                <!-- Project Info (Click to open) -->
+                                                <Button Grid.Column="1" Click="OnOpenProjectFromHistory" Tag="{x:Bind}"
+                                                    Background="Transparent" BorderThickness="0" Padding="0"
+                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="{x:Bind Name}" FontSize="13" FontWeight="SemiBold"
+                                                            Foreground="#E3E1EC" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{x:Bind FormattedDate}" FontSize="11" Foreground="#7A7B8C"/>
+                                                    </StackPanel>
+                                                </Button>
+
+                                                <!-- Action Buttons: Rename, Reveal in Explorer, Delete -->
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <!-- Rename -->
+                                                    <Button Click="OnRenameProjectClicked" Tag="{x:Bind}"
+                                                        Background="Transparent" BorderThickness="0" CornerRadius="6" Width="30" Height="30" Padding="0"
+                                                        ToolTipService.ToolTip="Rename">
+                                                        <FontIcon Glyph="&#xE70F;" FontSize="13" Foreground="#94A3B8"/>
+                                                    </Button>
+                                                    <!-- Open in Explorer -->
+                                                    <Button Click="OnRevealProjectClicked" Tag="{x:Bind}"
+                                                        Background="Transparent" BorderThickness="0" CornerRadius="6" Width="30" Height="30" Padding="0"
+                                                        ToolTipService.ToolTip="Open in Folder">
+                                                        <FontIcon Glyph="&#xED25;" FontSize="13" Foreground="#94A3B8"/>
+                                                    </Button>
+                                                    <!-- Delete -->
+                                                    <Button Click="OnDeleteProjectClicked" Tag="{x:Bind}"
+                                                        Background="Transparent" BorderThickness="0" CornerRadius="6" Width="30" Height="30" Padding="0"
+                                                        ToolTipService.ToolTip="Delete">
+                                                        <FontIcon Glyph="&#xE74D;" FontSize="13" Foreground="#EF4444"/>
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
             </Border>
         </Grid>
     </Grid>

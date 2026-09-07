@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="ScreenPowerPro.Views.LibraryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:ScreenPowerPro.Models"
+    mc:Ignorable="d"
+    Background="{StaticResource SurfaceContainerLowestBrush}">
+
+    <Page.Resources>
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#22FFFFFF" />
+            <Setter Property="BorderBrush" Value="#33FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Top Navigation Bar -->
+            <RowDefinition Height="56" />
+            <!-- Main Content Area -->
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ====================================================
+             TOP NAVIGATION BAR
+             ==================================================== -->
+        <Border Grid.Row="0"
+            Background="{StaticResource GlassNavBrush}"
+            BorderBrush="{StaticResource GlassBorderBrush}"
+            BorderThickness="0,0,0,1">
+            <Grid Padding="24,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="100" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: Back to Dashboard & Title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <Button x:Name="BtnBack" Click="OnBackClicked"
+                        Background="Transparent" BorderThickness="0"
+                        CornerRadius="6" Padding="8,6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72B;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="Kayıt Paneli" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </Button>
+                    <Rectangle Width="1" Height="16" Fill="{StaticResource GlassBorderBrush}"/>
+                    <TextBlock Text="Proje Kütüphanesi" FontSize="15" FontWeight="SemiBold"
+                        Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Center: Drag Area -->
+                <Border x:Name="TitleBarDragArea" Grid.Column="1" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+
+                <!-- Right: Refresh Button -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Click="OnRefreshClicked"
+                        Background="#1AFFFFFF" BorderBrush="{StaticResource GlassBorderBrush}"
+                        BorderThickness="1" CornerRadius="6" Padding="12,6">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE72C;" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                            <TextBlock Text="Yenile" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Far Right: Space reserved for Window Caption Buttons -->
+                <Border Grid.Column="3" Width="100" Background="Transparent" />
+            </Grid>
+        </Border>
+
+        <!-- ====================================================
+             MAIN CONTENT: PROJECT GRID & EMPTY STATE
+             ==================================================== -->
+        <ScrollViewer Grid.Row="1" Padding="32,24">
+            <StackPanel Spacing="20">
+                <!-- Header description -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Kayıtlı Projeler" FontSize="24" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Text="Tüm ekran kayıtlarınızı görüntüleyin, düzenleyin veya dışa aktarın."
+                        FontSize="13" Foreground="{StaticResource TextMutedBrush}" />
+                </StackPanel>
+
+                <!-- Loading State -->
+                <ProgressBar IsIndeterminate="True"
+                    Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisConverter}}"
+                    HorizontalAlignment="Stretch" Margin="0,16"/>
+
+                <!-- Empty State -->
+                <Border Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay, Converter={StaticResource BoolToVisConverter}}"
+                    Background="{StaticResource GlassNavBrush}"
+                    BorderBrush="{StaticResource GlassBorderBrush}"
+                    BorderThickness="1" CornerRadius="16" Padding="40"
+                    HorizontalAlignment="Center" Margin="0,40" MinWidth="400">
+                    <StackPanel Spacing="16" HorizontalAlignment="Center">
+                        <Border Width="72" Height="72" CornerRadius="36" Background="#1AC0C1FF" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE714;" FontSize="32" Foreground="{StaticResource PrimaryAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Henüz Hiç Kayıt Yok" FontSize="18" FontWeight="SemiBold"
+                            Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Kayıt panelinden ilk ekran kaydınızı başlatarak projelerinizi burada görebilirsiniz."
+                            FontSize="13" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
+                            TextAlignment="Center" MaxWidth="320"/>
+                        <Button Click="OnStartNewRecordingClicked"
+                            HorizontalAlignment="Center" Margin="0,8,0,0"
+                            Padding="20,10" CornerRadius="8">
+                            <Button.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#C0C1FF" Offset="0"/>
+                                    <GradientStop Color="#8083FF" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Button.Background>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE768;" FontSize="14" Foreground="#1000A9"/>
+                                <TextBlock Text="İlk Kaydı Başlat" FontWeight="SemiBold" FontSize="13" Foreground="#1000A9"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Projects ItemsControl Grid -->
+                <ItemsControl ItemsSource="{x:Bind ViewModel.Projects, Mode=OneWay}"
+                    Visibility="{x:Bind ViewModel.HasProjects, Mode=OneWay, Converter={StaticResource BoolToVisConverter}}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <!-- Adaptive wrapping grid -->
+                            <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="3" ItemWidth="340" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:ProjectInfo">
+                            <Border Margin="8" Background="{StaticResource GlassNavBrush}"
+                                BorderBrush="{StaticResource GlassBorderBrush}"
+                                BorderThickness="1" CornerRadius="12" Padding="16">
+                                <Grid RowSpacing="12">
+                                    <Grid.RowDefinitions>
+                                        <!-- Video Thumbnail Box -->
+                                        <RowDefinition Height="150" />
+                                        <!-- Project Info -->
+                                        <RowDefinition Height="Auto" />
+                                        <!-- Action Buttons -->
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Thumbnail Placeholder / Card -->
+                                    <Border Grid.Row="0" Background="#0D0E15" CornerRadius="8"
+                                        BorderBrush="#1AFFFFFF" BorderThickness="1">
+                                        <Grid>
+                                            <FontIcon Glyph="&#xE714;" FontSize="40" Foreground="{StaticResource PrimaryAccentBrush}"
+                                                Opacity="0.4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <!-- Duration badge -->
+                                            <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                Margin="8" Background="#CC000000" CornerRadius="4" Padding="6,2">
+                                                <TextBlock Text="{x:Bind FormattedDuration}" FontSize="11"
+                                                    FontFamily="Consolas" Foreground="White" />
+                                            </Border>
+                                            <!-- Zoom Count badge -->
+                                            <Border HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                Margin="8" Background="#338083FF" BorderBrush="#8083FF"
+                                                BorderThickness="1" CornerRadius="4" Padding="6,2">
+                                                <TextBlock Text="{x:Bind ZoomBadgeText}" FontSize="11"
+                                                    FontWeight="SemiBold" Foreground="{StaticResource PrimaryAccentBrush}" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Project Details -->
+                                    <StackPanel Grid.Row="1" Spacing="4">
+                                        <TextBlock Text="{x:Bind Name}" FontSize="15" FontWeight="SemiBold"
+                                            Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{x:Bind FormattedDate}" FontSize="12" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Action Buttons -->
+                                    <Grid Grid.Row="2" ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Edit Button -->
+                                        <Button Grid.Column="0" Click="OnEditProjectClicked"
+                                            Tag="{x:Bind}" HorizontalAlignment="Stretch"
+                                            CornerRadius="6" Padding="8,6">
+                                            <Button.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                    <GradientStop Color="#33C0C1FF" Offset="0"/>
+                                                    <GradientStop Color="#338083FF" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Button.Background>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                                <FontIcon Glyph="&#xE70F;" FontSize="12" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                                <TextBlock Text="Düzenle" FontSize="12" FontWeight="SemiBold"
+                                                    Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Reveal in Explorer -->
+                                        <Button Grid.Column="1" Click="OnRevealClicked" Tag="{x:Bind}"
+                                            Style="{StaticResource ActionButtonStyle}" ToolTipService.ToolTip="Dosya Konumunda Göster">
+                                            <FontIcon Glyph="&#xED25;" FontSize="13"/>
+                                        </Button>
+
+                                        <!-- Delete Button -->
+                                        <Button Grid.Column="2" Click="OnDeleteClicked" Tag="{x:Bind}"
+                                            Style="{StaticResource ActionButtonStyle}" ToolTipService.ToolTip="Projeyi Sil">
+                                            <FontIcon Glyph="&#xE74D;" FontSize="13" Foreground="#FF6B72"/>
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

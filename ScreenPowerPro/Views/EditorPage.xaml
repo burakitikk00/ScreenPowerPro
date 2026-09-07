@@ -7,6 +7,8 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:ScreenPowerPro.Models"
     mc:Ignorable="d"
+    IsTabStop="True"
+    KeyDown="OnPageKeyDown"
     Background="{StaticResource SurfaceContainerLowestBrush}">
 
     <Page.Resources>
@@ -64,6 +66,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="140" />
                 </Grid.ColumnDefinitions>
 
                 <!-- Left: Back + project name -->
@@ -84,24 +87,26 @@
                         VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Center: timecode badge -->
-                <StackPanel Grid.Column="1" HorizontalAlignment="Center"
-                    Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <Border Background="#660D0E15" CornerRadius="6" Padding="10,4"
-                        BorderBrush="#1AFFFFFF" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <TextBlock x:Name="TbCurrentTime" Text="00:00:00"
-                                FontSize="13" FontWeight="SemiBold"
-                                FontFamily="Consolas"
-                                Foreground="{StaticResource PrimaryAccentBrush}"/>
-                            <TextBlock Text="/" FontSize="13"
-                                Foreground="{StaticResource TextMutedBrush}"/>
-                            <TextBlock x:Name="TbTotalTime" Text="00:00:00"
-                                FontSize="13" FontFamily="Consolas"
-                                Foreground="{StaticResource TextMutedBrush}"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
+                <!-- Center: timecode badge & drag area -->
+                <Border x:Name="TitleBarDragArea" Grid.Column="1" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <StackPanel HorizontalAlignment="Center"
+                        Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Border Background="#660D0E15" CornerRadius="6" Padding="10,4"
+                            BorderBrush="#1AFFFFFF" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock x:Name="TbCurrentTime" Text="00:00:00"
+                                    FontSize="13" FontWeight="SemiBold"
+                                    FontFamily="Consolas"
+                                    Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock Text="/" FontSize="13"
+                                    Foreground="{StaticResource TextMutedBrush}"/>
+                                <TextBlock x:Name="TbTotalTime" Text="00:00:00"
+                                    FontSize="13" FontFamily="Consolas"
+                                    Foreground="{StaticResource TextMutedBrush}"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
 
                 <!-- Right: Save + Export -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -128,6 +133,9 @@
                         </StackPanel>
                     </Button>
                 </StackPanel>
+
+                <!-- Far Right: Space reserved for Window Caption Buttons -->
+                <Border Grid.Column="3" Width="140" Background="Transparent" />
             </Grid>
         </Border>
 
@@ -171,14 +179,19 @@
                         </Border.Background>
 
                         <Grid>
-                            <!-- MediaPlayer -->
+                            <!-- MediaPlayer with live zoom simulation transform -->
                             <MediaPlayerElement
                                 x:Name="VideoPlayer"
                                 AutoPlay="False"
                                 AreTransportControlsEnabled="False"
                                 HorizontalAlignment="Stretch"
                                 VerticalAlignment="Stretch"
-                                MinHeight="200"/>
+                                MinHeight="200"
+                                RenderTransformOrigin="0.5,0.5">
+                                <MediaPlayerElement.RenderTransform>
+                                    <CompositeTransform x:Name="VideoTransform" ScaleX="1.0" ScaleY="1.0" TranslateX="0" TranslateY="0"/>
+                                </MediaPlayerElement.RenderTransform>
+                            </MediaPlayerElement>
 
                             <!-- Click overlay for play/pause -->
                             <Button
@@ -196,7 +209,7 @@
                                 CornerRadius="10"
                                 HorizontalAlignment="Stretch"
                                 VerticalAlignment="Stretch"
-                                Opacity="0"
+                                Opacity="1"
                                 IsHitTestVisible="False">
                                 <Border
                                     Width="64" Height="64" CornerRadius="32"
@@ -209,6 +222,21 @@
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                             </Border>
+
+                            <!-- No video file warning message -->
+                            <StackPanel
+                                x:Name="NoVideoMessage"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="8"
+                                Visibility="Collapsed"
+                                IsHitTestVisible="False">
+                                <FontIcon Glyph="&#xE7BA;" FontSize="36" Foreground="#F59E0B" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Video Dosyası Yüklenemedi" FontSize="15" FontWeight="SemiBold"
+                                    Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TbMissingVideoPath" Text="" FontSize="11"
+                                    Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" MaxWidth="400" TextAlignment="Center"/>
+                            </StackPanel>
 
                             <!-- Resolution badge top-right -->
                             <Border
@@ -530,6 +558,98 @@
                             </Border>
                         </StackPanel>
 
+                        <!-- SECTION: Audio Controls -->
+                        <StackPanel Spacing="12">
+                            <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
+                            <TextBlock Text="SES KONTROLLERİ"
+                                FontSize="11" FontWeight="Bold"
+                                CharacterSpacing="50"
+                                Foreground="{StaticResource TextMutedBrush}"/>
+
+                            <Border Background="{StaticResource SurfaceHighBrush}"
+                                CornerRadius="10" Padding="14"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="14">
+                                    <!-- Mic Volume -->
+                                    <StackPanel Spacing="6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Mikrofon Seviyesi" FontSize="13"
+                                                Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbMicVolVal" Grid.Column="1" Text="100%"
+                                                FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="MicVolumeSlider" Minimum="0" Maximum="100" Value="100"
+                                            ValueChanged="OnMicVolumeChanged"/>
+                                    </StackPanel>
+
+                                    <!-- System Volume -->
+                                    <StackPanel Spacing="6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Sistem Sesi Seviyesi" FontSize="13"
+                                                Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbSysVolVal" Grid.Column="1" Text="100%"
+                                                FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="SysVolumeSlider" Minimum="0" Maximum="100" Value="100"
+                                            ValueChanged="OnSysVolumeChanged"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- SECTION: Camera & Watermark -->
+                        <StackPanel Spacing="12">
+                            <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
+                            <TextBlock Text="KAMERA &amp; FİLİGRAN"
+                                FontSize="11" FontWeight="Bold"
+                                CharacterSpacing="50"
+                                Foreground="{StaticResource TextMutedBrush}"/>
+
+                            <Border Background="{StaticResource SurfaceHighBrush}"
+                                CornerRadius="10" Padding="14"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="14">
+                                    <!-- Camera Visibility -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Kamera Katmanı" FontSize="13"
+                                            Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsCameraVisible" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.CameraVisible, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+
+                                    <!-- Watermark Toggle & Text -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Filigran Göster" FontSize="13"
+                                            Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsWatermark" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.Watermark, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+                                    <TextBox x:Name="TbWatermarkText"
+                                        Text="{x:Bind ViewModel.WatermarkText, Mode=TwoWay}"
+                                        PlaceholderText="Filigran Metni"
+                                        FontSize="12" CornerRadius="6"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -752,14 +872,20 @@
                             <Canvas Grid.Row="0"
                                 x:Name="TimeRuler"
                                 Background="{StaticResource SurfaceContainerLowestBrush}"
-                                Height="22">
+                                Height="22"
+                                PointerPressed="OnTimelinePointerPressed"
+                                PointerMoved="OnTimelinePointerMoved"
+                                PointerReleased="OnTimelinePointerReleased">
                                 <!-- Ruler ticks are generated in code-behind -->
                             </Canvas>
 
                             <!-- VIDEO TRACK -->
                             <Canvas Grid.Row="1"
                                 x:Name="VideoTrack"
-                                Background="#080D0E15">
+                                Background="#080D0E15"
+                                PointerPressed="OnTimelinePointerPressed"
+                                PointerMoved="OnTimelinePointerMoved"
+                                PointerReleased="OnTimelinePointerReleased">
                                 <!-- Video clip block (drawn in code-behind) -->
                                 <Border
                                     x:Name="VideoClipBlock"

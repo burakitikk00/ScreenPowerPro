@@ -6,143 +6,389 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Background="{StaticResource AppBgBrush}">
+    Background="{StaticResource SurfaceContainerLowestBrush}">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel MaxWidth="800" Margin="32,24,32,48" Spacing="24">
+    <Page.Resources>
+        <Style x:Key="SettingsCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceContainerBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="Margin" Value="0,0,0,16" />
+        </Style>
+    </Page.Resources>
 
-            <!-- Header -->
-            <StackPanel Spacing="4">
-                <TextBlock Text="Ayarlar" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                <TextBlock Text="Uygulama tercihleri, çekirdek seviyesi Win32 izinleri ve kayıt parametreleri" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Top Nav -->
+            <RowDefinition Height="56" />
+            <!-- Content -->
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ====================================================
+             TOP NAV BAR
+             ==================================================== -->
+        <Border Grid.Row="0"
+            Background="{StaticResource GlassNavBrush}"
+            BorderBrush="{StaticResource GlassBorderBrush}"
+            BorderThickness="0,0,0,1">
+            <Grid Padding="24,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="100" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <Button Click="OnBackClicked"
+                        Background="Transparent" BorderThickness="0"
+                        CornerRadius="6" Padding="8,6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72B;" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="Geri Dön" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                    </Button>
+                    <Rectangle Width="1" Height="16" Fill="{StaticResource GlassBorderBrush}"/>
+                    <TextBlock Text="Uygulama Ayarları" FontSize="15" FontWeight="SemiBold"
+                        Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Center: Drag Area -->
+                <Border x:Name="TitleBarDragArea" Grid.Column="1" Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+
+                <!-- Save Button -->
+                <Button Grid.Column="2" Click="OnSaveClicked"
+                    Padding="16,6" CornerRadius="6">
+                    <Button.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#C0C1FF" Offset="0"/>
+                            <GradientStop Color="#8083FF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Button.Background>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE74E;" FontSize="13" Foreground="#1000A9"/>
+                        <TextBlock Text="Kaydet" FontSize="13" FontWeight="Bold" Foreground="#1000A9"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Far Right: Space reserved for Window Caption Buttons -->
+                <Border Grid.Column="3" Width="100" Background="Transparent" />
+            </Grid>
+        </Border>
+
+        <!-- ====================================================
+             SETTINGS TABS CONTENT
+             ==================================================== -->
+        <ScrollViewer Grid.Row="1" Padding="32,20" VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="800" Spacing="16">
+
+                <!-- Success InfoBar -->
+                <InfoBar x:Name="SaveSuccessInfoBar" IsOpen="False" Severity="Success"
+                    Title="Başarılı" Message="Ayarlar kaydedildi." Margin="0,0,0,8"/>
+
+                <!-- TabView or Segmented Pivot -->
+                <Pivot x:Name="SettingsPivot">
+                    <!-- ====================================================
+                         TAB 1: GENEL (GENERAL)
+                         ==================================================== -->
+                    <PivotItem Header="Genel">
+                        <StackPanel Margin="0,16,0,0">
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Text="KAYIT VE ÇIKTI DİZİNLERİ" FontSize="11" FontWeight="Bold"
+                                        Foreground="{StaticResource PrimaryAccentBrush}" CharacterSpacing="50" />
+
+                                    <!-- Project Save Location -->
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Proje Kayıt Klasörü" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBox Text="{x:Bind ViewModel.ProjectSaveLocation, Mode=TwoWay}" IsReadOnly="True" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" VerticalAlignment="Bottom"
+                                            Command="{x:Bind ViewModel.PickProjectSaveLocationCommand}"
+                                            Content="Gözat..." Padding="12,6" CornerRadius="6" />
+                                    </Grid>
+
+                                    <!-- Export Location -->
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Dışa Aktarım Klasörü" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBox Text="{x:Bind ViewModel.ExportLocation, Mode=TwoWay}" IsReadOnly="True" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" VerticalAlignment="Bottom"
+                                            Command="{x:Bind ViewModel.PickExportLocationCommand}"
+                                            Content="Gözat..." Padding="12,6" CornerRadius="6" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Win32 Window Display Affinity -->
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Text="WIN32 GİZLİLİK VE SİSTEM İZİNLERİ" FontSize="11" FontWeight="Bold"
+                                        Foreground="{StaticResource PrimaryAccentBrush}" CharacterSpacing="50" />
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Kontrol Pencerelerini Kayıttan Gizle" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Kayıt çubuğu ekranda görünse bile videoda yer almaz (WDA_EXCLUDEFROMCAPTURE)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.ExcludeAppFromRecording, Mode=TwoWay}" MinWidth="0" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </PivotItem>
+
+                    <!-- ====================================================
+                         TAB 2: KAYIT (RECORD)
+                         ==================================================== -->
+                    <PivotItem Header="Kayıt">
+                        <StackPanel Margin="0,16,0,0">
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Text="OTOMATİK ZOOM VE ANİMASYON" FontSize="11" FontWeight="Bold"
+                                        Foreground="{StaticResource PrimaryAccentBrush}" CharacterSpacing="50" />
+
+                                    <!-- Auto Zoom Mode -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Otomatik Zoom Modu" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Tıklamalara göre video üzerine otomatik zoom uygulama şekli" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ComboBox Grid.Column="1" SelectedValue="{x:Bind ViewModel.AutoZoomMode, Mode=TwoWay}"
+                                            SelectedValuePath="Tag" Width="180">
+                                            <ComboBoxItem Content="Kapalı" Tag="none" />
+                                            <ComboBoxItem Content="Yumuşak (Smooth)" Tag="smooth" />
+                                            <ComboBoxItem Content="Anlık (Instant)" Tag="instant" />
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- Countdown Seconds -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Kayıt Öncesi Geri Sayım" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Kayıt başlamadan önceki görsel hazırlık süresi" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ComboBox Grid.Column="1" SelectedValue="{x:Bind ViewModel.CountdownSeconds, Mode=TwoWay}"
+                                            SelectedValuePath="Tag" Width="180">
+                                            <ComboBoxItem Content="Kapalı (0 sn)" Tag="0" />
+                                            <ComboBoxItem Content="3 Saniye" Tag="3" />
+                                            <ComboBoxItem Content="5 Saniye" Tag="5" />
+                                            <ComboBoxItem Content="10 Saniye" Tag="10" />
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Text="MASAÜSTÜ VE İMLEÇ DAVRANIŞLARI" FontSize="11" FontWeight="Bold"
+                                        Foreground="{StaticResource PrimaryAccentBrush}" CharacterSpacing="50" />
+
+                                    <!-- Hide Cursor -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Ham Fare İmlecini Gizle" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Video kaydına işletim sistemi imleci yansımaz, imleç editörde simüle edilir" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.HideMouseCursor, Mode=TwoWay}" MinWidth="0" />
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- Hide Desktop Icons -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Masaüstü Simgelerini Gizle" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Kayıt başladığında masaüstü simgeleri gizlenir, bittiğinde geri getirilir" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.HideDesktopIcons, Mode=TwoWay}" MinWidth="0" />
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- Hide Taskbar -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Windows Görev Çubuğunu Gizle" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Kayıt sırasında Windows görev çubuğunu gizler" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.HideTaskbar, Mode=TwoWay}" MinWidth="0" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </PivotItem>
+
+                    <!-- ====================================================
+                         TAB 3: DIŞA AKTARIM (EXPORT)
+                         ==================================================== -->
+                    <PivotItem Header="Dışa Aktarım">
+                        <StackPanel Margin="0,16,0,0">
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Text="RENDER VE FORMAT PARAMETRELERİ" FontSize="11" FontWeight="Bold"
+                                        Foreground="{StaticResource PrimaryAccentBrush}" CharacterSpacing="50" />
+
+                                    <!-- Format -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Video Formatı" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Nihai dosya kodlama formatı" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ComboBox Grid.Column="1" SelectedValue="{x:Bind ViewModel.ExportFormat, Mode=TwoWay}"
+                                            SelectedValuePath="Content" Width="180">
+                                            <ComboBoxItem Content="mp4" />
+                                            <ComboBoxItem Content="webm" />
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- Export Resolution -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Çıkış Çözünürlüğü" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Dışa aktarılan video çözünürlüğü" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ComboBox Grid.Column="1" SelectedValue="{x:Bind ViewModel.ExportResolution, Mode=TwoWay}"
+                                            SelectedValuePath="Content" Width="180">
+                                            <ComboBoxItem Content="720p" />
+                                            <ComboBoxItem Content="1080p" />
+                                            <ComboBoxItem Content="4k" />
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- FPS -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Kare Hızı (FPS)" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Saniyedeki kare sayısı" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ComboBox Grid.Column="1" SelectedValue="{x:Bind ViewModel.Fps, Mode=TwoWay}"
+                                            SelectedValuePath="Tag" Width="180">
+                                            <ComboBoxItem Content="30 FPS" Tag="30" />
+                                            <ComboBoxItem Content="60 FPS" Tag="60" />
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </PivotItem>
+
+                    <!-- ====================================================
+                         TAB 4: CİHAZLAR (DEVICES)
+                         ==================================================== -->
+                    <PivotItem Header="Cihazlar">
+                        <StackPanel Margin="0,16,0,0">
+                            <Border Style="{StaticResource SettingsCardStyle}">
+                                <StackPanel Spacing="16">
+                                    <TextBlock Text="GİRİŞ VE ÇIKIŞ DONANIMLARI" FontSize="11" FontWeight="Bold"
+                                        Foreground="{StaticResource PrimaryAccentBrush}" CharacterSpacing="50" />
+
+                                    <!-- Microphone -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Mikrofon Aygıtı" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Ses kaydı için kullanılacak mikrofon" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ComboBox Grid.Column="1" ItemsSource="{x:Bind ViewModel.AvailableMics, Mode=OneWay}"
+                                            SelectedItem="{x:Bind ViewModel.SelectedMicDevice, Mode=TwoWay}" Width="240" />
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- Speaker / System Audio -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Sistem Ses Çıkışı (Hoparlör)" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Bilgisayar içi seslerin kaydedileceği kanal" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ComboBox Grid.Column="1" ItemsSource="{x:Bind ViewModel.AvailableSpeakers, Mode=OneWay}"
+                                            SelectedItem="{x:Bind ViewModel.SelectedSpeakerDevice, Mode=TwoWay}" Width="240" />
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- Camera -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Web Kamerası" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Yüzen kamera penceresi için video kaynağı" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ComboBox Grid.Column="1" ItemsSource="{x:Bind ViewModel.AvailableCameras, Mode=OneWay}"
+                                            SelectedItem="{x:Bind ViewModel.SelectedCameraDevice, Mode=TwoWay}" Width="240" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </PivotItem>
+                </Pivot>
             </StackPanel>
-
-            <!-- Success InfoBar -->
-            <InfoBar x:Name="SaveSuccessInfoBar" IsOpen="False" Severity="Success" Title="Başarılı" Message="Ayarlar kaydedildi." />
-
-            <!-- Core / Win32 Level Features -->
-            <Border Background="{StaticResource SurfaceContainerBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
-                <StackPanel Spacing="16">
-                    <TextBlock Text="ÇEKİRDEK SEVİYESİ / WIN32 SİSTEM İZİNLERİ" FontSize="11" FontWeight="Bold" Foreground="{StaticResource PrimaryAccentBrush}" CharacterSpacing="50" />
-
-                    <!-- Exclude App Windows -->
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Kontrol Pencerelerini Kayıttan Gizle" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
-                            <TextBlock Text="Kayıt çubuğu ekranda görünse bile nihai video çıktısında asla yer almaz (WDA_EXCLUDEFROMCAPTURE)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.ExcludeAppFromRecording, Mode=TwoWay}" OnContent="" OffContent="" MinWidth="0" />
-                    </Grid>
-
-                    <MenuFlyoutSeparator Background="{StaticResource BorderBrush}" />
-
-                    <!-- Hide Mouse Cursor -->
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Fare İmlecini Videodan Gizle" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
-                            <TextBlock Text="Video kaydına ana fare imleci yansımaz, sadece tıklama efektleri simüle edilir" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.HideMouseCursor, Mode=TwoWay}" OnContent="" OffContent="" MinWidth="0" />
-                    </Grid>
-
-                    <MenuFlyoutSeparator Background="{StaticResource BorderBrush}" />
-
-                    <!-- Hide Desktop Icons -->
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Kayıt Sırasında Masaüstü Simgelerini Gizle" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
-                            <TextBlock Text="Kayıt başladığında masaüstü simgeleri gizlenir, bittiğinde otomatik geri getirilir" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.HideDesktopIcons, Mode=TwoWay}" OnContent="" OffContent="" MinWidth="0" />
-                    </Grid>
-
-                    <MenuFlyoutSeparator Background="{StaticResource BorderBrush}" />
-
-                    <!-- Hide Taskbar -->
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Kayıt Sırasında Windows Görev Çubuğunu Gizle" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
-                            <TextBlock Text="Tam ekran kayıtlarda temiz bir görünüm için görev çubuğunu geçici gizler" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.HideTaskbar, Mode=TwoWay}" OnContent="" OffContent="" MinWidth="0" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- Video & Audio Quality -->
-            <Border Background="{StaticResource SurfaceContainerBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
-                <StackPanel Spacing="16">
-                    <TextBlock Text="KAYIT VE ÇIKTI KALİTESİ" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" CharacterSpacing="50" />
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- FPS -->
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Kare Hızı (FPS)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
-                            <ComboBox SelectedValue="{x:Bind ViewModel.Fps, Mode=TwoWay}" HorizontalAlignment="Stretch" CornerRadius="8" Background="{StaticResource SurfaceHighBrush}">
-                                <x:Int32>60</x:Int32>
-                                <x:Int32>30</x:Int32>
-                            </ComboBox>
-                        </StackPanel>
-
-                        <!-- Resolution -->
-                        <StackPanel Grid.Column="1" Spacing="6">
-                            <TextBlock Text="Varsayılan Çözünürlük" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
-                            <ComboBox SelectedValue="{x:Bind ViewModel.Resolution, Mode=TwoWay}" SelectedValuePath="Content" HorizontalAlignment="Stretch" CornerRadius="8" Background="{StaticResource SurfaceHighBrush}">
-                                <ComboBoxItem Content="1080p" />
-                                <ComboBoxItem Content="4K" />
-                                <ComboBoxItem Content="720p" />
-                            </ComboBox>
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- Folders -->
-            <Border Background="{StaticResource SurfaceContainerBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
-                <StackPanel Spacing="16">
-                    <TextBlock Text="DOSYA VE KAYIT KONUMLARI" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" CharacterSpacing="50" />
-
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Proje Kayıt Klasörü" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
-                        <TextBox Text="{x:Bind ViewModel.ProjectSaveLocation, Mode=TwoWay}" CornerRadius="8" Background="{StaticResource SurfaceHighBrush}" BorderBrush="{StaticResource BorderBrush}" />
-                    </StackPanel>
-
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Video Export Klasörü" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
-                        <TextBox Text="{x:Bind ViewModel.ExportLocation, Mode=TwoWay}" CornerRadius="8" Background="{StaticResource SurfaceHighBrush}" BorderBrush="{StaticResource BorderBrush}" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- Save Button -->
-            <Button Click="OnSaveClicked" Background="{StaticResource PrimaryButtonGradient}" BorderThickness="0" CornerRadius="10" Padding="24,12" HorizontalAlignment="Right">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE74E;" FontSize="14" Foreground="White" />
-                    <TextBlock Text="Değişiklikleri Kaydet" FontWeight="Bold" FontSize="13" Foreground="White" />
-                </StackPanel>
-            </Button>
-
-        </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+    </Grid>
 </Page>

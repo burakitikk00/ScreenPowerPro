@@ -139,6 +139,10 @@ public partial class EditorViewModel : ObservableObject
     [ObservableProperty]
     private double _timelineZoom = 50; // % 10 - 200
 
+    public List<MouseMoveEvent> MouseMoves { get; private set; } = new();
+    public List<MouseClickEvent> MouseClicks { get; private set; } = new();
+    public List<KeystrokeEvent> Keystrokes { get; private set; } = new();
+
     [ObservableProperty]
     private double _timelineScroll = 0;
 
@@ -191,6 +195,12 @@ public partial class EditorViewModel : ObservableObject
     {
         get => Settings.CursorClickSound;
         set { if (Settings.CursorClickSound != value) { Settings.CursorClickSound = value; OnPropertyChanged(); } }
+    }
+
+    public bool HideCursorWhenIdle
+    {
+        get => Settings.HideCursorWhenIdle;
+        set { if (Settings.HideCursorWhenIdle != value) { Settings.HideCursorWhenIdle = value; OnPropertyChanged(); } }
     }
 
     public bool MotionBlur
@@ -571,6 +581,11 @@ public partial class EditorViewModel : ObservableObject
         {
             SelectedZoomEffect = ZoomEffects[0];
         }
+
+        // Telemetri verilerini yükle
+        MouseClicks = _projectService.LoadMouseClicks(projectDir);
+        MouseMoves = _projectService.LoadMouseMoves(projectDir);
+        Keystrokes = _projectService.LoadKeystrokes(projectDir);
 
         LoadWaveformData();
         NotifyAllProperties();
@@ -1035,6 +1050,7 @@ public partial class EditorViewModel : ObservableObject
         OnPropertyChanged(nameof(CursorStyle));
         OnPropertyChanged(nameof(ClickEffect));
         OnPropertyChanged(nameof(CursorClickSound));
+        OnPropertyChanged(nameof(HideCursorWhenIdle));
         OnPropertyChanged(nameof(MotionBlur));
         OnPropertyChanged(nameof(MotionBlurAmount));
         OnPropertyChanged(nameof(DefaultZoomScale));

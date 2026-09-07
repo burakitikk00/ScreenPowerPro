@@ -104,19 +104,19 @@
                             <Border Width="16" Height="16" CornerRadius="4" Background="White" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <FontIcon Glyph="&#xE71A;" FontSize="9" Foreground="#DC2626" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="Kaydı Bitir" FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+                            <TextBlock x:Name="TbStopNormalText" Text="Kaydı Bitir" FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
                         </StackPanel>
 
                         <!-- Loading State: ProgressRing + Pulsing "Loading..." -->
                         <StackPanel x:Name="StopLoadingPanel" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center" Visibility="Collapsed">
                             <ProgressRing IsActive="True" Width="14" Height="14" Foreground="White" />
-                            <TextBlock Text="Loading..." FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+                            <TextBlock x:Name="TbStopLoadingText" Text="Loading..." FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
                         </StackPanel>
                     </Grid>
                 </Button>
 
                 <!-- Cancel Button -->
-                <Button Click="OnCancelClicked"
+                <Button x:Name="BtnCancelRec" Click="OnCancelClicked"
                     Style="{StaticResource BarButtonStyle}"
                     ToolTipService.ToolTip="Kaydı İptal Et">
                     <FontIcon Glyph="&#xE711;" FontSize="11" Foreground="#8E8E9F" />

@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -47,6 +48,11 @@ public sealed partial class RegionSelectionWindow : Window
         // Exclude this window from capture so it doesn't flash in recordings, though it should be closed by then.
         IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         Win32Helper.SetWindowDisplayAffinity(hwnd, Win32Helper.WDA_EXCLUDEFROMCAPTURE);
+
+        var loc = App.Current.Services.GetRequiredService<ScreenPowerPro.Services.LocalizationService>();
+        Title = loc["Region_Title"];
+        TbInstruction.Text = loc["Region_Instruction"];
+        TbCancelHint.Text = loc["Region_CancelHint"];
         
         // Wait for it to be ready
         RootGrid.Loaded += (s, e) =>

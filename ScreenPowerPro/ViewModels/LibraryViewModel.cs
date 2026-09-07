@@ -17,6 +17,7 @@ namespace ScreenPowerPro.ViewModels;
 public partial class LibraryViewModel : ObservableObject
 {
     private readonly ProjectService _projectService;
+    private readonly LocalizationService _loc;
 
     [ObservableProperty]
     private ObservableCollection<ProjectInfo> _projects = new();
@@ -33,9 +34,14 @@ public partial class LibraryViewModel : ObservableObject
     public event Action<string>? NavigateToEditor;
     public event Action? NavigateToDashboard;
 
-    public LibraryViewModel(ProjectService projectService)
+    public LibraryViewModel(ProjectService projectService, LocalizationService loc)
     {
         _projectService = projectService;
+        _loc = loc;
+        _loc.LanguageChanged += () =>
+        {
+            _ = RefreshProjectsAsync();
+        };
     }
 
     /// <summary>
@@ -51,6 +57,9 @@ public partial class LibraryViewModel : ObservableObject
             Projects.Clear();
             foreach (var p in list)
             {
+                p.EditButtonText = _loc["Library_Btn_Edit"];
+                p.RevealTooltip = _loc["Library_Btn_OpenFolder"];
+                p.DeleteTooltip = _loc["Library_Btn_Delete"];
                 Projects.Add(p);
             }
             OnPropertyChanged(nameof(HasProjects));

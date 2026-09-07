@@ -38,7 +38,7 @@
                     <TextBlock Text="Teleprompter" FontSize="13" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <TextBlock Grid.Column="1" Text="(Sürükleyip konumlandırabilirsiniz)"
+                <TextBlock x:Name="TbDragHint" Grid.Column="1" Text="(Sürükleyip konumlandırabilirsiniz)"
                     FontSize="11" Foreground="#8E8E9F" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
                 <Button Grid.Column="2" Click="OnCloseClicked"
@@ -73,7 +73,7 @@
 
                 <!-- Font Size Controls -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <TextBlock Text="Boyut:" FontSize="11" Foreground="#8E8E9F" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <TextBlock x:Name="TbSizeLabel" Text="Boyut:" FontSize="11" Foreground="#8E8E9F" VerticalAlignment="Center" Margin="0,0,4,0"/>
                     <Button Click="OnDecreaseFontSize" Background="#26FFFFFF" BorderThickness="0" CornerRadius="4" Width="28" Height="28" Padding="0">
                         <FontIcon Glyph="&#xE738;" FontSize="11" Foreground="White"/>
                     </Button>
@@ -93,14 +93,14 @@
                         </StackPanel>
                     </Button>
 
-                    <TextBlock Text="Hız:" FontSize="11" Foreground="#8E8E9F" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TbSpeedLabel" Text="Hız:" FontSize="11" Foreground="#8E8E9F" VerticalAlignment="Center"/>
                     <Slider x:Name="SliderSpeed" Minimum="1" Maximum="10" Value="3" Width="100" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Reset Scroll -->
                 <Button Grid.Column="2" Click="OnResetScroll"
                     Background="#26FFFFFF" BorderThickness="0" CornerRadius="6" Padding="10,6" VerticalAlignment="Center">
-                    <TextBlock Text="Başa Dön" FontSize="11" Foreground="#D1D1DB"/>
+                    <TextBlock x:Name="TbResetScroll" Text="Başa Dön" FontSize="11" Foreground="#D1D1DB"/>
                 </Button>
             </Grid>
         </Border>

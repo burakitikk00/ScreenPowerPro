@@ -94,13 +94,13 @@
                         CornerRadius="6" Padding="10,4" Margin="4,0,0,0">
                         <Button.Flyout>
                             <MenuFlyout Placement="Bottom">
-                                <MenuFlyoutItem Text="History" Click="OnFileHistoryClicked">
+                                <MenuFlyoutItem x:Name="MenuFileHistory" Text="History" Click="OnFileHistoryClicked">
                                     <MenuFlyoutItem.Icon>
                                         <FontIcon Glyph="&#xE81C;" FontSize="13" Foreground="#C0C1FF"/>
                                     </MenuFlyoutItem.Icon>
                                 </MenuFlyoutItem>
                                 <MenuFlyoutSeparator />
-                                <MenuFlyoutItem Text="Import Video to Create Project" Click="OnImportVideoClicked">
+                                <MenuFlyoutItem x:Name="MenuFileImport" Text="Import Video to Create Project" Click="OnImportVideoClicked">
                                     <MenuFlyoutItem.Icon>
                                         <FontIcon Glyph="&#xE8B9;" FontSize="13" Foreground="#00D2FF"/>
                                     </MenuFlyoutItem.Icon>
@@ -109,7 +109,7 @@
                         </Button.Flyout>
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <FontIcon Glyph="&#xED25;" FontSize="12" Foreground="#C7C4D7"/>
-                            <TextBlock Text="File" FontSize="12" FontWeight="Medium" Foreground="#E3E1EC"/>
+                            <TextBlock x:Name="TbFileBtn" Text="File" FontSize="12" FontWeight="Medium" Foreground="#E3E1EC"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
@@ -135,7 +135,7 @@
                     </Button>
 
                     <!-- Settings Button -->
-                    <Button Click="OnSettingsClicked"
+                    <Button x:Name="BtnHeaderSettings" Click="OnSettingsClicked"
                         Background="Transparent" BorderThickness="0" CornerRadius="6" Width="28" Height="28" Padding="0"
                         ToolTipService.ToolTip="Settings">
                         <FontIcon Glyph="&#xE713;" FontSize="13" Foreground="#8E8E9F"/>
@@ -167,11 +167,11 @@
                     <ColumnDefinition Width="260" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0"
+                <TextBlock Grid.Column="0" x:Name="TbSelectModeTitle"
                     Text="Please select the recording mode"
                     FontSize="13" FontWeight="SemiBold" Foreground="#9595A5" VerticalAlignment="Center"/>
 
-                <TextBlock Grid.Column="1"
+                <TextBlock Grid.Column="1" x:Name="TbDeviceToolTitle"
                     Text="Device &amp; Tool"
                     FontSize="12" FontWeight="SemiBold" Foreground="#8E8E9F" VerticalAlignment="Center"/>
             </Grid>
@@ -237,7 +237,7 @@
                             </Border>
 
                             <!-- Card Title -->
-                            <TextBlock Grid.Row="1" Text="Full Screen" FontSize="12" FontWeight="SemiBold"
+                            <TextBlock Grid.Row="1" x:Name="TbModeFullScreenTitle" Text="Full Screen" FontSize="12" FontWeight="SemiBold"
                                 Foreground="White" HorizontalAlignment="Center"/>
                         </Grid>
                     </Border>
@@ -280,7 +280,7 @@
                             </Border>
 
                             <!-- Card Title -->
-                            <TextBlock Grid.Row="1" Text="Custom" FontSize="12" FontWeight="SemiBold"
+                            <TextBlock Grid.Row="1" x:Name="TbModeCustomTitle" Text="Custom" FontSize="12" FontWeight="SemiBold"
                                 Foreground="#CCCCCC" HorizontalAlignment="Center"/>
                         </Grid>
                     </Border>
@@ -331,7 +331,7 @@
                             </Border>
 
                             <!-- Card Title -->
-                            <TextBlock Grid.Row="1" Text="Window" FontSize="12" FontWeight="SemiBold"
+                            <TextBlock Grid.Row="1" x:Name="TbModeWindowTitle" Text="Window" FontSize="12" FontWeight="SemiBold"
                                 Foreground="#CCCCCC" HorizontalAlignment="Center"/>
                         </Grid>
                     </Border>
@@ -376,7 +376,7 @@
                             </Border>
 
                             <!-- Card Title -->
-                            <TextBlock Grid.Row="1" Text="Device" FontSize="12" FontWeight="SemiBold"
+                            <TextBlock Grid.Row="1" x:Name="TbModeDeviceTitle" Text="Device" FontSize="12" FontWeight="SemiBold"
                                 Foreground="#CCCCCC" HorizontalAlignment="Center"/>
                         </Grid>
                     </Border>
@@ -544,7 +544,7 @@
                                 <TextBlock Text="A" FontSize="10" FontWeight="Bold" Foreground="#C0C1FF"
                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="Teleprompter" FontSize="11" FontWeight="SemiBold" Foreground="#E3E1EC"/>
+                            <TextBlock x:Name="TbTeleprompterTool" Text="Teleprompter" FontSize="11" FontWeight="SemiBold" Foreground="#E3E1EC"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
@@ -559,7 +559,7 @@
             <Border Width="260" CornerRadius="12" Background="#161720" BorderBrush="#2B2D3D" BorderThickness="1"
                 Padding="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,46,24,0" MaxHeight="240">
                 <StackPanel Spacing="3">
-                    <TextBlock Text="Select Camera" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E9F" Margin="6,2,6,6"/>
+                    <TextBlock x:Name="TbSelectCameraTitle" Text="Select Camera" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E9F" Margin="6,2,6,6"/>
                     <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="190">
                         <ItemsControl x:Name="CameraItemsList">
                             <ItemsControl.ItemTemplate>
@@ -592,7 +592,7 @@
             <Border Width="260" CornerRadius="12" Background="#161720" BorderBrush="#2B2D3D" BorderThickness="1"
                 Padding="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,50,24,0" MaxHeight="240">
                 <StackPanel Spacing="3">
-                    <TextBlock Text="Select Microphone" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E9F" Margin="6,2,6,6"/>
+                    <TextBlock x:Name="TbSelectMicTitle" Text="Select Microphone" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E9F" Margin="6,2,6,6"/>
                     <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="190">
                         <ItemsControl x:Name="MicItemsList">
                             <ItemsControl.ItemTemplate>
@@ -637,7 +637,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Text="Select Running Applications" FontSize="11" FontWeight="SemiBold"
+                        <TextBlock Grid.Row="0" x:Name="TbSelectAudioAppTitle" Text="Select Running Applications" FontSize="11" FontWeight="SemiBold"
                             Foreground="#8E8E9F" Margin="6,2,6,6"/>
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                             <ItemsControl x:Name="AudioAppItemsList">
@@ -722,7 +722,7 @@
 
                     <!-- Header with Title & Close button -->
                     <Grid Grid.Row="0">
-                        <TextBlock Text="File History" FontSize="17" FontWeight="Bold" Foreground="#F5F5FA"
+                        <TextBlock x:Name="TbHistoryTitle" Text="File History" FontSize="17" FontWeight="Bold" Foreground="#F5F5FA"
                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         <Button Click="OnCloseFileHistory"
                             Background="Transparent" BorderThickness="0" CornerRadius="6" Width="30" Height="30" Padding="0"
@@ -736,12 +736,12 @@
                         <Button x:Name="BtnTabProjectHistory" Click="OnTabProjectHistoryClicked"
                             Background="#1E3A8A" BorderBrush="#3B82F6" BorderThickness="1"
                             CornerRadius="8" Padding="16,8">
-                            <TextBlock Text="Project History" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock x:Name="TbTabProjectHistory" Text="Project History" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
                         </Button>
                         <Button x:Name="BtnTabSharingHistory" Click="OnTabSharingHistoryClicked"
                             Background="#1A1B24" BorderThickness="0"
                             CornerRadius="8" Padding="16,8">
-                            <TextBlock Text="Sharing History" FontSize="13" FontWeight="Normal" Foreground="#8E8E9F"/>
+                            <TextBlock x:Name="TbTabSharingHistory" Text="Sharing History" FontSize="13" FontWeight="Normal" Foreground="#8E8E9F"/>
                         </Button>
                     </StackPanel>
 

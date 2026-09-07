@@ -18,6 +18,20 @@ public sealed partial class MaskOverlayWindow : Window
 
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
 
+        try
+        {
+            var services = App.Current?.Services;
+            if (services != null)
+            {
+                var loc = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetService<ScreenPowerPro.Services.LocalizationService>(services);
+                if (loc != null)
+                {
+                    Title = loc.CurrentLanguage == "en" ? "Region Mask" : "Bölge Maskesi";
+                }
+            }
+        }
+        catch { }
+
         // Kayıt videosunda bu karartmanın görünmemesi için dışla
         Win32Helper.SetWindowDisplayAffinity(hwnd, Win32Helper.WDA_EXCLUDEFROMCAPTURE);
 

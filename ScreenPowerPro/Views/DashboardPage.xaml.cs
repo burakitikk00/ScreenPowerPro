@@ -22,6 +22,7 @@ public sealed partial class DashboardPage : Page
 {
     public DashboardViewModel ViewModel { get; }
     private readonly AudioLevelMonitorService _audioMonitor;
+    private readonly LocalizationService _loc;
 
     private string _activeMode = "FullScreen";
 
@@ -30,6 +31,7 @@ public sealed partial class DashboardPage : Page
         InitializeComponent();
         ViewModel = App.Current.Services.GetRequiredService<DashboardViewModel>();
         _audioMonitor = App.Current.Services.GetRequiredService<AudioLevelMonitorService>();
+        _loc = App.Current.Services.GetRequiredService<LocalizationService>();
         DataContext = ViewModel;
 
         ViewModel.RequestStartRecording += OnRecordingStarted;
@@ -46,6 +48,9 @@ public sealed partial class DashboardPage : Page
             XamlRoot.Changed += OnXamlRootChanged;
         }
 
+        _loc.LanguageChanged += ApplyLocalization;
+        ApplyLocalization();
+
         SelectMode("FullScreen");
         await ViewModel.InitializeDevicesAsync();
         UpdateOnlyAppMenuText();
@@ -56,12 +61,41 @@ public sealed partial class DashboardPage : Page
 
     private void OnPageUnloaded(object sender, RoutedEventArgs e)
     {
+        _loc.LanguageChanged -= ApplyLocalization;
         if (XamlRoot != null)
         {
             XamlRoot.Changed -= OnXamlRootChanged;
         }
         _audioMonitor.AudioLevelsChanged -= OnAudioLevelsChanged;
         _audioMonitor.StopMonitoring();
+    }
+
+    private void ApplyLocalization()
+    {
+        if (MenuFileHistory != null) MenuFileHistory.Text = _loc["Dashboard_Header_History"];
+        if (MenuFileImport != null) MenuFileImport.Text = _loc["Dashboard_History_ImportVideo"];
+        if (TbFileBtn != null) TbFileBtn.Text = _loc.CurrentLanguage == "en" ? "File" : "Dosya";
+        if (BtnHeaderSettings != null) ToolTipService.SetToolTip(BtnHeaderSettings, _loc["Dashboard_Header_Settings"]);
+
+        if (TbSelectModeTitle != null) TbSelectModeTitle.Text = _loc["Dashboard_Subtitle"];
+        if (TbDeviceToolTitle != null) TbDeviceToolTitle.Text = _loc.CurrentLanguage == "en" ? "Device & Tool" : "Cihazlar & Araçlar";
+
+        if (TbModeFullScreenTitle != null) TbModeFullScreenTitle.Text = _loc["Dashboard_Mode_Screen"];
+        if (TbModeCustomTitle != null) TbModeCustomTitle.Text = _loc["Dashboard_Mode_Custom"];
+        if (TbModeWindowTitle != null) TbModeWindowTitle.Text = _loc["Dashboard_Mode_Window"];
+        if (TbModeDeviceTitle != null) TbModeDeviceTitle.Text = _loc["Dashboard_Mode_Camera"];
+
+        if (TbTeleprompterTool != null) TbTeleprompterTool.Text = _loc["Dashboard_Header_Teleprompter"];
+        if (TbSelectCameraTitle != null) TbSelectCameraTitle.Text = _loc.CurrentLanguage == "en" ? "Select Camera" : "Kamera Seçin";
+        if (TbSelectMicTitle != null) TbSelectMicTitle.Text = _loc.CurrentLanguage == "en" ? "Select Microphone" : "Mikrofon Seçin";
+        if (TbSelectAudioAppTitle != null) TbSelectAudioAppTitle.Text = _loc.CurrentLanguage == "en" ? "Select Running Applications" : "Çalışan Uygulamaları Seçin";
+
+        if (TbHistoryTitle != null) TbHistoryTitle.Text = _loc["Dashboard_History_Title"];
+        if (TbTabProjectHistory != null) TbTabProjectHistory.Text = _loc["Dashboard_History_TabRecordings"];
+        if (TbTabSharingHistory != null) TbTabSharingHistory.Text = _loc["Dashboard_History_TabShared"];
+        if (TbHistoryEmpty != null) TbHistoryEmpty.Text = _loc["Dashboard_History_Empty"];
+
+        UpdateOnlyAppMenuText();
     }
 
     private void OnXamlRootChanged(XamlRoot sender, XamlRootChangedEventArgs args)
@@ -393,6 +427,7 @@ public sealed partial class DashboardPage : Page
         BtnTabSharingHistory.Background = new SolidColorBrush(ColorHelper.FromArgb(255, 26, 27, 36));
         BtnTabSharingHistory.BorderThickness = new Thickness(0);
 
+        TbHistoryEmpty.Text = _loc["Dashboard_History_Empty"];
         RefreshHistoryProjectsList();
     }
 
@@ -406,7 +441,7 @@ public sealed partial class DashboardPage : Page
         BtnTabProjectHistory.BorderThickness = new Thickness(0);
 
         // Sharing history empty placeholder
-        TbHistoryEmpty.Text = "No sharing history available.";
+        TbHistoryEmpty.Text = _loc["Dashboard_History_SharedEmpty"];
         TbHistoryEmpty.Visibility = Visibility.Visible;
         HistoryProjectsList.ItemsSource = null;
     }
@@ -427,16 +462,16 @@ public sealed partial class DashboardPage : Page
             var textBox = new TextBox
             {
                 Text = project.Name,
-                PlaceholderText = "Yeni proje adı girin",
+                PlaceholderText = _loc["Dashboard_Rename_Placeholder"],
                 Margin = new Thickness(0, 8, 0, 0)
             };
 
             var dialog = new ContentDialog
             {
-                Title = "Projeyi Yeniden Adlandır",
+                Title = _loc["Dashboard_Rename_Title"],
                 Content = textBox,
-                PrimaryButtonText = "Kaydet",
-                CloseButtonText = "İptal",
+                PrimaryButtonText = _loc["Common_Save"],
+                CloseButtonText = _loc["Common_Cancel"],
                 XamlRoot = XamlRoot
             };
 
@@ -472,10 +507,10 @@ public sealed partial class DashboardPage : Page
         {
             var dialog = new ContentDialog
             {
-                Title = "Projeyi Sil",
-                Content = $"\"{project.Name}\" projesini ve tüm kayıt dosyalarını kalıcı olarak silmek istediğinizden emin misiniz?",
-                PrimaryButtonText = "Sil",
-                CloseButtonText = "İptal",
+                Title = _loc["Dashboard_Delete_Title"],
+                Content = _loc.Get("Dashboard_Delete_Confirm", project.Name),
+                PrimaryButtonText = _loc["Common_Delete"],
+                CloseButtonText = _loc["Common_Cancel"],
                 XamlRoot = XamlRoot
             };
 

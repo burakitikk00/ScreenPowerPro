@@ -87,6 +87,21 @@ public class ProjectService
         catch { }
     }
 
+    public List<MouseMoveEvent> LoadMouseMoves(string projectDir)
+    {
+        string path = Path.Combine(projectDir, "recording", "mousemoves-0.json");
+        if (!File.Exists(path)) return new();
+        try
+        {
+            string json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<List<MouseMoveEvent>>(json, JsonOptions) ?? new();
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
     public void SaveKeystrokes(string projectDir, List<KeystrokeEvent> keystrokes)
     {
         try
@@ -97,6 +112,21 @@ public class ProjectService
             File.WriteAllText(path, json);
         }
         catch { }
+    }
+
+    public List<KeystrokeEvent> LoadKeystrokes(string projectDir)
+    {
+        string path = Path.Combine(projectDir, "recording", "keystrokes-0.json");
+        if (!File.Exists(path)) return new();
+        try
+        {
+            string json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<List<KeystrokeEvent>>(json, JsonOptions) ?? new();
+        }
+        catch
+        {
+            return new();
+        }
     }
 
     public List<ProjectInfo> GetRecentProjects()

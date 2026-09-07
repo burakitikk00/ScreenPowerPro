@@ -1,7 +1,9 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
+using ScreenPowerPro.Services;
 using Windows.Graphics;
 
 namespace ScreenPowerPro.Views;
@@ -12,10 +14,13 @@ public sealed partial class TeleprompterWindow : Window
     private Windows.Foundation.Point _startPoint;
     private readonly DispatcherTimer _scrollTimer;
     private bool _isScrolling = false;
+    private readonly LocalizationService? _loc;
 
     public TeleprompterWindow()
     {
         InitializeComponent();
+
+        _loc = App.Current?.Services?.GetService<LocalizationService>();
 
         var appWindow = AppWindow;
         if (appWindow.Presenter is OverlappedPresenter presenter)
@@ -33,8 +38,31 @@ public sealed partial class TeleprompterWindow : Window
             appWindow.Move(new PointInt32(x, y));
         }
 
+        if (_loc != null)
+        {
+            _loc.LanguageChanged += ApplyLocalization;
+            ApplyLocalization();
+        }
+
+        Closed += (s, e) =>
+        {
+            if (_loc != null) _loc.LanguageChanged -= ApplyLocalization;
+        };
+
         _scrollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _scrollTimer.Tick += OnScrollTick;
+    }
+
+    private void ApplyLocalization()
+    {
+        if (_loc == null) return;
+        Title = _loc["Teleprompter_Title"];
+        if (TbDragHint != null) TbDragHint.Text = _loc["Teleprompter_DragHint"];
+        if (ScriptTextBox != null) ScriptTextBox.PlaceholderText = _loc["Teleprompter_Placeholder"];
+        if (TbSizeLabel != null) TbSizeLabel.Text = _loc["Teleprompter_Size"];
+        if (TbSpeedLabel != null) TbSpeedLabel.Text = _loc["Teleprompter_SpeedLabel"];
+        if (TbResetScroll != null) TbResetScroll.Text = _loc["Teleprompter_Reset"];
+        if (TbPlayPause != null) TbPlayPause.Text = _isScrolling ? _loc["Teleprompter_Pause"] : _loc["Teleprompter_Start"];
     }
 
     private void OnScrollTick(object? sender, object e)

@@ -24,7 +24,7 @@
             <StackPanel x:Name="ToolbarContentPanel" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
 
                 <!-- 1. Close Button [X] -->
-                <Button Click="OnCloseClicked"
+                <Button x:Name="BtnClose" Click="OnCloseClicked"
                         Background="Transparent" BorderThickness="0" CornerRadius="6"
                         Width="28" Height="32" Padding="0"
                         ToolTipService.ToolTip="Kapat ve Dashboard'a Dön">
@@ -46,14 +46,14 @@
                     <Button.Flyout>
                         <MenuFlyout x:Name="GearFlyout" Placement="Top">
                             <!-- Zoom Effect Submenu -->
-                            <MenuFlyoutSubItem Text="Zoom Efekti">
+                            <MenuFlyoutSubItem x:Name="FlyoutSubZoom" Text="Zoom Efekti">
                                 <ToggleMenuFlyoutItem x:Name="ItemZoomNone" Text="Yok" Click="OnSelectZoomNone" />
                                 <ToggleMenuFlyoutItem x:Name="ItemZoom2D" Text="2D Zoom" Click="OnSelectZoom2D" />
                                 <ToggleMenuFlyoutItem x:Name="ItemZoom3D" Text="3D Hareket" Click="OnSelectZoom3D" />
                             </MenuFlyoutSubItem>
 
                             <!-- Pre-Recording Countdown Submenu -->
-                            <MenuFlyoutSubItem Text="Geri Sayım Süresi">
+                            <MenuFlyoutSubItem x:Name="FlyoutSubCountdown" Text="Geri Sayım Süresi">
                                 <ToggleMenuFlyoutItem x:Name="ItemCount3s" Text="3 saniye" Click="OnSelectCount3s" />
                                 <ToggleMenuFlyoutItem x:Name="ItemCount5s" Text="5 saniye" Click="OnSelectCount5s" />
                                 <ToggleMenuFlyoutItem x:Name="ItemCountNone" Text="Geri sayım yok" Click="OnSelectCountNone" />
@@ -70,7 +70,7 @@
                             <MenuFlyoutSeparator />
 
                             <!-- More Settings -->
-                            <MenuFlyoutItem Text="Daha Fazla Ayar" Click="OnOpenMoreSettings">
+                            <MenuFlyoutItem x:Name="ItemMoreSettings" Text="Daha Fazla Ayar" Click="OnOpenMoreSettings">
                                 <MenuFlyoutItem.Icon>
                                     <FontIcon Glyph="&#xE713;" FontSize="12" Foreground="#C0C1FF"/>
                                 </MenuFlyoutItem.Icon>
@@ -145,10 +145,10 @@
                 </Button>
 
                 <!-- 7. Kayıta Başla / Record Action Button -->
-                <Button Click="OnRecClicked"
+                <Button x:Name="BtnStartRec" Click="OnRecClicked"
                         Height="34" CornerRadius="10" Padding="12,0"
                         BorderThickness="0" Margin="0"
-                        ToolTipService.ToolTip="Kayıta Başla (Record)">
+                        ToolTipService.ToolTip="Kayıt Başlat">
                     <Button.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                             <GradientStop Color="#DC2626" Offset="0"/>
@@ -157,7 +157,7 @@
                     </Button.Background>
                     <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                         <Ellipse Width="8" Height="8" Fill="White" />
-                        <TextBlock Text="Kayıta Başla (Record)" FontSize="12" FontWeight="Bold" Foreground="White"
+                        <TextBlock x:Name="TbStartRecText" Text="Kayıt Başlat" FontSize="12" FontWeight="Bold" Foreground="White"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>

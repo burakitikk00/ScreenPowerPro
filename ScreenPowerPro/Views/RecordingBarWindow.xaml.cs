@@ -2,8 +2,10 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using ScreenPowerPro.Helpers;
+using ScreenPowerPro.Services;
 using ScreenPowerPro.ViewModels;
 using Windows.Graphics;
 
@@ -21,12 +23,14 @@ public sealed partial class RecordingBarWindow : Window
     private bool _isDragging = false;
     private PointInt32 _dragStartPoint;
     private PointInt32 _windowStartPoint;
+    private readonly LocalizationService _loc;
 
     public RecordingBarWindow(string projectDir)
     {
         InitializeComponent();
 
         _viewModel = App.Current.Services.GetRequiredService<RecordingBarViewModel>();
+        _loc = App.Current.Services.GetRequiredService<LocalizationService>();
         _viewModel.SetActiveProject(projectDir);
 
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -50,6 +54,14 @@ public sealed partial class RecordingBarWindow : Window
         BarBorder.Loaded += (s, e) => UpdateBarSize();
         UpdateBarSize();
 
+        _loc.LanguageChanged += ApplyLocalization;
+        ApplyLocalization();
+
+        Closed += (s, e) =>
+        {
+            _loc.LanguageChanged -= ApplyLocalization;
+        };
+
         // Süre güncellemesini dinle
         _viewModel.PropertyChanged += (s, e) =>
         {
@@ -65,6 +77,16 @@ public sealed partial class RecordingBarWindow : Window
         _viewModel.RecordingFinished += OnRecordingFinished;
 
         Activated += (s, e) => PulseStoryboard.Begin();
+    }
+
+    private void ApplyLocalization()
+    {
+        if (StatusTextBlock != null) StatusTextBlock.Text = _loc.CurrentLanguage == "en" ? "REC" : "KAYIT";
+        if (BtnPause != null) ToolTipService.SetToolTip(BtnPause, _loc["RecBar_Pause"]);
+        if (BtnStop != null) ToolTipService.SetToolTip(BtnStop, _loc["RecBar_Finish"]);
+        if (TbStopNormalText != null) TbStopNormalText.Text = _loc.CurrentLanguage == "en" ? "Finish Recording" : "Kaydı Bitir";
+        if (TbStopLoadingText != null) TbStopLoadingText.Text = _loc["RecBar_Loading"];
+        if (BtnCancelRec != null) ToolTipService.SetToolTip(BtnCancelRec, _loc["RecBar_Cancel"]);
     }
 
     private void UpdateBarSize()

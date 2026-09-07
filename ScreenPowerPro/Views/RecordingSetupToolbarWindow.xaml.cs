@@ -19,6 +19,7 @@ public sealed partial class RecordingSetupToolbarWindow : Window
     private readonly SettingsService _settingsService;
     private readonly DeviceManagerService _deviceManager;
     private readonly DashboardViewModel _viewModel;
+    private readonly LocalizationService _loc;
 
     private readonly IntPtr _hwnd;
     private bool _hasPositioned = false;
@@ -33,6 +34,7 @@ public sealed partial class RecordingSetupToolbarWindow : Window
         _settingsService = App.Current.Services.GetRequiredService<SettingsService>();
         _deviceManager = App.Current.Services.GetRequiredService<DeviceManagerService>();
         _viewModel = App.Current.Services.GetRequiredService<DashboardViewModel>();
+        _loc = App.Current.Services.GetRequiredService<LocalizationService>();
 
         var appWindow = AppWindow;
         if (appWindow.Presenter is OverlappedPresenter presenter)
@@ -46,6 +48,14 @@ public sealed partial class RecordingSetupToolbarWindow : Window
         Win32Helper.SetWindowDisplayAffinity(_hwnd, Win32Helper.WDA_EXCLUDEFROMCAPTURE);
 
         GearFlyout.Opening += (s, e) => RefreshMenuCheckmarks();
+
+        _loc.LanguageChanged += ApplyLocalization;
+        ApplyLocalization();
+
+        Closed += (s, e) =>
+        {
+            _loc.LanguageChanged -= ApplyLocalization;
+        };
 
         RefreshMenuCheckmarks();
         RefreshDeviceLabels();
@@ -63,6 +73,26 @@ public sealed partial class RecordingSetupToolbarWindow : Window
         ToolbarBorder.Loaded += (s, e) => UpdateToolbarSize();
 
         UpdateToolbarSize();
+    }
+
+    private void ApplyLocalization()
+    {
+        if (BtnClose != null) ToolTipService.SetToolTip(BtnClose, _loc["Setup_Close"]);
+        if (ModeIcon != null) ToolTipService.SetToolTip(ModeIcon, _loc["Setup_FullScreen"]);
+        if (FlyoutSubZoom != null) FlyoutSubZoom.Text = _loc["Setup_ZoomEffect"];
+        if (ItemZoomNone != null) ItemZoomNone.Text = _loc["Setup_ZoomNone"];
+        if (ItemZoom2D != null) ItemZoom2D.Text = _loc["Setup_Zoom2D"];
+        if (ItemZoom3D != null) ItemZoom3D.Text = _loc["Setup_Zoom3D"];
+        if (FlyoutSubCountdown != null) FlyoutSubCountdown.Text = _loc["Setup_Countdown"];
+        if (ItemCount3s != null) ItemCount3s.Text = _loc["Setup_Count3s"];
+        if (ItemCount5s != null) ItemCount5s.Text = _loc["Setup_Count5s"];
+        if (ItemCountNone != null) ItemCountNone.Text = _loc["Setup_CountNone"];
+        if (ItemHideIcons != null) ItemHideIcons.Text = _loc["Setup_HideIcons"];
+        if (ItemHideTaskbar != null) ItemHideTaskbar.Text = _loc["Setup_HideTaskbar"];
+        if (ItemMoreSettings != null) ItemMoreSettings.Text = _loc["Setup_MoreSettings"];
+        if (TbStartRecText != null) TbStartRecText.Text = _loc["Setup_Start"];
+        if (BtnStartRec != null) ToolTipService.SetToolTip(BtnStartRec, _loc["Setup_Start"]);
+        RefreshDeviceLabels();
     }
 
     private void UpdateToolbarSize()
@@ -153,9 +183,10 @@ public sealed partial class RecordingSetupToolbarWindow : Window
 
     private void RefreshDeviceLabels()
     {
-        TbCameraName.Text = _deviceManager.SelectedCamera?.Name ?? "None";
-        TbMicName.Text = _deviceManager.SelectedMicrophone?.Name ?? "None";
-        TbSpeakerName.Text = _deviceManager.SelectedSpeaker?.Name ?? "None";
+        string none = _loc["None"];
+        TbCameraName.Text = _deviceManager.SelectedCamera?.Name ?? none;
+        TbMicName.Text = _deviceManager.SelectedMicrophone?.Name ?? none;
+        TbSpeakerName.Text = _deviceManager.SelectedSpeaker?.Name ?? none;
     }
 
     private void OnCameraClicked(object sender, RoutedEventArgs e)
@@ -163,7 +194,7 @@ public sealed partial class RecordingSetupToolbarWindow : Window
         CameraFlyout.Items.Clear();
 
         // "None" option
-        var noneItem = new MenuFlyoutItem { Text = "None" };
+        var noneItem = new MenuFlyoutItem { Text = _loc["None"] };
         noneItem.Click += (s, ev) =>
         {
             _deviceManager.SelectCamera("none");
@@ -190,7 +221,7 @@ public sealed partial class RecordingSetupToolbarWindow : Window
     {
         MicFlyout.Items.Clear();
 
-        var noneItem = new MenuFlyoutItem { Text = "None" };
+        var noneItem = new MenuFlyoutItem { Text = _loc["None"] };
         noneItem.Click += (s, ev) =>
         {
             _deviceManager.SelectMicrophone("none");
@@ -217,7 +248,7 @@ public sealed partial class RecordingSetupToolbarWindow : Window
     {
         SpeakerFlyout.Items.Clear();
 
-        var noneItem = new MenuFlyoutItem { Text = "None" };
+        var noneItem = new MenuFlyoutItem { Text = _loc["None"] };
         noneItem.Click += (s, ev) =>
         {
             _deviceManager.SelectSpeaker("none");

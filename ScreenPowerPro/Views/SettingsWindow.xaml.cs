@@ -16,6 +16,7 @@ namespace ScreenPowerPro.Views;
 public sealed partial class SettingsWindow : Window
 {
     private readonly SettingsService _settingsService;
+    private readonly LocalizationService _locService;
     private bool _isInitializing = true;
 
     public SettingsWindow()
@@ -23,6 +24,10 @@ public sealed partial class SettingsWindow : Window
         InitializeComponent();
 
         _settingsService = App.Current.Services.GetRequiredService<SettingsService>();
+        _locService = App.Current.Services.GetRequiredService<LocalizationService>();
+
+        _locService.LanguageChanged += OnLanguageChanged;
+        Closed += (s, e) => _locService.LanguageChanged -= OnLanguageChanged;
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarGrid);
@@ -51,7 +56,43 @@ public sealed partial class SettingsWindow : Window
         IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         Win32Helper.SetWindowDisplayAffinity(hwnd, Win32Helper.WDA_EXCLUDEFROMCAPTURE);
 
+        ApplyLocalization();
         LoadSettingsToUI();
+    }
+
+    private void OnLanguageChanged()
+    {
+        ApplyLocalization();
+    }
+
+    private void ApplyLocalization()
+    {
+        Title = _locService["Settings_Title"];
+        if (TbSettingsTitle != null) TbSettingsTitle.Text = _locService["Settings_Title"];
+        if (TbTabGeneral != null) TbTabGeneral.Text = _locService["Settings_Tab_General"];
+        if (TbTabRecord != null) TbTabRecord.Text = _locService["Settings_Tab_Record"];
+        if (TbTabShortcuts != null) TbTabShortcuts.Text = _locService["Settings_Tab_Shortcuts"];
+        if (TbTabExport != null) TbTabExport.Text = _locService["Settings_Tab_Export"];
+
+        if (TbLanguageLabel != null) TbLanguageLabel.Text = _locService["Settings_Language"];
+        if (TbSaveLocationLabel != null) TbSaveLocationLabel.Text = _locService["Settings_SaveLocation"];
+        if (TbExportLocationLabel != null) TbExportLocationLabel.Text = _locService["Settings_ExportLocation"];
+        if (TbAutoStartLabel != null) TbAutoStartLabel.Text = _locService["Settings_AutoStart"];
+        if (TbAutoPlayVideoLabel != null) TbAutoPlayVideoLabel.Text = _locService["Settings_AutoPlay"];
+
+        if (TbZoomEffectLabel != null) TbZoomEffectLabel.Text = _locService["Settings_ZoomEffect"];
+        if (TbHideDesktopIconsLabel != null) TbHideDesktopIconsLabel.Text = _locService["Settings_HideDesktopIcons"];
+        if (TbHideTaskbarLabel != null) TbHideTaskbarLabel.Text = _locService["Settings_HideTaskbar"];
+        if (TbRecordingQualityLabel != null) TbRecordingQualityLabel.Text = _locService["Settings_Quality"];
+        if (TbCountdownLabel != null) TbCountdownLabel.Text = _locService["Settings_Countdown"];
+
+        if (TbShortcutStartStopLabel != null) TbShortcutStartStopLabel.Text = _locService["Settings_Shortcut_StartStop"];
+        if (TbShortcutPauseLabel != null) TbShortcutPauseLabel.Text = _locService["Settings_Shortcut_Pause"];
+        if (TbShortcutScreenshotLabel != null) TbShortcutScreenshotLabel.Text = _locService["Settings_Shortcut_Screenshot"];
+
+        if (TbExportFormatLabel != null) TbExportFormatLabel.Text = _locService["Settings_ExportFormat"];
+        if (TbExportResolutionLabel != null) TbExportResolutionLabel.Text = _locService["Settings_ExportResolution"];
+        if (TbExportFpsLabel != null) TbExportFpsLabel.Text = _locService["Settings_Fps"];
     }
 
     private void LoadSettingsToUI()
@@ -60,6 +101,7 @@ public sealed partial class SettingsWindow : Window
         var s = _settingsService.Current;
 
         // General
+        CmbLanguage.SelectedIndex = string.Equals(_locService.CurrentLanguage, "en", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         TbSaveLocation.Text = s.ProjectSaveLocation;
         TbExportLocation.Text = s.ExportLocation;
         SwitchAutoStart.IsOn = s.AutoStart || SystemHelper.IsAutoStartEnabled();
@@ -91,6 +133,13 @@ public sealed partial class SettingsWindow : Window
         SetComboSelection(CmbExportFps, $"{s.Fps} FPS");
 
         _isInitializing = false;
+    }
+
+    private void OnLanguageSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing) return;
+        string targetLang = CmbLanguage.SelectedIndex == 1 ? "en" : "tr";
+        _locService.SetLanguage(targetLang);
     }
 
     private static void SetComboSelection(ComboBox cmb, string value)

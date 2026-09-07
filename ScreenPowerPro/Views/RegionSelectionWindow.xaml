@@ -33,8 +33,8 @@
                     HorizontalAlignment="Center" 
                     VerticalAlignment="Center">
                 <StackPanel Spacing="8" HorizontalAlignment="Center">
-                    <TextBlock Text="Kayıt Alınacak Bölgeyi Seçin" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                    <TextBlock Text="İptal etmek için ESC'ye basın" FontSize="12" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="TbInstruction" Text="Kayıt Alınacak Bölgeyi Seçin" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock x:Name="TbCancelHint" Text="İptal etmek için ESC'ye basın" FontSize="12" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" />
                 </StackPanel>
             </Border>
             

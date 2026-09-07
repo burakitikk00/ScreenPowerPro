@@ -333,7 +333,7 @@ public class RecordingMetadata
 /// <summary>
 /// Kaydedilmiş bir projenin özet bilgileri (Kütüphane ve Son Kayıtlar listesi için).
 /// </summary>
-public class ProjectInfo
+public partial class ProjectInfo : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 {
     public string Name { get; set; } = string.Empty;
     public string FolderPath { get; set; } = string.Empty;
@@ -346,4 +346,13 @@ public class ProjectInfo
 
     public string FormattedDuration => TimeSpan.FromSeconds(DurationSeconds).ToString(@"mm\:ss");
     public string FormattedDate => CreatedAt.ToString("dd.MM.yyyy HH:mm");
+
+    [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+    private string _editButtonText = "Düzenle";
+
+    [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+    private string _revealTooltip = "Klasörde Aç";
+
+    [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+    private string _deleteTooltip = "Sil";
 }

@@ -1,8 +1,11 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using ScreenPowerPro.Services;
 using Windows.Graphics;
 using Windows.Media.Capture;
 
@@ -39,6 +42,19 @@ public sealed partial class CameraOverlayWindow : Window
             int y = displayArea.WorkArea.Height - 240;
             appWindow.Move(new PointInt32(x, y));
         }
+
+        try
+        {
+            var loc = App.Current?.Services?.GetService<LocalizationService>();
+            if (loc != null)
+            {
+                Title = loc["Camera_Title"];
+                TbCameraActive.Text = loc["Camera_Active"];
+                ToolTipService.SetToolTip(BtnToggleShape, loc["Camera_ToggleShape"]);
+                ToolTipService.SetToolTip(BtnCloseCam, loc["Camera_Close"]);
+            }
+        }
+        catch { }
 
         _ = InitializeCameraAsync();
     }

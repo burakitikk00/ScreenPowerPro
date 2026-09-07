@@ -13,6 +13,7 @@ namespace ScreenPowerPro.ViewModels;
 public partial class DashboardViewModel : ObservableObject
 {
     private readonly SettingsService _settingsService;
+    private readonly LocalizationService _loc;
     private readonly ProjectService _projectService;
     private readonly ScreenRecorderService _recorderService;
     private readonly InputTrackerService _inputTracker;
@@ -73,17 +74,20 @@ public partial class DashboardViewModel : ObservableObject
 
     public DashboardViewModel(
         SettingsService settingsService,
+        LocalizationService localizationService,
         ProjectService projectService,
         ScreenRecorderService recorderService,
         InputTrackerService inputTracker,
         DeviceManagerService deviceManager)
     {
         _settingsService = settingsService;
+        _loc = localizationService;
         _projectService = projectService;
         _recorderService = recorderService;
         _inputTracker = inputTracker;
         DeviceManager = deviceManager;
 
+        _loc.LanguageChanged += UpdateDeviceDisplayNames;
         DeviceManager.DevicesUpdated += UpdateDeviceDisplayNames;
         DeviceManager.AudioAppsUpdated += UpdateDeviceDisplayNames;
 
@@ -109,7 +113,7 @@ public partial class DashboardViewModel : ObservableObject
         }
         else
         {
-            CameraDisplayName = "None";
+            CameraDisplayName = _loc["None"];
             IsCameraEnabled = false;
         }
 
@@ -122,7 +126,7 @@ public partial class DashboardViewModel : ObservableObject
         }
         else
         {
-            MicDisplayName = "None";
+            MicDisplayName = _loc["None"];
             IsMicEnabled = false;
         }
 
@@ -130,7 +134,7 @@ public partial class DashboardViewModel : ObservableObject
         if (DeviceManager.IsOnlyAppAudioSelected)
         {
             int count = DeviceManager.GetSelectedAppCount();
-            SpeakerDisplayName = $"Only App ({count})";
+            SpeakerDisplayName = _loc.Get("Dashboard_OnlyAppCount", count);
             IsSystemAudioEnabled = true;
         }
         else if (DeviceManager.SelectedSpeaker != null && !DeviceManager.SelectedSpeaker.IsNone)
@@ -141,7 +145,7 @@ public partial class DashboardViewModel : ObservableObject
         }
         else
         {
-            SpeakerDisplayName = "None";
+            SpeakerDisplayName = _loc["None"];
             IsSystemAudioEnabled = false;
         }
     }

@@ -230,13 +230,28 @@ public class CountdownWindow
             using var countBrush = new SolidBrush(Color.White);
             g.DrawString(countStr, countFont, countBrush, new RectangleF(0, 0, _width, _height - 60), sf);
 
-            // 2. Altında sade beyaz durum metni: "Kayıt Başlıyor..."
+            // 2. Altında sade beyaz durum metni: "Kayıt Başlıyor..." / "Recording Starting..."
+            string statusText = "Kayıt Başlıyor...";
+            try
+            {
+                var services = App.Current?.Services;
+                if (services != null)
+                {
+                    var loc = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetService<ScreenPowerPro.Services.LocalizationService>(services);
+                    if (loc != null)
+                    {
+                        statusText = loc["Countdown_Status"];
+                    }
+                }
+            }
+            catch { }
+
             using var subFont = new Font("Segoe UI", 18, FontStyle.Bold, GraphicsUnit.Pixel);
             using var subShadow = new SolidBrush(Color.FromArgb(130, 0, 0, 0));
-            g.DrawString("Kayıt Başlıyor...", subFont, subShadow, new RectangleF(2, _height - 52, _width, 36), sf);
+            g.DrawString(statusText, subFont, subShadow, new RectangleF(2, _height - 52, _width, 36), sf);
 
             using var subBrush = new SolidBrush(Color.FromArgb(245, 255, 255, 255));
-            g.DrawString("Kayıt Başlıyor...", subFont, subBrush, new RectangleF(0, _height - 54, _width, 36), sf);
+            g.DrawString(statusText, subFont, subBrush, new RectangleF(0, _height - 54, _width, 36), sf);
         }
 
         IntPtr hdcScreen = GetDC(IntPtr.Zero);

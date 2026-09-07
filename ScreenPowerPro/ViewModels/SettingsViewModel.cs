@@ -21,6 +21,9 @@ public partial class SettingsViewModel : ObservableObject
 
     // --- Genel Ayarlar ---
     [ObservableProperty]
+    private string _language = "tr";
+
+    [ObservableProperty]
     private string _projectSaveLocation = string.Empty;
 
     [ObservableProperty]
@@ -107,6 +110,7 @@ public partial class SettingsViewModel : ObservableObject
         var s = _settingsService.Current;
         ProjectSaveLocation = s.ProjectSaveLocation;
         ExportLocation = s.ExportLocation;
+        Language = s.Language ?? "tr";
         AutoZoomMode = s.AutoZoomMode ?? "smooth";
         AutoZoom = s.AutoZoom;
         HideDesktopIcons = s.HideDesktopIcons;
@@ -151,6 +155,7 @@ public partial class SettingsViewModel : ObservableObject
     public void Save()
     {
         var s = _settingsService.Current;
+        s.Language = Language;
         s.ProjectSaveLocation = ProjectSaveLocation;
         s.ExportLocation = ExportLocation;
         s.AutoZoomMode = AutoZoomMode;

@@ -47,6 +47,12 @@ public class AppSettings
     );
 
     /// <summary>
+    /// Uygulama arayüz dili: "tr" (Türkçe) veya "en" (English).
+    /// </summary>
+    [JsonPropertyName("language")]
+    public string Language { get; set; } = "tr";
+
+    /// <summary>
     /// Otomatik zoom modu: "none" (kapalı), "smooth" (yumuşak geçişli), "instant" (anlık sıçrama).
     /// </summary>
     [JsonPropertyName("autoZoomMode")]

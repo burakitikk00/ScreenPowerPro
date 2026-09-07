@@ -36,19 +36,19 @@
                 <StackPanel x:Name="FallbackPanel"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                     <FontIcon Glyph="&#xE714;" FontSize="36" Foreground="{StaticResource PrimaryAccentBrush}" />
-                    <TextBlock Text="Kamera Aktif" FontSize="11" FontWeight="SemiBold"
+                    <TextBlock x:Name="TbCameraActive" Text="Kamera Aktif" FontSize="11" FontWeight="SemiBold"
                         Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Floating close & shape toggle buttons on hover -->
                 <StackPanel Orientation="Horizontal" Spacing="4"
                     HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8">
-                    <Button Click="OnToggleShapeClicked"
+                    <Button x:Name="BtnToggleShape" Click="OnToggleShapeClicked"
                         Background="#99000000" BorderThickness="0" CornerRadius="12"
                         Width="24" Height="24" Padding="0" ToolTipService.ToolTip="Şekil Değiştir">
                         <FontIcon Glyph="&#xE790;" FontSize="11" Foreground="White"/>
                     </Button>
-                    <Button Click="OnCloseClicked"
+                    <Button x:Name="BtnCloseCam" Click="OnCloseClicked"
                         Background="#99000000" BorderThickness="0" CornerRadius="12"
                         Width="24" Height="24" Padding="0" ToolTipService.ToolTip="Kapat">
                         <FontIcon Glyph="&#xE711;" FontSize="10" Foreground="White"/>

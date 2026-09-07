@@ -73,6 +73,7 @@ public partial class EditorViewModel : ObservableObject
 {
     private readonly ProjectService _projectService;
     private readonly ZoomEngineService _zoomEngineService;
+    private readonly AudioWaveformService _waveformService;
 
     // Maksimum geri alma adımı sayısı
     private const int MaxHistory = 50;
@@ -124,7 +125,13 @@ public partial class EditorViewModel : ObservableObject
     private string? _selectedClipId;
 
     [ObservableProperty]
-    private string _activeSidebarTab = "motion"; // motion, cursor, camera, audio, canvas
+    private string? _selectedTrackType; // "video", "mic", "sys"
+
+    [ObservableProperty]
+    private float[]? _waveformPeaks;
+
+    [ObservableProperty]
+    private string _activeSidebarTab = "cursor"; // cursor, canvas, audio, keys, motion, camera, watermark
 
     [ObservableProperty]
     private string _activeEditorTool = "cursor"; // cursor, split, delete
@@ -282,6 +289,153 @@ public partial class EditorViewModel : ObservableObject
         set { if (Math.Abs(Settings.SysVolume - value) > 0.01) { Settings.SysVolume = value; OnPropertyChanged(); } }
     }
 
+    public bool MicMuted
+    {
+        get => Settings.MicMuted;
+        set { if (Settings.MicMuted != value) { Settings.MicMuted = value; OnPropertyChanged(); } }
+    }
+
+    public double VolumeEnhancement
+    {
+        get => Settings.VolumeEnhancement;
+        set { if (Math.Abs(Settings.VolumeEnhancement - value) > 0.01) { Settings.VolumeEnhancement = value; OnPropertyChanged(); } }
+    }
+
+    public bool AudioNoiseReduction
+    {
+        get => Settings.AudioNoiseReduction;
+        set { if (Settings.AudioNoiseReduction != value) { Settings.AudioNoiseReduction = value; OnPropertyChanged(); } }
+    }
+
+    public bool VocalEnhancement
+    {
+        get => Settings.VocalEnhancement;
+        set { if (Settings.VocalEnhancement != value) { Settings.VocalEnhancement = value; OnPropertyChanged(); } }
+    }
+
+    public int VocalEnhancementAmount
+    {
+        get => Settings.VocalEnhancementAmount;
+        set { if (Settings.VocalEnhancementAmount != value) { Settings.VocalEnhancementAmount = value; OnPropertyChanged(); } }
+    }
+
+    // Canvas ayarları
+    public int Padding
+    {
+        get => Settings.Padding;
+        set { if (Settings.Padding != value) { Settings.Padding = value; OnPropertyChanged(); } }
+    }
+
+    public int Inset
+    {
+        get => Settings.Inset;
+        set { if (Settings.Inset != value) { Settings.Inset = value; OnPropertyChanged(); } }
+    }
+
+    public int Roundness
+    {
+        get => Settings.Roundness;
+        set { if (Settings.Roundness != value) { Settings.Roundness = value; OnPropertyChanged(); } }
+    }
+
+    public int Shadow
+    {
+        get => Settings.Shadow;
+        set { if (Settings.Shadow != value) { Settings.Shadow = value; OnPropertyChanged(); } }
+    }
+
+    public bool FixedZoomPart
+    {
+        get => Settings.FixedZoomPart;
+        set { if (Settings.FixedZoomPart != value) { Settings.FixedZoomPart = value; OnPropertyChanged(); } }
+    }
+
+    public string CanvasPreset
+    {
+        get => Settings.CanvasPreset;
+        set { if (Settings.CanvasPreset != value) { Settings.CanvasPreset = value; OnPropertyChanged(); } }
+    }
+
+    // Motion ayarları
+    public bool ZoomInMotionBlur
+    {
+        get => Settings.ZoomInMotionBlur;
+        set { if (Settings.ZoomInMotionBlur != value) { Settings.ZoomInMotionBlur = value; OnPropertyChanged(); } }
+    }
+
+    public double ZoomInMotionBlurAmount
+    {
+        get => Settings.ZoomInMotionBlurAmount;
+        set { if (Math.Abs(Settings.ZoomInMotionBlurAmount - value) > 0.01) { Settings.ZoomInMotionBlurAmount = value; OnPropertyChanged(); } }
+    }
+
+    public double ScreenMotionBlurAmount
+    {
+        get => Settings.ScreenMotionBlurAmount;
+        set { if (Math.Abs(Settings.ScreenMotionBlurAmount - value) > 0.01) { Settings.ScreenMotionBlurAmount = value; OnPropertyChanged(); } }
+    }
+
+    public double CursorMotionBlurAmount
+    {
+        get => Settings.CursorMotionBlurAmount;
+        set { if (Math.Abs(Settings.CursorMotionBlurAmount - value) > 0.01) { Settings.CursorMotionBlurAmount = value; OnPropertyChanged(); } }
+    }
+
+    public string ZoomPanMovementType
+    {
+        get => Settings.ZoomPanMovementType;
+        set { if (Settings.ZoomPanMovementType != value) { Settings.ZoomPanMovementType = value; OnPropertyChanged(); } }
+    }
+
+    public string CursorMovementType
+    {
+        get => Settings.CursorMovementType;
+        set { if (Settings.CursorMovementType != value) { Settings.CursorMovementType = value; OnPropertyChanged(); } }
+    }
+
+    // Kısayol Tuşları ayarları
+    public string ShortcutKeyStyle
+    {
+        get => Settings.ShortcutKeyStyle;
+        set { if (Settings.ShortcutKeyStyle != value) { Settings.ShortcutKeyStyle = value; OnPropertyChanged(); } }
+    }
+
+    public string ShortcutFontColor
+    {
+        get => Settings.ShortcutFontColor;
+        set { if (Settings.ShortcutFontColor != value) { Settings.ShortcutFontColor = value; OnPropertyChanged(); } }
+    }
+
+    public string ShortcutBgColor
+    {
+        get => Settings.ShortcutBgColor;
+        set { if (Settings.ShortcutBgColor != value) { Settings.ShortcutBgColor = value; OnPropertyChanged(); } }
+    }
+
+    public int ShortcutBgOpacity
+    {
+        get => Settings.ShortcutBgOpacity;
+        set { if (Settings.ShortcutBgOpacity != value) { Settings.ShortcutBgOpacity = value; OnPropertyChanged(); } }
+    }
+
+    public int ShortcutSize
+    {
+        get => Settings.ShortcutSize;
+        set { if (Settings.ShortcutSize != value) { Settings.ShortcutSize = value; OnPropertyChanged(); } }
+    }
+
+    public string ShortcutPosition
+    {
+        get => Settings.ShortcutPosition;
+        set { if (Settings.ShortcutPosition != value) { Settings.ShortcutPosition = value; OnPropertyChanged(); } }
+    }
+
+    public bool DisplaySingleShortcutKey
+    {
+        get => Settings.DisplaySingleShortcutKey;
+        set { if (Settings.DisplaySingleShortcutKey != value) { Settings.DisplaySingleShortcutKey = value; OnPropertyChanged(); } }
+    }
+
     // --- Geri Alma / Yineleme Durum Bayrakları ---
     public bool CanUndo => _historyIndex > 0;
     public bool CanRedo => _historyIndex >= 0 && _historyIndex < _history.Count - 1;
@@ -293,10 +447,11 @@ public partial class EditorViewModel : ObservableObject
     // Dışa aktarıma yönlendirme olayı
     public event Action<string>? NavigateToExport;
 
-    public EditorViewModel(ProjectService projectService, ZoomEngineService zoomEngineService)
+    public EditorViewModel(ProjectService projectService, ZoomEngineService zoomEngineService, AudioWaveformService waveformService)
     {
         _projectService = projectService;
         _zoomEngineService = zoomEngineService;
+        _waveformService = waveformService;
     }
 
     /// <summary>
@@ -417,7 +572,30 @@ public partial class EditorViewModel : ObservableObject
             SelectedZoomEffect = ZoomEffects[0];
         }
 
+        LoadWaveformData();
         NotifyAllProperties();
+    }
+
+    /// <summary>
+    /// Ses dosyasından dalga formu peak verilerini çeker.
+    /// </summary>
+    public void LoadWaveformData()
+    {
+        try
+        {
+            string? audioFile = !string.IsNullOrEmpty(MicAudioPath) && File.Exists(MicAudioPath)
+                ? MicAudioPath
+                : (!string.IsNullOrEmpty(SystemAudioPath) && File.Exists(SystemAudioPath)
+                    ? SystemAudioPath
+                    : (!string.IsNullOrEmpty(VideoPath) && File.Exists(VideoPath) ? VideoPath : null));
+
+            WaveformPeaks = _waveformService.ExtractPeaks(audioFile, 1200);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[EditorViewModel] Waveform load error: {ex.Message}");
+            WaveformPeaks = null;
+        }
     }
 
     /// <summary>
@@ -686,10 +864,31 @@ public partial class EditorViewModel : ObservableObject
         {
             PushHistory();
             string cid = SelectedClipId;
-            VideoTrack.Clips = RemoveClipAndShift(VideoTrack.Clips, cid);
-            MicTrack.Clips = RemoveClipAndShift(MicTrack.Clips, cid);
-            SysTrack.Clips = RemoveClipAndShift(SysTrack.Clips, cid);
+            bool inVideo = VideoTrack.Clips.Any(c => c.Id == cid);
+            bool inMic = MicTrack.Clips.Any(c => c.Id == cid);
+            bool inSys = SysTrack.Clips.Any(c => c.Id == cid);
+
+            if (SelectedTrackType == "video" || (inVideo && !inMic && !inSys))
+            {
+                VideoTrack.Clips = RemoveClipAndShift(VideoTrack.Clips, cid);
+            }
+            else if (SelectedTrackType == "mic" || (inMic && !inVideo && !inSys))
+            {
+                MicTrack.Clips = RemoveClipAndShift(MicTrack.Clips, cid);
+            }
+            else if (SelectedTrackType == "sys" || (inSys && !inVideo && !inMic))
+            {
+                SysTrack.Clips = RemoveClipAndShift(SysTrack.Clips, cid);
+            }
+            else
+            {
+                if (inVideo) VideoTrack.Clips = RemoveClipAndShift(VideoTrack.Clips, cid);
+                if (inMic) MicTrack.Clips = RemoveClipAndShift(MicTrack.Clips, cid);
+                if (inSys) SysTrack.Clips = RemoveClipAndShift(SysTrack.Clips, cid);
+            }
+
             SelectedClipId = null;
+            SelectedTrackType = null;
             SaveProject();
         }
         else if (SelectedZoomEffect != null)
@@ -852,5 +1051,29 @@ public partial class EditorViewModel : ObservableObject
         OnPropertyChanged(nameof(CameraSize));
         OnPropertyChanged(nameof(MicVolume));
         OnPropertyChanged(nameof(SysVolume));
+        OnPropertyChanged(nameof(MicMuted));
+        OnPropertyChanged(nameof(VolumeEnhancement));
+        OnPropertyChanged(nameof(AudioNoiseReduction));
+        OnPropertyChanged(nameof(VocalEnhancement));
+        OnPropertyChanged(nameof(VocalEnhancementAmount));
+        OnPropertyChanged(nameof(Padding));
+        OnPropertyChanged(nameof(Inset));
+        OnPropertyChanged(nameof(Roundness));
+        OnPropertyChanged(nameof(Shadow));
+        OnPropertyChanged(nameof(FixedZoomPart));
+        OnPropertyChanged(nameof(CanvasPreset));
+        OnPropertyChanged(nameof(ZoomInMotionBlur));
+        OnPropertyChanged(nameof(ZoomInMotionBlurAmount));
+        OnPropertyChanged(nameof(ScreenMotionBlurAmount));
+        OnPropertyChanged(nameof(CursorMotionBlurAmount));
+        OnPropertyChanged(nameof(ZoomPanMovementType));
+        OnPropertyChanged(nameof(CursorMovementType));
+        OnPropertyChanged(nameof(ShortcutKeyStyle));
+        OnPropertyChanged(nameof(ShortcutFontColor));
+        OnPropertyChanged(nameof(ShortcutBgColor));
+        OnPropertyChanged(nameof(ShortcutBgOpacity));
+        OnPropertyChanged(nameof(ShortcutSize));
+        OnPropertyChanged(nameof(ShortcutPosition));
+        OnPropertyChanged(nameof(DisplaySingleShortcutKey));
     }
 }

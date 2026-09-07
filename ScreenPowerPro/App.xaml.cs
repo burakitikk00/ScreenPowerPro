@@ -28,6 +28,7 @@ public partial class App : Application
         services.AddSingleton<ScreenRecorderService>();
         services.AddSingleton<ExportService>();
         services.AddSingleton<AudioLevelMonitorService>();
+        services.AddSingleton<AudioWaveformService>();
 
         // Register ViewModels
         services.AddSingleton<DashboardViewModel>();

@@ -42,16 +42,39 @@
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="0" />
         </Style>
+
+        <!-- Sidebar Tab Button Style -->
+        <Style x:Key="SidebarTabButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,2" />
+        </Style>
+
+        <!-- Preset Button Style -->
+        <Style x:Key="PresetTabButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+        </Style>
     </Page.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <!-- Top Nav Bar -->
             <RowDefinition Height="48" />
-            <!-- Main workspace: video + properties -->
+            <!-- Main workspace: FocuSee Left Sidebar + Video Preview -->
             <RowDefinition Height="*" />
             <!-- Timeline -->
-            <RowDefinition Height="260" />
+            <RowDefinition Height="270" />
         </Grid.RowDefinitions>
 
         <!-- ====================================================
@@ -140,23 +163,994 @@
         </Border>
 
         <!-- ====================================================
-             ROW 1: MAIN WORKSPACE — VIDEO CANVAS + PROPERTIES
+             ROW 1: MAIN WORKSPACE — FOCUSEE LEFT SIDEBAR + VIDEO PREVIEW
              ==================================================== -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
+                <!-- 0: Icon Bar (48px) -->
+                <ColumnDefinition Width="48" />
+                <!-- 1: Tab Detail Flyout (280px) -->
+                <ColumnDefinition Width="280" />
+                <!-- 2: Video Canvas (*) -->
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="300" />
             </Grid.ColumnDefinitions>
 
-            <!-- VIDEO CANVAS -->
+            <!-- 0: VERTICAL ICON TAB BAR (FOCUSEE STYLE) -->
             <Border Grid.Column="0"
-                Margin="20,16,12,16"
+                Background="{StaticResource SurfaceContainerLowestBrush}"
+                BorderBrush="{StaticResource GlassBorderBrush}"
+                BorderThickness="0,0,1,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="6" Padding="4,12" HorizontalAlignment="Center">
+                        <!-- Cursor -->
+                        <Button x:Name="TabBtnCursor" Style="{StaticResource SidebarTabButtonStyle}"
+                            Click="OnSidebarTabClicked" Tag="cursor"
+                            Background="#26C0C1FF"
+                            ToolTipService.ToolTip="Cursor (İmleç Ayarları)">
+                            <FontIcon Glyph="&#xED1E;" FontSize="16" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                        </Button>
+                        <!-- Canvas Size -->
+                        <Button x:Name="TabBtnCanvas" Style="{StaticResource SidebarTabButtonStyle}"
+                            Click="OnSidebarTabClicked" Tag="canvas"
+                            ToolTipService.ToolTip="Canvas Size &amp; Style (Tuval)">
+                            <FontIcon Glyph="&#xE799;" FontSize="16" Foreground="{StaticResource TextMutedBrush}"/>
+                        </Button>
+                        <!-- Microphone Audio -->
+                        <Button x:Name="TabBtnAudio" Style="{StaticResource SidebarTabButtonStyle}"
+                            Click="OnSidebarTabClicked" Tag="audio"
+                            ToolTipService.ToolTip="Microphone Audio (Mikrofon)">
+                            <FontIcon Glyph="&#xE720;" FontSize="16" Foreground="{StaticResource TextMutedBrush}"/>
+                        </Button>
+                        <!-- Shortcut Keys -->
+                        <Button x:Name="TabBtnKeys" Style="{StaticResource SidebarTabButtonStyle}"
+                            Click="OnSidebarTabClicked" Tag="keys"
+                            ToolTipService.ToolTip="Shortcut Keys (Kısayol Tuşları)">
+                            <FontIcon Glyph="&#xE765;" FontSize="16" Foreground="{StaticResource TextMutedBrush}"/>
+                        </Button>
+                        <!-- Motion & Blur -->
+                        <Button x:Name="TabBtnMotion" Style="{StaticResource SidebarTabButtonStyle}"
+                            Click="OnSidebarTabClicked" Tag="motion"
+                            ToolTipService.ToolTip="Motion &amp; Blur (Hareket &amp; Bulanıklık)">
+                            <FontIcon Glyph="&#xE74B;" FontSize="16" Foreground="{StaticResource TextMutedBrush}"/>
+                        </Button>
+                        <Rectangle Width="26" Height="1" Fill="{StaticResource GlassBorderBrush}" Margin="0,4"/>
+                        <!-- Camera -->
+                        <Button x:Name="TabBtnCamera" Style="{StaticResource SidebarTabButtonStyle}"
+                            Click="OnSidebarTabClicked" Tag="camera"
+                            ToolTipService.ToolTip="Camera Overlay (Kamera)">
+                            <FontIcon Glyph="&#xE722;" FontSize="16" Foreground="{StaticResource TextMutedBrush}"/>
+                        </Button>
+                        <!-- Audio Mixer -->
+                        <Button x:Name="TabBtnVolume" Style="{StaticResource SidebarTabButtonStyle}"
+                            Click="OnSidebarTabClicked" Tag="volume"
+                            ToolTipService.ToolTip="Volume Mixer (Ses Mikseri)">
+                            <FontIcon Glyph="&#xE767;" FontSize="16" Foreground="{StaticResource TextMutedBrush}"/>
+                        </Button>
+                        <!-- Watermark -->
+                        <Button x:Name="TabBtnWatermark" Style="{StaticResource SidebarTabButtonStyle}"
+                            Click="OnSidebarTabClicked" Tag="watermark"
+                            ToolTipService.ToolTip="Watermark (Filigran)">
+                            <FontIcon Glyph="&#xE734;" FontSize="16" Foreground="{StaticResource TextMutedBrush}"/>
+                        </Button>
+                        <!-- Zoom Props -->
+                        <Button x:Name="TabBtnZoom" Style="{StaticResource SidebarTabButtonStyle}"
+                            Click="OnSidebarTabClicked" Tag="zoom"
+                            ToolTipService.ToolTip="Zoom Effect Properties (Zoom Detay)">
+                            <FontIcon Glyph="&#xE71E;" FontSize="16" Foreground="{StaticResource TertiaryBrush}"/>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- 1: TAB DETAILS PANEL (FOCUSEE CONTENT) -->
+            <Border Grid.Column="1"
+                Background="{StaticResource SurfaceContainerBrush}"
+                BorderBrush="{StaticResource GlassBorderBrush}"
+                BorderThickness="0,0,1,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14">
+                    <StackPanel Spacing="16">
+
+                        <!-- ==================== TAB 1: CURSOR ==================== -->
+                        <StackPanel x:Name="PanelTabCursor" Spacing="14">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xED1E;" FontSize="16" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock Text="CURSOR" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Show Cursor -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Show Cursor" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                    <ToggleSwitch x:Name="TsShowCursor" Grid.Column="1"
+                                        IsOn="{x:Bind ViewModel.CursorVisible, Mode=TwoWay}"
+                                        OnContent="" OffContent="" Margin="0"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Cursor Size -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Cursor Size" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TbCursorSizeVal" Grid.Column="1" Text="1.0x" FontSize="12" FontWeight="SemiBold"
+                                            Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <Button Grid.Column="2" Content="Reset" FontSize="11" Padding="6,2"
+                                            Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextMutedBrush}"
+                                            Click="OnResetCursorSizeClicked"/>
+                                    </Grid>
+                                    <Slider x:Name="CursorSizeSlider" Minimum="1.0" Maximum="5.0" Value="1.0" StepFrequency="0.1"
+                                        ValueChanged="OnCursorSizeSliderChanged"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Cursor Style -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Cursor Style" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="BtnCursorStyleDefault" Grid.Column="0" Click="OnCursorStyleSelected" Tag="default"
+                                            Background="#26C0C1FF" BorderBrush="{StaticResource PrimaryAccentBrush}" BorderThickness="1"
+                                            CornerRadius="6" HorizontalAlignment="Stretch" Padding="4,6">
+                                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                                <FontIcon Glyph="&#xED1E;" FontSize="14" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                                <TextBlock Text="Default" FontSize="10" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="BtnCursorStyleHighlight" Grid.Column="1" Click="OnCursorStyleSelected" Tag="highlight"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"
+                                            CornerRadius="6" HorizontalAlignment="Stretch" Padding="4,6">
+                                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                                <FontIcon Glyph="&#xEA3B;" FontSize="14" Foreground="{StaticResource TextMutedBrush}"/>
+                                                <TextBlock Text="Highlight" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="BtnCursorStyleSpotlight" Grid.Column="2" Click="OnCursorStyleSelected" Tag="spotlight"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"
+                                            CornerRadius="6" HorizontalAlignment="Stretch" Padding="4,6">
+                                            <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                                <FontIcon Glyph="&#xE753;" FontSize="14" Foreground="{StaticResource TextMutedBrush}"/>
+                                                <TextBlock Text="Spotlight" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Click Effect Grid (None, Default, Ripple, Ring, Diffusion, Spotlight, Sparkle, Firework, Christmas) -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Click Effect" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Grid ColumnSpacing="6" RowSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Button x:Name="BtnClickNone" Grid.Row="0" Grid.Column="0" Content="None" FontSize="10"
+                                            Click="OnClickEffectSelected" Tag="none" HorizontalAlignment="Stretch" CornerRadius="6" Padding="2,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnClickDefault" Grid.Row="0" Grid.Column="1" Content="Default" FontSize="10"
+                                            Click="OnClickEffectSelected" Tag="default" HorizontalAlignment="Stretch" CornerRadius="6" Padding="2,6"
+                                            Background="#26C0C1FF" BorderBrush="{StaticResource PrimaryAccentBrush}" BorderThickness="1" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                        <Button x:Name="BtnClickRipple" Grid.Row="0" Grid.Column="2" Content="Ripple" FontSize="10"
+                                            Click="OnClickEffectSelected" Tag="ripple" HorizontalAlignment="Stretch" CornerRadius="6" Padding="2,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnClickRing" Grid.Row="1" Grid.Column="0" Content="Ring" FontSize="10"
+                                            Click="OnClickEffectSelected" Tag="ring" HorizontalAlignment="Stretch" CornerRadius="6" Padding="2,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnClickDiffusion" Grid.Row="1" Grid.Column="1" Content="Diffusion" FontSize="10"
+                                            Click="OnClickEffectSelected" Tag="diffusion" HorizontalAlignment="Stretch" CornerRadius="6" Padding="2,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnClickSpotlight" Grid.Row="1" Grid.Column="2" Content="Spotlight" FontSize="10"
+                                            Click="OnClickEffectSelected" Tag="spotlight" HorizontalAlignment="Stretch" CornerRadius="6" Padding="2,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnClickSparkle" Grid.Row="2" Grid.Column="0" Content="Sparkle" FontSize="10"
+                                            Click="OnClickEffectSelected" Tag="sparkle" HorizontalAlignment="Stretch" CornerRadius="6" Padding="2,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnClickFirework" Grid.Row="2" Grid.Column="1" Content="Firework" FontSize="10"
+                                            Click="OnClickEffectSelected" Tag="firework" HorizontalAlignment="Stretch" CornerRadius="6" Padding="2,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnClickChristmas" Grid.Row="2" Grid.Column="2" Content="Christmas" FontSize="10"
+                                            Click="OnClickEffectSelected" Tag="christmas" HorizontalAlignment="Stretch" CornerRadius="6" Padding="2,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Cursor Sounds & Idle Toggles -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Cursor Click Sound" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsCursorSound" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.CursorClickSound, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+                                    <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Hide Cursor When Idle" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsHideIdleCursor" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.Settings.HideCursorWhenIdle, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ==================== TAB 2: CANVAS SIZE & STYLE ==================== -->
+                        <StackPanel x:Name="PanelTabCanvas" Spacing="14" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE799;" FontSize="16" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock Text="CANVAS SIZE &amp; STYLE" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Aspect Ratio Buttons -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Aspect Ratio" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="BtnRatioOrig" Grid.Column="0" Content="Auto" FontSize="10"
+                                            Click="OnCanvasRatioSelected" Tag="Original" HorizontalAlignment="Stretch" CornerRadius="6" Padding="0,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnRatio169" Grid.Column="1" Content="16:9" FontSize="10"
+                                            Click="OnCanvasRatioSelected" Tag="16:9" HorizontalAlignment="Stretch" CornerRadius="6" Padding="0,6"
+                                            Background="#26C0C1FF" BorderBrush="{StaticResource PrimaryAccentBrush}" BorderThickness="1" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                        <Button x:Name="BtnRatio11" Grid.Column="2" Content="1:1" FontSize="10"
+                                            Click="OnCanvasRatioSelected" Tag="1:1" HorizontalAlignment="Stretch" CornerRadius="6" Padding="0,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnRatio43" Grid.Column="3" Content="4:3" FontSize="10"
+                                            Click="OnCanvasRatioSelected" Tag="4:3" HorizontalAlignment="Stretch" CornerRadius="6" Padding="0,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnRatio916" Grid.Column="4" Content="9:16" FontSize="10"
+                                            Click="OnCanvasRatioSelected" Tag="9:16" HorizontalAlignment="Stretch" CornerRadius="6" Padding="0,6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Style Sliders (Padding, Inset, Roundness, Shadow) -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Fixed Zoom Part" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsFixedZoom" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.FixedZoomPart, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+                                    <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
+
+                                    <!-- Padding -->
+                                    <StackPanel Spacing="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Padding" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbPaddingVal" Grid.Column="1" Text="5" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="SliderPadding" Minimum="0" Maximum="20" Value="{x:Bind ViewModel.Padding, Mode=TwoWay}"
+                                            ValueChanged="OnPaddingValueChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Inset -->
+                                    <StackPanel Spacing="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Inset" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbInsetVal" Grid.Column="1" Text="0" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="SliderInset" Minimum="0" Maximum="10" Value="{x:Bind ViewModel.Inset, Mode=TwoWay}"
+                                            ValueChanged="OnInsetValueChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Roundness -->
+                                    <StackPanel Spacing="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Roundness" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbRoundnessVal" Grid.Column="1" Text="4" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="SliderRoundness" Minimum="0" Maximum="20" Value="{x:Bind ViewModel.Roundness, Mode=TwoWay}"
+                                            ValueChanged="OnRoundnessValueChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Shadow -->
+                                    <StackPanel Spacing="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Shadow" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbShadowVal" Grid.Column="1" Text="100%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="SliderShadow" Minimum="0" Maximum="100" Value="{x:Bind ViewModel.Shadow, Mode=TwoWay}"
+                                            ValueChanged="OnShadowValueChanged"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Background Presets & Color Palette -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Background Preset" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <!-- Preset tabs -->
+                                    <Grid ColumnSpacing="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="BtnPresetDefault" Grid.Column="0" Style="{StaticResource PresetTabButtonStyle}"
+                                            Content="Default" Click="OnCanvasPresetSelected" Tag="Default"
+                                            Background="#26C0C1FF" Foreground="{StaticResource PrimaryAccentBrush}" HorizontalAlignment="Stretch"/>
+                                        <Button x:Name="BtnPresetSteady" Grid.Column="1" Style="{StaticResource PresetTabButtonStyle}"
+                                            Content="Steady" Click="OnCanvasPresetSelected" Tag="Steady" HorizontalAlignment="Stretch"/>
+                                        <Button x:Name="BtnPresetGraceful" Grid.Column="2" Style="{StaticResource PresetTabButtonStyle}"
+                                            Content="Grace" Click="OnCanvasPresetSelected" Tag="Graceful" HorizontalAlignment="Stretch"/>
+                                        <Button x:Name="BtnPresetScenery" Grid.Column="3" Style="{StaticResource PresetTabButtonStyle}"
+                                            Content="Scene" Click="OnCanvasPresetSelected" Tag="Scenery" HorizontalAlignment="Stretch"/>
+                                    </Grid>
+
+                                    <!-- Color Swatches Grid -->
+                                    <Grid ColumnSpacing="8" RowSpacing="8" Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Border x:Name="BgBlack" Grid.Row="0" Grid.Column="0" Width="26" Height="26" CornerRadius="13"
+                                            Background="#0D0E15" BorderBrush="{StaticResource PrimaryAccentBrush}" BorderThickness="2"
+                                            Tapped="OnBgColorSelected" Tag="Black"/>
+                                        <Border Grid.Row="0" Grid.Column="1" Width="26" Height="26" CornerRadius="13"
+                                            Background="#1E1F27" BorderBrush="Transparent" BorderThickness="2"
+                                            Tapped="OnBgColorSelected" Tag="DarkGray"/>
+                                        <Border Grid.Row="0" Grid.Column="2" Width="26" Height="26" CornerRadius="13"
+                                            Background="#1E1B4B" BorderBrush="Transparent" BorderThickness="2"
+                                            Tapped="OnBgColorSelected" Tag="Purple"/>
+                                        <Border Grid.Row="0" Grid.Column="3" Width="26" Height="26" CornerRadius="13"
+                                            Background="#0C4A6E" BorderBrush="Transparent" BorderThickness="2"
+                                            Tapped="OnBgColorSelected" Tag="Navy"/>
+                                        <Border Grid.Row="0" Grid.Column="4" Width="26" Height="26" CornerRadius="13"
+                                            Background="#064E3B" BorderBrush="Transparent" BorderThickness="2"
+                                            Tapped="OnBgColorSelected" Tag="Emerald"/>
+                                        <Border Grid.Row="0" Grid.Column="5" Width="26" Height="26" CornerRadius="13"
+                                            Background="#4C0519" BorderBrush="Transparent" BorderThickness="2"
+                                            Tapped="OnBgColorSelected" Tag="Crimson"/>
+
+                                        <!-- Row 2: Gradients -->
+                                        <Border Grid.Row="1" Grid.Column="0" Width="26" Height="26" CornerRadius="13"
+                                            BorderBrush="Transparent" BorderThickness="2" Tapped="OnBgColorSelected" Tag="Grad1">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#C0C1FF" Offset="0"/>
+                                                    <GradientStop Color="#A078FF" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <Border Grid.Row="1" Grid.Column="1" Width="26" Height="26" CornerRadius="13"
+                                            BorderBrush="Transparent" BorderThickness="2" Tapped="OnBgColorSelected" Tag="Grad2">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#3B82F6" Offset="0"/>
+                                                    <GradientStop Color="#9333EA" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <Border Grid.Row="1" Grid.Column="2" Width="26" Height="26" CornerRadius="13"
+                                            BorderBrush="Transparent" BorderThickness="2" Tapped="OnBgColorSelected" Tag="Grad3">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#EC4899" Offset="0"/>
+                                                    <GradientStop Color="#F43F5E" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <Border Grid.Row="1" Grid.Column="3" Width="26" Height="26" CornerRadius="13"
+                                            BorderBrush="Transparent" BorderThickness="2" Tapped="OnBgColorSelected" Tag="Grad4">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#10B981" Offset="0"/>
+                                                    <GradientStop Color="#06B6D4" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <Border Grid.Row="1" Grid.Column="4" Width="26" Height="26" CornerRadius="13"
+                                            BorderBrush="Transparent" BorderThickness="2" Tapped="OnBgColorSelected" Tag="Grad5">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#F59E0B" Offset="0"/>
+                                                    <GradientStop Color="#EF4444" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <Border Grid.Row="1" Grid.Column="5" Width="26" Height="26" CornerRadius="13"
+                                            BorderBrush="Transparent" BorderThickness="2" Tapped="OnBgColorSelected" Tag="Grad6">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#6366F1" Offset="0"/>
+                                                    <GradientStop Color="#D946EF" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Opacity -->
+                                    <StackPanel Spacing="4" Margin="0,4,0,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Opacity" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbOpacity" Text="100%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="OpacitySlider" Minimum="0" Maximum="100" Value="100"
+                                            ValueChanged="OnOpacityChanged"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ==================== TAB 3: MICROPHONE AUDIO ==================== -->
+                        <StackPanel x:Name="PanelTabAudio" Spacing="14" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE720;" FontSize="16" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock Text="MICROPHONE AUDIO" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Mute -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Mute Microphone" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                    <ToggleSwitch x:Name="TsMicMute" Grid.Column="1"
+                                        IsOn="{x:Bind ViewModel.MicMuted, Mode=TwoWay}"
+                                        OnContent="" OffContent="" Margin="0"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Volume Enhancement -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Volume Enhancement" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TbVolEnhanceVal" Grid.Column="1" Text="1.0x" FontSize="12" FontWeight="SemiBold"
+                                            Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <Button Grid.Column="2" Content="Reset" FontSize="11" Padding="6,2"
+                                            Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextMutedBrush}"
+                                            Click="OnResetVolumeEnhanceClicked"/>
+                                    </Grid>
+                                    <Slider x:Name="SliderVolEnhance" Minimum="0.5" Maximum="3.0" Value="{x:Bind ViewModel.VolumeEnhancement, Mode=TwoWay}" StepFrequency="0.1"
+                                        ValueChanged="OnVolumeEnhanceChanged"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Microphone Level Slider -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Microphone Level" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                        <TextBlock x:Name="TbMicVolVal" Grid.Column="1" Text="100%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                    </Grid>
+                                    <Slider x:Name="MicVolumeSlider" Minimum="0" Maximum="100" Value="100"
+                                        ValueChanged="OnMicVolumeChanged"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Audio AI: Noise Reduction & Vocal Enhancement -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Noise Reduction (AI)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="Arka plan gürültülerini filtreler" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </StackPanel>
+                                        <ToggleSwitch x:Name="TsNoiseReduction" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.AudioNoiseReduction, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+                                    <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
+                                    <StackPanel Spacing="8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Vocal Enhancement" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock Text="Ses netliğini ve frekansını yükseltir" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                            </StackPanel>
+                                            <ToggleSwitch x:Name="TsVocalEnhance" Grid.Column="1"
+                                                IsOn="{x:Bind ViewModel.VocalEnhancement, Mode=TwoWay}"
+                                                OnContent="" OffContent="" Margin="0"/>
+                                        </Grid>
+                                        <Slider x:Name="SliderVocalEnhance" Minimum="0" Maximum="100"
+                                            Value="{x:Bind ViewModel.VocalEnhancementAmount, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ==================== TAB 4: SHORTCUT KEYS ==================== -->
+                        <StackPanel x:Name="PanelTabKeys" Spacing="14" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE765;" FontSize="16" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock Text="SHORTCUT KEYS" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Display Toggles -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Display Shortcut Keys" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsShortcutKeys" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.ShowKeystrokes, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+                                    <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Display Single Shortcut Key" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsDisplaySingleKey" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.DisplaySingleShortcutKey, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Style & Color -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Key Style" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="BtnKeyStyleFilled" Grid.Column="0" Content="Filled" FontSize="11"
+                                            Click="OnKeyStyleSelected" Tag="filled" HorizontalAlignment="Stretch" CornerRadius="6"
+                                            Background="#26C0C1FF" BorderBrush="{StaticResource PrimaryAccentBrush}" BorderThickness="1" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                        <Button x:Name="BtnKeyStyleOutline" Grid.Column="1" Content="Outline" FontSize="11"
+                                            Click="OnKeyStyleSelected" Tag="outline" HorizontalAlignment="Stretch" CornerRadius="6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnKeyStyleMinimal" Grid.Column="2" Content="Minimal" FontSize="11"
+                                            Click="OnKeyStyleSelected" Tag="minimal" HorizontalAlignment="Stretch" CornerRadius="6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                    </Grid>
+
+                                    <!-- Size Slider -->
+                                    <StackPanel Spacing="4" Margin="0,6,0,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Key Size" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbKeySizeVal" Grid.Column="1" Text="24" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="SliderKeySize" Minimum="12" Maximum="48" Value="{x:Bind ViewModel.ShortcutSize, Mode=TwoWay}"
+                                            ValueChanged="OnKeySizeChanged"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Position 3x3 Grid -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Screen Position" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Grid HorizontalAlignment="Center" ColumnSpacing="8" RowSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="40"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="30"/>
+                                            <RowDefinition Height="30"/>
+                                            <RowDefinition Height="30"/>
+                                        </Grid.RowDefinitions>
+                                        <Button Click="OnKeyPosSelected" Tag="top-left" Grid.Row="0" Grid.Column="0" Content="TL" FontSize="9" CornerRadius="4" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                        <Button Click="OnKeyPosSelected" Tag="top-center" Grid.Row="0" Grid.Column="1" Content="TC" FontSize="9" CornerRadius="4" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                        <Button Click="OnKeyPosSelected" Tag="top-right" Grid.Row="0" Grid.Column="2" Content="TR" FontSize="9" CornerRadius="4" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                        <Button Click="OnKeyPosSelected" Tag="mid-left" Grid.Row="1" Grid.Column="0" Content="ML" FontSize="9" CornerRadius="4" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                        <Button Click="OnKeyPosSelected" Tag="center" Grid.Row="1" Grid.Column="1" Content="C" FontSize="9" CornerRadius="4" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                        <Button Click="OnKeyPosSelected" Tag="mid-right" Grid.Row="1" Grid.Column="2" Content="MR" FontSize="9" CornerRadius="4" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                        <Button Click="OnKeyPosSelected" Tag="bottom-left" Grid.Row="2" Grid.Column="0" Content="BL" FontSize="9" CornerRadius="4" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                        <Button Click="OnKeyPosSelected" Tag="bottom-center" Grid.Row="2" Grid.Column="1" Content="BC" FontSize="9" CornerRadius="4" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#26C0C1FF" BorderBrush="{StaticResource PrimaryAccentBrush}" BorderThickness="1" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                        <Button Click="OnKeyPosSelected" Tag="bottom-right" Grid.Row="2" Grid.Column="2" Content="BR" FontSize="9" CornerRadius="4" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ==================== TAB 5: MOTION & BLUR ==================== -->
+                        <StackPanel x:Name="PanelTabMotion" Spacing="14" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE74B;" FontSize="16" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock Text="MOTION &amp; BLUR" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Motion Blur Master Toggle -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Motion Blur" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                    <ToggleSwitch x:Name="TsMotionBlur" Grid.Column="1"
+                                        IsOn="{x:Bind ViewModel.MotionBlur, Mode=TwoWay}"
+                                        OnContent="" OffContent="" Margin="0"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Blur Sliders (Zoom-in, Screen, Cursor) -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <!-- Zoom-in Motion Blur -->
+                                    <StackPanel Spacing="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Zoom-in Motion Blur" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbZoomBlurVal" Grid.Column="1" Text="50%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="MotionBlurSlider" Minimum="0" Maximum="100" Value="50"
+                                            ValueChanged="OnMotionBlurChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Screen Motion Blur -->
+                                    <StackPanel Spacing="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Screen Motion Blur" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbScreenBlurVal" Grid.Column="1" Text="50%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider Minimum="0" Maximum="100" Value="{x:Bind ViewModel.ScreenMotionBlurAmount, Mode=TwoWay}"/>
+                                    </StackPanel>
+
+                                    <!-- Cursor Motion Blur -->
+                                    <StackPanel Spacing="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Cursor Motion Blur" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbCursorBlurVal" Grid.Column="1" Text="50%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider Minimum="0" Maximum="100" Value="{x:Bind ViewModel.CursorMotionBlurAmount, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Movement Speed Selectors -->
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Cursor Movement" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsCursorMovement" Grid.Column="1" IsOn="True" OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+                                    <Grid ColumnSpacing="2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="BtnSpeedSlow" Grid.Column="0" Style="{StaticResource SpeedButtonStyle}"
+                                            Content="Slow" Click="OnSpeedSelected" Tag="Slow" HorizontalAlignment="Stretch"/>
+                                        <Button x:Name="BtnSpeedMedium" Grid.Column="1" Style="{StaticResource SpeedButtonStyle}"
+                                            Content="Medium" Click="OnSpeedSelected" Tag="Medium" HorizontalAlignment="Stretch"
+                                            Background="{StaticResource SurfaceContainerLowestBrush}" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                        <Button x:Name="BtnSpeedFast" Grid.Column="2" Style="{StaticResource SpeedButtonStyle}"
+                                            Content="Fast" Click="OnSpeedSelected" Tag="Fast" HorizontalAlignment="Stretch"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ==================== TAB 6: CAMERA ==================== -->
+                        <StackPanel x:Name="PanelTabCamera" Spacing="14" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE722;" FontSize="16" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock Text="CAMERA OVERLAY" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Kamera Katmanı" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsCameraVisible" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.CameraVisible, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+
+                                    <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
+
+                                    <TextBlock Text="Kamera Şekli" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="BtnCamCircle" Grid.Column="0" Content="Daire" FontSize="11"
+                                            Click="OnCameraShapeSelected" Tag="circle" HorizontalAlignment="Stretch" CornerRadius="6"
+                                            Background="#26C0C1FF" BorderBrush="{StaticResource PrimaryAccentBrush}" BorderThickness="1" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                        <Button x:Name="BtnCamSquare" Grid.Column="1" Content="Kare" FontSize="11"
+                                            Click="OnCameraShapeSelected" Tag="square" HorizontalAlignment="Stretch" CornerRadius="6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                        <Button x:Name="BtnCamRounded" Grid.Column="2" Content="Yuvarlak" FontSize="11"
+                                            Click="OnCameraShapeSelected" Tag="rounded" HorizontalAlignment="Stretch" CornerRadius="6"
+                                            Background="Transparent" BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ==================== TAB 7: VOLUME MIXER ==================== -->
+                        <StackPanel x:Name="PanelTabVolume" Spacing="14" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE767;" FontSize="16" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock Text="AUDIO MIXER" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="14">
+                                    <!-- Mic Volume -->
+                                    <StackPanel Spacing="6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Mikrofon Seviyesi" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbMicVolVal2" Grid.Column="1" Text="100%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider Minimum="0" Maximum="100" Value="{x:Bind ViewModel.MicVolume, Mode=TwoWay}"/>
+                                    </StackPanel>
+
+                                    <!-- System Volume -->
+                                    <StackPanel Spacing="6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Sistem Sesi Seviyesi" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbSysVolVal" Grid.Column="1" Text="100%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Grid>
+                                        <Slider x:Name="SysVolumeSlider" Minimum="0" Maximum="100" Value="100"
+                                            ValueChanged="OnSysVolumeChanged"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ==================== TAB 8: WATERMARK ==================== -->
+                        <StackPanel x:Name="PanelTabWatermark" Spacing="14" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE734;" FontSize="16" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                <TextBlock Text="WATERMARK" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
+                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Filigran Göster" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="TsWatermark" Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.Watermark, Mode=TwoWay}"
+                                            OnContent="" OffContent="" Margin="0"/>
+                                    </Grid>
+                                    <TextBox x:Name="TbWatermarkText"
+                                        Text="{x:Bind ViewModel.WatermarkText, Mode=TwoWay}"
+                                        PlaceholderText="Filigran Metni"
+                                        FontSize="12" CornerRadius="6"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ==================== TAB 9: ZOOM PROPERTIES ==================== -->
+                        <StackPanel x:Name="PanelTabZoom" Spacing="14" Visibility="Collapsed">
+                            <StackPanel x:Name="ZoomPropertiesPanel" Spacing="12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE71E;" FontSize="16" Foreground="{StaticResource TertiaryBrush}"/>
+                                        <TextBlock Text="ZOOM PROPERTIES" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                            Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Background="Transparent" BorderThickness="0" Padding="4"
+                                        Click="OnDeleteZoomClicked">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="{StaticResource ErrorBrush}"/>
+                                    </Button>
+                                </Grid>
+                                <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="14"
+                                    BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                    <StackPanel Spacing="14">
+                                        <!-- Zoom Factor -->
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Zoom Factor" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <Border Grid.Column="1" Background="{StaticResource PrimaryGlowBrush}" CornerRadius="4" Padding="6,2">
+                                                    <TextBlock x:Name="TbSelectedZoomFactor" Text="1.5x" FontSize="11" FontWeight="SemiBold"
+                                                        Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                                </Border>
+                                            </Grid>
+                                            <Slider x:Name="SelectedZoomSlider" Minimum="1" Maximum="4" Value="1.5" StepFrequency="0.1"
+                                                ValueChanged="OnSelectedZoomFactorChanged"/>
+                                        </StackPanel>
+
+                                        <!-- Start / End Sec -->
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="4">
+                                                <TextBlock Text="Start (sec)" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                <NumberBox x:Name="NbZoomStart" Minimum="0" SmallChange="0.1"
+                                                    BorderBrush="{StaticResource GlassBorderBrush}"
+                                                    Background="{StaticResource SurfaceContainerLowestBrush}"
+                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="End (sec)" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                <NumberBox x:Name="NbZoomEnd" Minimum="0" SmallChange="0.1"
+                                                    BorderBrush="{StaticResource GlassBorderBrush}"
+                                                    Background="{StaticResource SurfaceContainerLowestBrush}"
+                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- 2: VIDEO CANVAS (CENTER) -->
+            <Border Grid.Column="2"
+                Margin="16"
                 Background="#0D0E15"
                 CornerRadius="12"
                 BorderBrush="{StaticResource GlassBorderBrush}"
                 BorderThickness="1">
                 <Grid>
-                    <!-- Radial glow -->
+                    <!-- Radial glow background -->
                     <Ellipse Width="600" Height="400" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Ellipse.Fill>
                             <RadialGradientBrush>
@@ -169,11 +1163,11 @@
                     <!-- 16:9 Video container -->
                     <Border
                         x:Name="VideoContainer"
-                        MaxWidth="880"
+                        MaxWidth="920"
                         CornerRadius="10"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        Margin="32">
+                        Margin="24">
                         <Border.Background>
                             <SolidColorBrush Color="#000000"/>
                         </Border.Background>
@@ -271,392 +1265,10 @@
                     </Border>
                 </Grid>
             </Border>
-
-            <!-- RIGHT PROPERTIES PANEL -->
-            <Border Grid.Column="1"
-                Margin="0,16,20,16"
-                Background="{StaticResource SurfaceContainerBrush}"
-                BorderBrush="{StaticResource GlassBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="12">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="18">
-                    <StackPanel Spacing="24">
-
-                        <!-- SECTION: Cursor & Blur -->
-                        <StackPanel Spacing="12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="CURSOR &amp; BLUR"
-                                    FontSize="11" FontWeight="Bold"
-                                    CharacterSpacing="50"
-                                    Foreground="{StaticResource TextMutedBrush}"
-                                    VerticalAlignment="Center"/>
-                                <Button Grid.Column="1"
-                                    Background="Transparent" BorderThickness="0" Padding="4"
-                                    Click="OnAddZoomClicked">
-                                    <FontIcon Glyph="&#xE710;" FontSize="14"
-                                        Foreground="{StaticResource PrimaryAccentBrush}"/>
-                                </Button>
-                            </Grid>
-
-                            <Border Background="{StaticResource SurfaceHighBrush}"
-                                CornerRadius="10" Padding="14"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="14">
-                                    <!-- Zoom Level -->
-                                    <StackPanel Spacing="6">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Zoom Level" FontSize="13"
-                                                Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <Border Grid.Column="1"
-                                                Background="{StaticResource PrimaryGlowBrush}"
-                                                CornerRadius="4" Padding="6,2">
-                                                <TextBlock x:Name="TbZoomLevel" Text="150%"
-                                                    FontSize="11" FontWeight="SemiBold"
-                                                    Foreground="{StaticResource PrimaryAccentBrush}"/>
-                                            </Border>
-                                        </Grid>
-                                        <Slider x:Name="ZoomLevelSlider"
-                                            Minimum="100" Maximum="300" Value="150"
-                                            ValueChanged="OnZoomLevelChanged"/>
-                                    </StackPanel>
-
-                                    <!-- Motion Blur -->
-                                    <StackPanel Spacing="6">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Motion Blur" FontSize="13"
-                                                Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <Border Grid.Column="1"
-                                                Background="{StaticResource SurfaceHighestBrush}"
-                                                CornerRadius="4" Padding="6,2">
-                                                <TextBlock x:Name="TbMotionBlur" Text="30%"
-                                                    FontSize="11"
-                                                    Foreground="{StaticResource TextMutedBrush}"/>
-                                            </Border>
-                                        </Grid>
-                                        <Slider x:Name="MotionBlurSlider"
-                                            Minimum="0" Maximum="100" Value="30"
-                                            ValueChanged="OnMotionBlurChanged"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- SECTION: Cursor Movement -->
-                        <StackPanel Spacing="12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="CURSOR MOVEMENT"
-                                    FontSize="11" FontWeight="Bold"
-                                    CharacterSpacing="50"
-                                    Foreground="{StaticResource TextMutedBrush}"
-                                    VerticalAlignment="Center"/>
-                                <ToggleSwitch x:Name="TsCursorMovement"
-                                    Grid.Column="1" IsOn="True"
-                                    OnContent="" OffContent="" Margin="0"/>
-                            </Grid>
-
-                            <!-- Speed selector -->
-                            <Border Background="{StaticResource SurfaceHighBrush}"
-                                CornerRadius="10" Padding="4"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                                <Grid ColumnSpacing="2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Button x:Name="BtnSpeedSlow" Grid.Column="0"
-                                        Style="{StaticResource SpeedButtonStyle}"
-                                        Content="Slow" Click="OnSpeedSelected"
-                                        Tag="Slow" HorizontalAlignment="Stretch"/>
-                                    <Button x:Name="BtnSpeedMedium" Grid.Column="1"
-                                        Style="{StaticResource SpeedButtonStyle}"
-                                        Content="Medium" Click="OnSpeedSelected"
-                                        Tag="Medium" HorizontalAlignment="Stretch"
-                                        Background="{StaticResource SurfaceContainerLowestBrush}"
-                                        Foreground="{StaticResource PrimaryAccentBrush}"/>
-                                    <Button x:Name="BtnSpeedFast" Grid.Column="2"
-                                        Style="{StaticResource SpeedButtonStyle}"
-                                        Content="Fast" Click="OnSpeedSelected"
-                                        Tag="Fast" HorizontalAlignment="Stretch"/>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- Divider -->
-                        <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
-
-                        <!-- SECTION: Style -->
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="STYLE"
-                                FontSize="11" FontWeight="Bold"
-                                CharacterSpacing="50"
-                                Foreground="{StaticResource TextMutedBrush}"/>
-
-                            <Border Background="{StaticResource SurfaceHighBrush}"
-                                CornerRadius="10" Padding="14"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="14">
-                                    <!-- Show Shortcut Keys toggle -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Show Shortcut Keys" FontSize="13"
-                                            Foreground="{StaticResource TextPrimaryBrush}"
-                                            VerticalAlignment="Center"/>
-                                        <ToggleSwitch x:Name="TsShortcutKeys"
-                                            Grid.Column="1" IsOn="True"
-                                            OnContent="" OffContent="" Margin="0"/>
-                                    </Grid>
-
-                                    <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
-
-                                    <!-- Canvas Background -->
-                                    <StackPanel Spacing="10">
-                                        <TextBlock Text="Canvas Background" FontSize="13"
-                                            Foreground="{StaticResource TextPrimaryBrush}"/>
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <Border x:Name="BgBlack"
-                                                Width="24" Height="24" CornerRadius="12"
-                                                Background="Black"
-                                                BorderBrush="{StaticResource PrimaryAccentBrush}"
-                                                BorderThickness="2"
-                                                Tapped="OnBgColorSelected">
-                                                <Border.Tag>Black</Border.Tag>
-                                            </Border>
-                                            <Border Width="24" Height="24" CornerRadius="12"
-                                                Background="#1A1A1A"
-                                                BorderBrush="Transparent" BorderThickness="2"
-                                                Tapped="OnBgColorSelected">
-                                                <Border.Tag>DarkGray</Border.Tag>
-                                            </Border>
-                                            <Border Width="24" Height="24" CornerRadius="12"
-                                                BorderBrush="Transparent" BorderThickness="2"
-                                                Tapped="OnBgColorSelected">
-                                                <Border.Background>
-                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                        <GradientStop Color="#1E1B4B" Offset="0"/>
-                                                        <GradientStop Color="#4C1D95" Offset="1"/>
-                                                    </LinearGradientBrush>
-                                                </Border.Background>
-                                                <Border.Tag>Purple</Border.Tag>
-                                            </Border>
-                                        </StackPanel>
-                                    </StackPanel>
-
-                                    <!-- Opacity -->
-                                    <StackPanel Spacing="6">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Opacity" FontSize="13"
-                                                Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <Border Grid.Column="1"
-                                                Background="{StaticResource SurfaceHighestBrush}"
-                                                CornerRadius="4" Padding="6,2">
-                                                <TextBlock x:Name="TbOpacity" Text="100%"
-                                                    FontSize="11"
-                                                    Foreground="{StaticResource TextMutedBrush}"/>
-                                            </Border>
-                                        </Grid>
-                                        <Slider x:Name="OpacitySlider"
-                                            Minimum="0" Maximum="100" Value="100"
-                                            ValueChanged="OnOpacityChanged"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- SECTION: Selected Zoom Properties -->
-                        <StackPanel x:Name="ZoomPropertiesPanel" Spacing="12" Visibility="Collapsed">
-                            <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="ZOOM PROPERTIES"
-                                    FontSize="11" FontWeight="Bold"
-                                    CharacterSpacing="50"
-                                    Foreground="{StaticResource TextMutedBrush}"
-                                    VerticalAlignment="Center"/>
-                                <Button Grid.Column="1"
-                                    Background="Transparent" BorderThickness="0" Padding="4"
-                                    Click="OnDeleteZoomClicked">
-                                    <FontIcon Glyph="&#xE74D;" FontSize="14"
-                                        Foreground="{StaticResource ErrorBrush}"/>
-                                </Button>
-                            </Grid>
-                            <Border Background="{StaticResource SurfaceHighBrush}"
-                                CornerRadius="10" Padding="14"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="14">
-                                    <StackPanel Spacing="6">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Zoom Factor" FontSize="13"
-                                                Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <Border Grid.Column="1"
-                                                Background="{StaticResource PrimaryGlowBrush}"
-                                                CornerRadius="4" Padding="6,2">
-                                                <TextBlock x:Name="TbSelectedZoomFactor" Text="1.5x"
-                                                    FontSize="11" FontWeight="SemiBold"
-                                                    Foreground="{StaticResource PrimaryAccentBrush}"/>
-                                            </Border>
-                                        </Grid>
-                                        <Slider x:Name="SelectedZoomSlider"
-                                            Minimum="1" Maximum="4" Value="1.5" StepFrequency="0.1"
-                                            ValueChanged="OnSelectedZoomFactorChanged"/>
-                                    </StackPanel>
-                                    <Grid ColumnSpacing="10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" Spacing="4">
-                                            <TextBlock Text="Start (sec)" FontSize="11"
-                                                Foreground="{StaticResource TextMutedBrush}"/>
-                                            <NumberBox x:Name="NbZoomStart"
-                                                Minimum="0" SmallChange="0.1"
-                                                BorderBrush="{StaticResource GlassBorderBrush}"
-                                                Background="{StaticResource SurfaceContainerLowestBrush}"
-                                                Foreground="{StaticResource TextPrimaryBrush}"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" Spacing="4">
-                                            <TextBlock Text="End (sec)" FontSize="11"
-                                                Foreground="{StaticResource TextMutedBrush}"/>
-                                            <NumberBox x:Name="NbZoomEnd"
-                                                Minimum="0" SmallChange="0.1"
-                                                BorderBrush="{StaticResource GlassBorderBrush}"
-                                                Background="{StaticResource SurfaceContainerLowestBrush}"
-                                                Foreground="{StaticResource TextPrimaryBrush}"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- SECTION: Audio Controls -->
-                        <StackPanel Spacing="12">
-                            <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
-                            <TextBlock Text="SES KONTROLLERİ"
-                                FontSize="11" FontWeight="Bold"
-                                CharacterSpacing="50"
-                                Foreground="{StaticResource TextMutedBrush}"/>
-
-                            <Border Background="{StaticResource SurfaceHighBrush}"
-                                CornerRadius="10" Padding="14"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="14">
-                                    <!-- Mic Volume -->
-                                    <StackPanel Spacing="6">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Mikrofon Seviyesi" FontSize="13"
-                                                Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <TextBlock x:Name="TbMicVolVal" Grid.Column="1" Text="100%"
-                                                FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
-                                        </Grid>
-                                        <Slider x:Name="MicVolumeSlider" Minimum="0" Maximum="100" Value="100"
-                                            ValueChanged="OnMicVolumeChanged"/>
-                                    </StackPanel>
-
-                                    <!-- System Volume -->
-                                    <StackPanel Spacing="6">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Sistem Sesi Seviyesi" FontSize="13"
-                                                Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <TextBlock x:Name="TbSysVolVal" Grid.Column="1" Text="100%"
-                                                FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
-                                        </Grid>
-                                        <Slider x:Name="SysVolumeSlider" Minimum="0" Maximum="100" Value="100"
-                                            ValueChanged="OnSysVolumeChanged"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- SECTION: Camera & Watermark -->
-                        <StackPanel Spacing="12">
-                            <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
-                            <TextBlock Text="KAMERA &amp; FİLİGRAN"
-                                FontSize="11" FontWeight="Bold"
-                                CharacterSpacing="50"
-                                Foreground="{StaticResource TextMutedBrush}"/>
-
-                            <Border Background="{StaticResource SurfaceHighBrush}"
-                                CornerRadius="10" Padding="14"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="14">
-                                    <!-- Camera Visibility -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Kamera Katmanı" FontSize="13"
-                                            Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                        <ToggleSwitch x:Name="TsCameraVisible" Grid.Column="1"
-                                            IsOn="{x:Bind ViewModel.CameraVisible, Mode=TwoWay}"
-                                            OnContent="" OffContent="" Margin="0"/>
-                                    </Grid>
-
-                                    <!-- Watermark Toggle & Text -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Filigran Göster" FontSize="13"
-                                            Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                        <ToggleSwitch x:Name="TsWatermark" Grid.Column="1"
-                                            IsOn="{x:Bind ViewModel.Watermark, Mode=TwoWay}"
-                                            OnContent="" OffContent="" Margin="0"/>
-                                    </Grid>
-                                    <TextBox x:Name="TbWatermarkText"
-                                        Text="{x:Bind ViewModel.WatermarkText, Mode=TwoWay}"
-                                        PlaceholderText="Filigran Metni"
-                                        FontSize="12" CornerRadius="6"/>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
         </Grid>
 
         <!-- ====================================================
-             ROW 2: TIMELINE AREA
+             ROW 2: TIMELINE AREA (PROFESSIONAL NLE GRADE)
              ==================================================== -->
         <Border Grid.Row="2"
             Background="{StaticResource SurfaceContainerLowBrush}"
@@ -684,27 +1296,33 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- Edit tools (left) -->
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                             <Button Style="{StaticResource IconButtonStyle}" Click="OnUndoClicked"
                                 ToolTipService.ToolTip="Geri Al (Ctrl+Z)">
-                                <FontIcon Glyph="&#xE7A7;" FontSize="16"
+                                <FontIcon Glyph="&#xE7A7;" FontSize="15"
                                     Foreground="{StaticResource TextMutedBrush}"/>
                             </Button>
                             <Button Style="{StaticResource IconButtonStyle}" Click="OnRedoClicked"
                                 ToolTipService.ToolTip="Yinele (Ctrl+Y)">
-                                <FontIcon Glyph="&#xE7A6;" FontSize="16"
+                                <FontIcon Glyph="&#xE7A6;" FontSize="15"
                                     Foreground="{StaticResource TextMutedBrush}"/>
                             </Button>
-                            <Rectangle Width="1" Height="18" Fill="{StaticResource GlassBorderBrush}" Margin="6,0"/>
+                            <Rectangle Width="1" Height="18" Fill="{StaticResource GlassBorderBrush}" Margin="4,0"/>
                             <Button Style="{StaticResource IconButtonStyle}" Click="OnSplitClicked"
-                                ToolTipService.ToolTip="Böl (S)">
-                                <FontIcon Glyph="&#xE8C6;" FontSize="16"
+                                ToolTipService.ToolTip="Böl / Cut (S)">
+                                <FontIcon Glyph="&#xE8C6;" FontSize="15"
                                     Foreground="{StaticResource TextPrimaryBrush}"/>
                             </Button>
                             <Button Style="{StaticResource IconButtonStyle}" Click="OnDeleteZoomClicked"
-                                ToolTipService.ToolTip="Sil (Del)">
-                                <FontIcon Glyph="&#xE74D;" FontSize="16"
+                                ToolTipService.ToolTip="Kırpılan Parçayı / Efekti Sil (Del)">
+                                <FontIcon Glyph="&#xE74D;" FontSize="15"
                                     Foreground="{StaticResource ErrorBrush}"/>
+                            </Button>
+                            <Rectangle Width="1" Height="18" Fill="{StaticResource GlassBorderBrush}" Margin="4,0"/>
+                            <Button Style="{StaticResource IconButtonStyle}" Click="OnAddZoomClicked"
+                                ToolTipService.ToolTip="Zoom Efekti Ekle (+)">
+                                <FontIcon Glyph="&#xE710;" FontSize="15"
+                                    Foreground="{StaticResource TertiaryBrush}"/>
                             </Button>
                         </StackPanel>
 
@@ -750,7 +1368,7 @@
                                     </Button>
                                     <Rectangle Width="1" Height="20" Fill="{StaticResource GlassBorderBrush}" Margin="4,0"/>
                                     <Button x:Name="BtnMuteAudio" Style="{StaticResource PlayControlStyle}"
-                                        Click="OnMuteClicked">
+                                        Click="OnMuteClicked" ToolTipService.ToolTip="Tüm Sesleri Kapat">
                                         <FontIcon x:Name="MuteIcon" Glyph="&#xE767;" FontSize="16"
                                             Foreground="{StaticResource TextPrimaryBrush}"/>
                                     </Button>
@@ -761,39 +1379,39 @@
                         <!-- Zoom slider (right) -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
                             VerticalAlignment="Center">
-                            <FontIcon Glyph="&#xE71F;" FontSize="14"
-                                Foreground="{StaticResource TextMutedBrush}"/>
+                            <FontIcon Glyph="&#xE71F;" FontSize="13"
+                                Foreground="{StaticResource TextMutedBrush}" ToolTipService.ToolTip="Timeline Daralt"/>
                             <Slider x:Name="TimelineZoomSlider"
                                 Width="100" Minimum="1" Maximum="100" Value="50"
                                 ValueChanged="OnTimelineZoomChanged"/>
-                            <FontIcon Glyph="&#xE8A3;" FontSize="14"
-                                Foreground="{StaticResource TextMutedBrush}"/>
+                            <FontIcon Glyph="&#xE8A3;" FontSize="13"
+                                Foreground="{StaticResource TextMutedBrush}" ToolTipService.ToolTip="Timeline Genişlet (Ctrl+Tekerlek)"/>
                         </StackPanel>
                     </Grid>
                 </Border>
 
-                <!-- TRACKS AREA -->
+                <!-- TRACKS AREA (Track Headers + Scrollable Canvas Content) -->
                 <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
-                        <!-- Track headers -->
+                        <!-- Track headers column -->
                         <ColumnDefinition Width="200"/>
-                        <!-- Scrollable timeline content -->
+                        <!-- Scrollable timeline content column -->
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- TRACK HEADERS -->
+                    <!-- TRACK HEADERS (LEFT 200px) -->
                     <Border Grid.Column="0"
                         Background="{StaticResource SurfaceContainerBrush}"
                         BorderBrush="{StaticResource GlassBorderBrush}"
                         BorderThickness="0,0,1,0">
                         <StackPanel>
-                            <!-- Time ruler spacer -->
+                            <!-- Time ruler spacer (22px) -->
                             <Border Height="22"
                                 Background="{StaticResource SurfaceContainerLowestBrush}"
                                 BorderBrush="{StaticResource GlassBorderBrush}"
                                 BorderThickness="0,0,0,1"/>
 
-                            <!-- Video track header -->
+                            <!-- Video track header (72px) -->
                             <Border Height="72"
                                 Background="Transparent"
                                 BorderBrush="{StaticResource GlassBorderBrush}"
@@ -807,24 +1425,53 @@
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                                         <FontIcon Glyph="&#xE714;" FontSize="16"
                                             Foreground="{StaticResource PrimaryAccentBrush}"/>
-                                        <TextBlock Text="Screen Recording" FontSize="12" FontWeight="SemiBold"
-                                            Foreground="{StaticResource TextPrimaryBrush}"
-                                            VerticalAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Video Track" FontSize="12" FontWeight="SemiBold"
+                                                Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="Screen Recording" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </StackPanel>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
-                                        <Button Style="{StaticResource IconButtonStyle}" Width="24" Height="24">
-                                            <FontIcon Glyph="&#xE7B3;" FontSize="12"
-                                                Foreground="{StaticResource TextMutedBrush}"/>
-                                        </Button>
-                                        <Button Style="{StaticResource IconButtonStyle}" Width="24" Height="24">
-                                            <FontIcon Glyph="&#xE785;" FontSize="12"
+                                        <Button x:Name="BtnVideoMute" Click="OnVideoTrackMuteClicked" Style="{StaticResource IconButtonStyle}" Width="24" Height="24"
+                                            ToolTipService.ToolTip="Video Sesini Kapat/Aç">
+                                            <FontIcon x:Name="IconVideoMute" Glyph="&#xE767;" FontSize="12"
                                                 Foreground="{StaticResource TextMutedBrush}"/>
                                         </Button>
                                     </StackPanel>
                                 </Grid>
                             </Border>
 
-                            <!-- Zoom effects track header -->
+                            <!-- Audio track header (56px) -->
+                            <Border Height="56"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource GlassBorderBrush}"
+                                BorderThickness="0,0,0,1"
+                                Padding="12,0">
+                                <Grid VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE720;" FontSize="16"
+                                            Foreground="#22C55E"/>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Audio Track" FontSize="12" FontWeight="SemiBold"
+                                                Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="Waveform / Mic" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                                        <Button x:Name="BtnAudioMute" Click="OnAudioTrackMuteClicked" Style="{StaticResource IconButtonStyle}" Width="24" Height="24"
+                                            ToolTipService.ToolTip="Ses Parçasını Kapat/Aç">
+                                            <FontIcon x:Name="IconAudioMute" Glyph="&#xE767;" FontSize="12"
+                                                Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Zoom effects track header (56px) -->
                             <Border Height="56"
                                 Background="Transparent"
                                 BorderBrush="{StaticResource GlassBorderBrush}"
@@ -844,7 +1491,7 @@
                                     </StackPanel>
                                     <Button Grid.Column="1" Style="{StaticResource IconButtonStyle}"
                                         Width="24" Height="24" Click="OnAddZoomClicked"
-                                        ToolTipService.ToolTip="Add Zoom Effect">
+                                        ToolTipService.ToolTip="Zoom Efekti Ekle">
                                         <FontIcon Glyph="&#xE710;" FontSize="12"
                                             Foreground="{StaticResource TertiaryBrush}"/>
                                     </Button>
@@ -864,11 +1511,13 @@
                                 <RowDefinition Height="22"/>
                                 <!-- Video track -->
                                 <RowDefinition Height="72"/>
+                                <!-- Audio track -->
+                                <RowDefinition Height="56"/>
                                 <!-- Zoom track -->
                                 <RowDefinition Height="56"/>
                             </Grid.RowDefinitions>
 
-                            <!-- TIME RULER -->
+                            <!-- TIME RULER (Row 0) -->
                             <Canvas Grid.Row="0"
                                 x:Name="TimeRuler"
                                 Background="{StaticResource SurfaceContainerLowestBrush}"
@@ -879,14 +1528,14 @@
                                 <!-- Ruler ticks are generated in code-behind -->
                             </Canvas>
 
-                            <!-- VIDEO TRACK -->
+                            <!-- VIDEO TRACK (Row 1) -->
                             <Canvas Grid.Row="1"
                                 x:Name="VideoTrack"
                                 Background="#080D0E15"
                                 PointerPressed="OnTimelinePointerPressed"
                                 PointerMoved="OnTimelinePointerMoved"
                                 PointerReleased="OnTimelinePointerReleased">
-                                <!-- Video clip block (drawn in code-behind) -->
+                                <!-- Base clip block (fallback/rendered in code-behind) -->
                                 <Border
                                     x:Name="VideoClipBlock"
                                     Height="56"
@@ -896,31 +1545,40 @@
                                     CornerRadius="6"
                                     Canvas.Left="40"
                                     Canvas.Top="8">
-                                    <TextBlock Text="recording_1.mp4" FontSize="11" FontWeight="SemiBold"
+                                    <TextBlock Text="recording.mp4" FontSize="11" FontWeight="SemiBold"
                                         Foreground="{StaticResource PrimaryAccentBrush}"
                                         Margin="8,4,0,0" VerticalAlignment="Top"/>
                                 </Border>
                             </Canvas>
 
-                            <!-- ZOOM EFFECTS TRACK -->
+                            <!-- AUDIO TRACK (Row 2: Waveform Canvas) -->
                             <Canvas Grid.Row="2"
+                                x:Name="AudioTrack"
+                                Background="#0500FF88"
+                                PointerPressed="OnAudioTrackPointerPressed"
+                                PointerMoved="OnTimelinePointerMoved"
+                                PointerReleased="OnTimelinePointerReleased">
+                                <!-- Waveform bars and audio clips are drawn dynamically in code-behind -->
+                            </Canvas>
+
+                            <!-- ZOOM EFFECTS TRACK (Row 3) -->
+                            <Canvas Grid.Row="3"
                                 x:Name="ZoomTrack"
                                 Background="#030D0E15"
                                 DoubleTapped="OnZoomTrackDoubleTapped">
                                 <!-- Zoom pills are added dynamically in code-behind -->
                             </Canvas>
 
-                            <!-- PLAYHEAD (spans all rows, rendered on top) -->
-                            <Canvas Grid.Row="0" Grid.RowSpan="3"
+                            <!-- PLAYHEAD (spans all 4 rows, rendered on top) -->
+                            <Canvas Grid.Row="0" Grid.RowSpan="4"
                                 IsHitTestVisible="False" ZIndex="100">
                                 <Rectangle
                                     x:Name="PlayheadLine"
                                     Width="2"
-                                    Height="150"
+                                    Height="206"
                                     Fill="{StaticResource SecondaryBrush}"
                                     Canvas.Left="200"
                                     Canvas.Top="0"/>
-                                <!-- Playhead triangle -->
                                 <Polygon
                                     x:Name="PlayheadTriangle"
                                     Fill="{StaticResource SecondaryBrush}"

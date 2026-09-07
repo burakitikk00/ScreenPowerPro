@@ -229,6 +229,81 @@ public class TimelineSettings
 
     [JsonPropertyName("sysVolume")]
     public double SysVolume { get; set; } = 100; // % ses seviyesi
+
+    [JsonPropertyName("micMuted")]
+    public bool MicMuted { get; set; } = false;
+
+    [JsonPropertyName("volumeEnhancement")]
+    public double VolumeEnhancement { get; set; } = 1.0;
+
+    [JsonPropertyName("audioNoiseReduction")]
+    public bool AudioNoiseReduction { get; set; } = false;
+
+    [JsonPropertyName("vocalEnhancement")]
+    public bool VocalEnhancement { get; set; } = false;
+
+    [JsonPropertyName("vocalEnhancementAmount")]
+    public int VocalEnhancementAmount { get; set; } = 48;
+
+    // --- Tuval (Canvas) ve Çerçeve Detayları ---
+    [JsonPropertyName("padding")]
+    public int Padding { get; set; } = 5;
+
+    [JsonPropertyName("inset")]
+    public int Inset { get; set; } = 0;
+
+    [JsonPropertyName("roundness")]
+    public int Roundness { get; set; } = 4;
+
+    [JsonPropertyName("shadow")]
+    public int Shadow { get; set; } = 100;
+
+    [JsonPropertyName("fixedZoomPart")]
+    public bool FixedZoomPart { get; set; } = false;
+
+    [JsonPropertyName("canvasPreset")]
+    public string CanvasPreset { get; set; } = "Default";
+
+    // --- Hareket Bulanıklığı ve Hız Detayları ---
+    [JsonPropertyName("zoomInMotionBlur")]
+    public bool ZoomInMotionBlur { get; set; } = true;
+
+    [JsonPropertyName("zoomInMotionBlurAmount")]
+    public double ZoomInMotionBlurAmount { get; set; } = 50;
+
+    [JsonPropertyName("screenMotionBlurAmount")]
+    public double ScreenMotionBlurAmount { get; set; } = 50;
+
+    [JsonPropertyName("cursorMotionBlurAmount")]
+    public double CursorMotionBlurAmount { get; set; } = 50;
+
+    [JsonPropertyName("zoomPanMovementType")]
+    public string ZoomPanMovementType { get; set; } = "Slow";
+
+    [JsonPropertyName("cursorMovementType")]
+    public string CursorMovementType { get; set; } = "Medium";
+
+    // --- Kısayol Tuşları Görünüm Detayları ---
+    [JsonPropertyName("shortcutKeyStyle")]
+    public string ShortcutKeyStyle { get; set; } = "filled";
+
+    [JsonPropertyName("shortcutFontColor")]
+    public string ShortcutFontColor { get; set; } = "#FFFFFF";
+
+    [JsonPropertyName("shortcutBgColor")]
+    public string ShortcutBgColor { get; set; } = "#000000";
+
+    [JsonPropertyName("shortcutBgOpacity")]
+    public int ShortcutBgOpacity { get; set; } = 80;
+
+    [JsonPropertyName("shortcutSize")]
+    public int ShortcutSize { get; set; } = 24;
+
+    [JsonPropertyName("shortcutPosition")]
+    public string ShortcutPosition { get; set; } = "bottom-center";
+
+    [JsonPropertyName("displaySingleShortcutKey")]
+    public bool DisplaySingleShortcutKey { get; set; } = false;
 }
 
 /// <summary>

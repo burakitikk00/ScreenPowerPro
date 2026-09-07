@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="ScreenPowerPro.Views.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Settings">
+
+    <Grid Background="#161720">
+        <Grid.RowDefinitions>
+            <!-- Title Bar & Drag Area -->
+            <RowDefinition Height="50" />
+            <!-- Tab Navigation Buttons -->
+            <RowDefinition Height="Auto" />
+            <!-- Tab Contents -->
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 1. Header with Title & Close Button -->
+        <Grid Grid.Row="0" x:Name="TitleBarGrid" Background="Transparent" Padding="24,12,16,8">
+            <!-- Centered Title -->
+            <TextBlock Text="Settings" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+            <!-- Close (X) Button at Top Right -->
+            <Button Click="OnCloseClicked"
+                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                    Background="Transparent" BorderThickness="0" CornerRadius="6"
+                    Width="32" Height="32" Padding="0">
+                <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="#8E8E9F" />
+            </Button>
+        </Grid>
+
+        <!-- 2. Navigation Tabs (Pill Buttons) -->
+        <Grid Grid.Row="1" Padding="24,4,24,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="BtnTabGeneral" Grid.Column="0" Click="OnTabGeneralClicked"
+                    Margin="0,0,6,0" HorizontalAlignment="Stretch" Height="38"
+                    CornerRadius="8" Background="#1E3A8A" BorderBrush="#2563EB" BorderThickness="1.5">
+                <TextBlock Text="General" FontSize="13" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center"/>
+            </Button>
+
+            <Button x:Name="BtnTabRecord" Grid.Column="1" Click="OnTabRecordClicked"
+                    Margin="3,0,3,0" HorizontalAlignment="Stretch" Height="38"
+                    CornerRadius="8" Background="#1B1C26" BorderBrush="#2A2B38" BorderThickness="1">
+                <TextBlock Text="Record" FontSize="13" FontWeight="SemiBold" Foreground="#A0A0B2" HorizontalAlignment="Center"/>
+            </Button>
+
+            <Button x:Name="BtnTabShortcuts" Grid.Column="2" Click="OnTabShortcutsClicked"
+                    Margin="3,0,3,0" HorizontalAlignment="Stretch" Height="38"
+                    CornerRadius="8" Background="#1B1C26" BorderBrush="#2A2B38" BorderThickness="1">
+                <TextBlock Text="Shortcut Keys" FontSize="13" FontWeight="SemiBold" Foreground="#A0A0B2" HorizontalAlignment="Center"/>
+            </Button>
+
+            <Button x:Name="BtnTabExport" Grid.Column="3" Click="OnTabExportClicked"
+                    Margin="6,0,0,0" HorizontalAlignment="Stretch" Height="38"
+                    CornerRadius="8" Background="#1B1C26" BorderBrush="#2A2B38" BorderThickness="1">
+                <TextBlock Text="Export" FontSize="13" FontWeight="SemiBold" Foreground="#A0A0B2" HorizontalAlignment="Center"/>
+            </Button>
+        </Grid>
+
+        <!-- 3. Tab Contents Area -->
+        <ScrollViewer Grid.Row="2" Padding="28,4,28,24" VerticalScrollBarVisibility="Auto">
+            <Grid>
+                <!-- ================= TAB 1: GENERAL ================= -->
+                <StackPanel x:Name="PanelTabGeneral" Visibility="Visible" Spacing="18">
+                    <!-- Save Location -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Save Location" FontSize="13" Foreground="#C7C4D7" FontWeight="Medium"/>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#101117" BorderBrush="#262736" BorderThickness="1" CornerRadius="8" Padding="12,10">
+                                <TextBlock x:Name="TbSaveLocation" Text="C:\ScreenPowerPro\Projects" FontSize="12" Foreground="#E3E1EC" TextTrimming="CharacterEllipsis"/>
+                            </Border>
+                            <Button Grid.Column="1" Click="OnBrowseSaveLocationClicked"
+                                    Width="42" Height="40" CornerRadius="8" Background="#1B1C26" BorderBrush="#2A2B38" BorderThickness="1">
+                                <FontIcon Glyph="&#xED43;" FontSize="15" Foreground="#93C5FD"/>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Export Location -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Export Location" FontSize="13" Foreground="#C7C4D7" FontWeight="Medium"/>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#101117" BorderBrush="#262736" BorderThickness="1" CornerRadius="8" Padding="12,10">
+                                <TextBlock x:Name="TbExportLocation" Text="C:\ScreenPowerPro\Exports" FontSize="12" Foreground="#E3E1EC" TextTrimming="CharacterEllipsis"/>
+                            </Border>
+                            <Button Grid.Column="1" Click="OnBrowseExportLocationClicked"
+                                    Width="42" Height="40" CornerRadius="8" Background="#1B1C26" BorderBrush="#2A2B38" BorderThickness="1">
+                                <FontIcon Glyph="&#xED43;" FontSize="15" Foreground="#93C5FD"/>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <Rectangle Height="1" Fill="#232432" Margin="0,4"/>
+
+                    <!-- Auto Start Toggle -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Auto Start" FontSize="13" Foreground="#E3E1EC" VerticalAlignment="Center"/>
+                        <ToggleSwitch Grid.Column="1" x:Name="SwitchAutoStart" Toggled="OnAutoStartToggled"
+                                      OnContent="" OffContent="" Margin="0,-6,0,-6"/>
+                    </Grid>
+
+                    <!-- Auto-play Video when entering editor -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Auto-play video when entering editor" FontSize="13" Foreground="#E3E1EC" VerticalAlignment="Center"/>
+                        <ToggleSwitch Grid.Column="1" x:Name="SwitchAutoPlayVideo" Toggled="OnAutoPlayVideoToggled"
+                                      OnContent="" OffContent="" Margin="0,-6,0,-6"/>
+                    </Grid>
+
+                    <Rectangle Height="1" Fill="#232432" Margin="0,4"/>
+
+                    <!-- Current Graphics Card Info -->
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="Current graphics card: click to view" FontSize="12" Foreground="#8E8E9F"/>
+                            <TextBlock Text="How to switch graphics card" FontSize="12" Foreground="#3B82F6" TextDecorations="Underline"/>
+                        </StackPanel>
+                        <Border HorizontalAlignment="Left" Background="#1B1C26" BorderBrush="#2A2B38" BorderThickness="1"
+                                CornerRadius="8" Padding="14,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE7F4;" FontSize="13" Foreground="#60A5FA"/>
+                                <TextBlock x:Name="TbGraphicsCard" Text="Detecting GPU..." FontSize="12" FontWeight="SemiBold" Foreground="#F3F4F6"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- ================= TAB 2: RECORD ================= -->
+                <StackPanel x:Name="PanelTabRecord" Visibility="Collapsed" Spacing="18">
+                    <!-- Auto-Add Zoom Effect -->
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="Auto-Add Zoom Effect" FontSize="13" Foreground="#C7C4D7" FontWeight="Medium"/>
+                            <FontIcon Glyph="&#xE946;" FontSize="12" Foreground="#8E8E9F" VerticalAlignment="Center" ToolTipService.ToolTip="Kayıt esnasında fare tıklamalarına göre akıllı zoom geçişi ekler."/>
+                        </StackPanel>
+                        <ComboBox x:Name="CmbZoomEffect" SelectionChanged="OnZoomEffectChanged"
+                                  HorizontalAlignment="Stretch" Background="#101117" BorderBrush="#262736" CornerRadius="8" Height="40">
+                            <ComboBoxItem Content="2D Zoom" />
+                            <ComboBoxItem Content="3D Motion" />
+                            <ComboBoxItem Content="None" />
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Hide Desktop Icons -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <TextBlock Text="Hide Desktop Icons" FontSize="13" Foreground="#E3E1EC"/>
+                            <FontIcon Glyph="&#xE946;" FontSize="12" Foreground="#8E8E9F" ToolTipService.ToolTip="Kayıt sırasında masaüstü simgelerini temiz ve profesyonel görünüm için gizler."/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" x:Name="SwitchHideDesktopIcons" Toggled="OnHideDesktopIconsToggled"
+                                      OnContent="" OffContent="" Margin="0,-6,0,-6"/>
+                    </Grid>
+
+                    <!-- Hide Taskbar -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <TextBlock Text="Hide Taskbar" FontSize="13" Foreground="#E3E1EC"/>
+                            <FontIcon Glyph="&#xE946;" FontSize="12" Foreground="#8E8E9F" ToolTipService.ToolTip="Kayıt esnasında Windows görev çubuğunu gizler."/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" x:Name="SwitchHideTaskbar" Toggled="OnHideTaskbarToggled"
+                                      OnContent="" OffContent="" Margin="0,-6,0,-6"/>
+                    </Grid>
+
+                    <Rectangle Height="1" Fill="#232432" Margin="0,4"/>
+
+                    <!-- Two-column: Recording Quality & Pre-Recording Countdown -->
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Recording Quality -->
+                        <StackPanel Grid.Column="0" Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Recording Quality" FontSize="13" Foreground="#C7C4D7" FontWeight="Medium"/>
+                                <FontIcon Glyph="&#xE946;" FontSize="12" Foreground="#8E8E9F" ToolTipService.ToolTip="Bitrate ve video kayıt keskinliği."/>
+                            </StackPanel>
+                            <ComboBox x:Name="CmbRecordingQuality" SelectionChanged="OnRecordingQualityChanged"
+                                      HorizontalAlignment="Stretch" Background="#101117" BorderBrush="#262736" CornerRadius="8" Height="40">
+                                <ComboBoxItem Content="Ultra" />
+                                <ComboBoxItem Content="High" />
+                                <ComboBoxItem Content="Medium" />
+                                <ComboBoxItem Content="Low" />
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Pre-Recording Countdown -->
+                        <StackPanel Grid.Column="1" Spacing="6">
+                            <TextBlock Text="Pre-Recording Countdown" FontSize="13" Foreground="#C7C4D7" FontWeight="Medium"/>
+                            <ComboBox x:Name="CmbCountdown" SelectionChanged="OnCountdownChanged"
+                                      HorizontalAlignment="Stretch" Background="#101117" BorderBrush="#262736" CornerRadius="8" Height="40">
+                                <ComboBoxItem Content="3s" />
+                                <ComboBoxItem Content="5s" />
+                                <ComboBoxItem Content="No countdown" />
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <!-- ================= TAB 3: SHORTCUT KEYS ================= -->
+                <StackPanel x:Name="PanelTabShortcuts" Visibility="Collapsed" Spacing="16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="140" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Start / Stop Recording" FontSize="13" Foreground="#E3E1EC" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" x:Name="TbShortcutStartStop" Text="F9" TextAlignment="Center"
+                                 Background="#101117" BorderBrush="#262736" CornerRadius="6" TextChanged="OnShortcutChanged"/>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="140" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Pause / Resume Recording" FontSize="13" Foreground="#E3E1EC" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" x:Name="TbShortcutPause" Text="F10" TextAlignment="Center"
+                                 Background="#101117" BorderBrush="#262736" CornerRadius="6" TextChanged="OnShortcutChanged"/>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="140" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Take Screenshot" FontSize="13" Foreground="#E3E1EC" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" x:Name="TbShortcutScreenshot" Text="F11" TextAlignment="Center"
+                                 Background="#101117" BorderBrush="#262736" CornerRadius="6" TextChanged="OnShortcutChanged"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- ================= TAB 4: EXPORT ================= -->
+                <StackPanel x:Name="PanelTabExport" Visibility="Collapsed" Spacing="16">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Video Format" FontSize="13" Foreground="#C7C4D7" FontWeight="Medium"/>
+                        <ComboBox x:Name="CmbExportFormat" SelectionChanged="OnExportSettingChanged"
+                                  HorizontalAlignment="Stretch" Background="#101117" BorderBrush="#262736" CornerRadius="8" Height="40">
+                            <ComboBoxItem Content="MP4" />
+                            <ComboBoxItem Content="MKV" />
+                            <ComboBoxItem Content="WebM" />
+                            <ComboBoxItem Content="GIF" />
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Export Resolution" FontSize="13" Foreground="#C7C4D7" FontWeight="Medium"/>
+                        <ComboBox x:Name="CmbExportResolution" SelectionChanged="OnExportSettingChanged"
+                                  HorizontalAlignment="Stretch" Background="#101117" BorderBrush="#262736" CornerRadius="8" Height="40">
+                            <ComboBoxItem Content="Original" />
+                            <ComboBoxItem Content="4K" />
+                            <ComboBoxItem Content="1080p" />
+                            <ComboBoxItem Content="720p" />
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Target Frame Rate" FontSize="13" Foreground="#C7C4D7" FontWeight="Medium"/>
+                        <ComboBox x:Name="CmbExportFps" SelectionChanged="OnExportSettingChanged"
+                                  HorizontalAlignment="Stretch" Background="#101117" BorderBrush="#262736" CornerRadius="8" Height="40">
+                            <ComboBoxItem Content="60 FPS" />
+                            <ComboBoxItem Content="30 FPS" />
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</Window>

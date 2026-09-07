@@ -210,7 +210,15 @@ public class ScreenRecorderService : IDisposable
                 videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -i desktop";
             }
 
-            string fullFfmpegArgs = $"-y {videoInputArgs} -c:v libx264 -preset ultrafast -tune zerolatency -crf 18 -pix_fmt yuv420p \"{_currentVideoPath}\"";
+            int crf = settings.RecordingQuality switch
+            {
+                "Ultra" => 15,
+                "High" => 18,
+                "Medium" => 23,
+                "Low" => 28,
+                _ => 18
+            };
+            string fullFfmpegArgs = $"-y {videoInputArgs} -c:v libx264 -preset ultrafast -tune zerolatency -crf {crf} -pix_fmt yuv420p \"{_currentVideoPath}\"";
 
             var psi = new ProcessStartInfo
             {

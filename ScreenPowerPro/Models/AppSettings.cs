@@ -53,6 +53,31 @@ public class AppSettings
     public string AutoZoomMode { get; set; } = "smooth";
 
     /// <summary>
+    /// UI ve ayarlar için Zoom Effect: "2D Zoom", "3D Motion", "None"
+    /// </summary>
+    [JsonPropertyName("zoomEffect")]
+    public string ZoomEffect
+    {
+        get => AutoZoomMode switch
+        {
+            "smooth" => "2D Zoom",
+            "instant" => "3D Motion",
+            "none" => "None",
+            _ => "2D Zoom"
+        };
+        set
+        {
+            AutoZoomMode = value switch
+            {
+                "2D Zoom" => "smooth",
+                "3D Motion" => "instant",
+                "None" => "none",
+                _ => "smooth"
+            };
+        }
+    }
+
+    /// <summary>
     /// Geriye dönük uyumluluk için boolean AutoZoom özelliği.
     /// </summary>
     [JsonPropertyName("autoZoom")]
@@ -61,6 +86,42 @@ public class AppSettings
         get => !string.Equals(AutoZoomMode, "none", StringComparison.OrdinalIgnoreCase);
         set => AutoZoomMode = value ? "smooth" : "none";
     }
+
+    /// <summary>
+    /// Windows ile birlikte otomatik başlatma tercihi.
+    /// </summary>
+    [JsonPropertyName("autoStart")]
+    public bool AutoStart { get; set; } = false;
+
+    /// <summary>
+    /// Editör açıldığında videonun otomatik oynatılması tercihi.
+    /// </summary>
+    [JsonPropertyName("autoPlayVideo")]
+    public bool AutoPlayVideo { get; set; } = true;
+
+    /// <summary>
+    /// Kayıt kalitesi: "Ultra", "High", "Medium", "Low"
+    /// </summary>
+    [JsonPropertyName("recordingQuality")]
+    public string RecordingQuality { get; set; } = "High";
+
+    /// <summary>
+    /// Kaydı Başlat/Durdur kısayolu (örn. F9).
+    /// </summary>
+    [JsonPropertyName("shortcutStartStop")]
+    public string ShortcutStartStop { get; set; } = "F9";
+
+    /// <summary>
+    /// Kaydı Duraklat/Devam Et kısayolu (örn. F10).
+    /// </summary>
+    [JsonPropertyName("shortcutPause")]
+    public string ShortcutPause { get; set; } = "F10";
+
+    /// <summary>
+    /// Ekran görüntüsü alma kısayolu (örn. F11).
+    /// </summary>
+    [JsonPropertyName("shortcutScreenshot")]
+    public string ShortcutScreenshot { get; set; } = "F11";
 
     /// <summary>
     /// Kayıt esnasında masaüstü simgelerini gizleme tercihi.

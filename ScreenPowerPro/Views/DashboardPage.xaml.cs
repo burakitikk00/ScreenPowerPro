@@ -96,11 +96,110 @@ public sealed partial class DashboardPage : Page
 
     #region Recording Mode Cards
 
-    private void OnModeCardClicked(object sender, PointerRoutedEventArgs e)
+    private void OnModeCardPointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border card)
+        {
+            // Mavi hover çerçevesi
+            card.BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 59, 130, 246)); // #3B82F6 Bright Blue
+            card.BorderThickness = new Thickness(2);
+        }
+    }
+
+    private void OnModeCardPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border card && card.Tag is string tag)
+        {
+            // Eğer aktif seçili mod değilse pasif kenarlığa geri dön
+            if (tag != _activeMode)
+            {
+                ResetCardBorder(card);
+            }
+            else
+            {
+                card.BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 37, 99, 235)); // #2563EB Active Blue
+                card.BorderThickness = new Thickness(2);
+            }
+        }
+    }
+
+    private async void OnModeCardClicked(object sender, PointerRoutedEventArgs e)
     {
         if (sender is Border card && card.Tag is string mode)
         {
             SelectMode(mode);
+            await LaunchRecordingSetupModeAsync(mode);
+        }
+    }
+
+    private async Task LaunchRecordingSetupModeAsync(string mode)
+    {
+        // 1. Dashboard penceresini simge durumuna küçült / gizle
+        if (MainWindow.CurrentInstance != null)
+        {
+            var appWin = MainWindow.CurrentInstance.AppWindow;
+            if (appWin.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.Minimize();
+            }
+        }
+
+        if (mode == "CustomArea")
+        {
+            // Bölge seçim penceresini aç
+            var regionWindow = new RegionSelectionWindow();
+            regionWindow.Activate();
+            var rect = await regionWindow.WaitForSelectionAsync();
+
+            if (rect.HasValue)
+            {
+                var r = rect.Value;
+                ViewModel.SelectedMode = RecordingMode.Region;
+                ViewModel.LastCropX = (int)r.X;
+                ViewModel.LastCropY = (int)r.Y;
+                ViewModel.LastCropWidth = (int)r.Width;
+                ViewModel.LastCropHeight = (int)r.Height;
+
+                // Seçilen özel bölgenin etrafında kesikli mavi çerçeve göster
+                var borderWin = new FullScreenBorderWindow(new RectInt32((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height));
+                borderWin.Activate();
+
+                // 2. Sayfa: Alt yüzen kurulum araç çubuğu
+                var toolbarWin = new RecordingSetupToolbarWindow();
+                toolbarWin.Activate();
+            }
+            else
+            {
+                // Kullanıcı iptal etti, Dashboard'u geri getir
+                RestoreMainWindow();
+            }
+        }
+        else
+        {
+            // FullScreen / Window / Device
+            if (mode == "FullScreen" || mode == "Device")
+            {
+                // Tam ekran çerçevesini kesikli çizgilerle göster
+                var borderWin = new FullScreenBorderWindow();
+                borderWin.Activate();
+            }
+
+            // 2. Sayfa: Alt yüzen kurulum araç çubuğunu aç
+            var toolbarWin = new RecordingSetupToolbarWindow();
+            toolbarWin.Activate();
+        }
+    }
+
+    private void RestoreMainWindow()
+    {
+        if (MainWindow.CurrentInstance != null)
+        {
+            var appWin = MainWindow.CurrentInstance.AppWindow;
+            if (appWin.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.Restore();
+            }
+            MainWindow.CurrentInstance.Activate();
         }
     }
 
@@ -421,7 +520,8 @@ public sealed partial class DashboardPage : Page
 
     private void OnSettingsClicked(object sender, RoutedEventArgs e)
     {
-        Frame.Navigate(typeof(SettingsPage));
+        var settingsWin = new SettingsWindow();
+        settingsWin.Activate();
     }
 
     private void OnStartRecordingClicked(object sender, RoutedEventArgs e)

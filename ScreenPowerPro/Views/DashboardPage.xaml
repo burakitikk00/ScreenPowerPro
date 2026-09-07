@@ -202,6 +202,8 @@
                         Background="#121319"
                         BorderBrush="#2563EB"
                         BorderThickness="2"
+                        PointerEntered="OnModeCardPointerEntered"
+                        PointerExited="OnModeCardPointerExited"
                         PointerPressed="OnModeCardClicked"
                         Tag="FullScreen">
                         <Grid Padding="8,8" RowSpacing="6">
@@ -247,6 +249,8 @@
                         Background="#121319"
                         BorderBrush="#1F202B"
                         BorderThickness="1"
+                        PointerEntered="OnModeCardPointerEntered"
+                        PointerExited="OnModeCardPointerExited"
                         PointerPressed="OnModeCardClicked"
                         Tag="CustomArea">
                         <Grid Padding="8,8" RowSpacing="6">
@@ -288,6 +292,8 @@
                         Background="#121319"
                         BorderBrush="#1F202B"
                         BorderThickness="1"
+                        PointerEntered="OnModeCardPointerEntered"
+                        PointerExited="OnModeCardPointerExited"
                         PointerPressed="OnModeCardClicked"
                         Tag="Window">
                         <Grid Padding="8,8" RowSpacing="6">
@@ -337,6 +343,8 @@
                         Background="#121319"
                         BorderBrush="#1F202B"
                         BorderThickness="1"
+                        PointerEntered="OnModeCardPointerEntered"
+                        PointerExited="OnModeCardPointerExited"
                         PointerPressed="OnModeCardClicked"
                         Tag="Device">
                         <Grid Padding="8,8" RowSpacing="6">
@@ -525,44 +533,20 @@
                         </Button>
                     </Grid>
 
-                    <!-- 4. Tool & Start Recording Compact Action Bar -->
-                    <Grid Margin="0,2,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Teleprompter Tool Button -->
-                        <Button Grid.Column="0" Click="OnTeleprompterClicked"
-                            Background="#171821" BorderBrush="#252733" BorderThickness="1"
-                            CornerRadius="7" Height="32" Padding="8,0" Margin="0,0,6,0"
-                            ToolTipService.ToolTip="Teleprompter">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Border Width="16" Height="16" CornerRadius="3" Background="#33C0C1FF">
-                                    <TextBlock Text="A" FontSize="9" FontWeight="Bold" Foreground="#C0C1FF"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <TextBlock Text="Prompter" FontSize="11" FontWeight="SemiBold" Foreground="#E3E1EC"/>
-                            </StackPanel>
-                        </Button>
-
-                        <!-- Start Recording Action Button -->
-                        <Button Grid.Column="1" Click="OnStartRecordingClicked"
-                            Height="32" CornerRadius="7"
-                            HorizontalAlignment="Stretch"
-                            BorderThickness="0">
-                            <Button.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                    <GradientStop Color="#DC2626" Offset="0.0"/>
-                                    <GradientStop Color="#EA580C" Offset="1.0"/>
-                                </LinearGradientBrush>
-                            </Button.Background>
-                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                                <Ellipse Width="8" Height="8" Fill="White"/>
-                                <TextBlock Text="Start Recording" FontSize="12" FontWeight="Bold" Foreground="White"/>
-                            </StackPanel>
-                        </Button>
-                    </Grid>
+                    <!-- 4. Teleprompter Tool Button (Start button replaced by direct mode setup toolbar) -->
+                    <Button Click="OnTeleprompterClicked"
+                        Background="#171821" BorderBrush="#252733" BorderThickness="1"
+                        CornerRadius="7" Height="32" Padding="12,0" Margin="0,2,0,0"
+                        HorizontalAlignment="Stretch"
+                        ToolTipService.ToolTip="Teleprompter">
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                            <Border Width="18" Height="18" CornerRadius="4" Background="#33C0C1FF">
+                                <TextBlock Text="A" FontSize="10" FontWeight="Bold" Foreground="#C0C1FF"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Teleprompter" FontSize="11" FontWeight="SemiBold" Foreground="#E3E1EC"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Grid>

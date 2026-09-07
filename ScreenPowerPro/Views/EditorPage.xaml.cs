@@ -238,6 +238,13 @@ public sealed partial class EditorPage : Page
                     UpdateFromViewModel();
                     RenderTimeline();
                 }
+
+                // Otomatik oynatma ayarı aktifse başlat
+                var settings = App.Current.Services.GetRequiredService<SettingsService>().Current;
+                if (settings.AutoPlayVideo)
+                {
+                    StartPlayback();
+                }
             }
         });
     }

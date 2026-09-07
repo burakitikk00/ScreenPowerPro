@@ -64,10 +64,10 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<ProjectInfo> _recentProjects = new();
 
-    public int LastCropX { get; private set; }
-    public int LastCropY { get; private set; }
-    public int LastCropWidth { get; private set; }
-    public int LastCropHeight { get; private set; }
+    public int LastCropX { get; set; }
+    public int LastCropY { get; set; }
+    public int LastCropWidth { get; set; }
+    public int LastCropHeight { get; set; }
 
     public event Action<string>? RequestStartRecording; // passes projectDir
 
@@ -232,29 +232,39 @@ public partial class DashboardViewModel : ObservableObject
 
         if (SelectedMode == RecordingMode.Region)
         {
-            var regionWindow = new Views.RegionSelectionWindow();
-            regionWindow.Activate();
-
-            var result = await regionWindow.WaitForSelectionAsync();
-            if (result == null)
+            if (LastCropWidth > 0 && LastCropHeight > 0)
             {
-                // User cancelled region selection
-                return;
+                cropX = LastCropX;
+                cropY = LastCropY;
+                cropW = LastCropWidth;
+                cropH = LastCropHeight;
             }
+            else
+            {
+                var regionWindow = new Views.RegionSelectionWindow();
+                regionWindow.Activate();
 
-            cropX = (int)result.Value.X;
-            cropY = (int)result.Value.Y;
-            cropW = (int)result.Value.Width;
-            cropH = (int)result.Value.Height;
-            
-            // Ensure even numbers for video dimensions (FFmpeg x264 requirement)
-            if (cropW % 2 != 0) cropW++;
-            if (cropH % 2 != 0) cropH++;
+                var result = await regionWindow.WaitForSelectionAsync();
+                if (result == null)
+                {
+                    // User cancelled region selection
+                    return;
+                }
 
-            LastCropX = cropX;
-            LastCropY = cropY;
-            LastCropWidth = cropW;
-            LastCropHeight = cropH;
+                cropX = (int)result.Value.X;
+                cropY = (int)result.Value.Y;
+                cropW = (int)result.Value.Width;
+                cropH = (int)result.Value.Height;
+                
+                // Ensure even numbers for video dimensions (FFmpeg x264 requirement)
+                if (cropW % 2 != 0) cropW++;
+                if (cropH % 2 != 0) cropH++;
+
+                LastCropX = cropX;
+                LastCropY = cropY;
+                LastCropWidth = cropW;
+                LastCropHeight = cropH;
+            }
         }
 
         // 1. Create project dir

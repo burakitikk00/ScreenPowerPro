@@ -13,11 +13,15 @@ public partial class App : Application
     public IServiceProvider Services { get; }
     public static new App Current => (App)Application.Current;
 
+    public static bool ShowIntegratedGpuWarning { get; set; }
+
     public App()
     {
         ScreenPowerPro.Helpers.AppLog.InitializeConsole();
         ScreenPowerPro.Helpers.AppLog.Info("Uygulama başlatılıyor (App ctor)...");
-        new GpuOptimizationService().Initialize();
+        var gpuService = new GpuOptimizationService();
+        gpuService.Initialize();
+        ShowIntegratedGpuWarning = gpuService.IsRunningOnIntegratedGpu;
 
         UnhandledException += (s, e) =>
         {

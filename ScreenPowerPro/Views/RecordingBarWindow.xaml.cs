@@ -38,6 +38,10 @@ public sealed partial class RecordingBarWindow : Window
         // 1. Çubuğun kendi video kaydında görünmemesi için WDA_EXCLUDEFROMCAPTURE uygula
         Win32Helper.SetWindowDisplayAffinity(_hwnd, Win32Helper.WDA_EXCLUDEFROMCAPTURE);
 
+        // 2. Pencereyi aktifleştirilmez (WS_EX_NOACTIVATE) yap ki focus çalmasın (fare titremesini önler)
+        long style = Win32Helper.GetWindowLongPtr(_hwnd, Win32Helper.GWL_EXSTYLE).ToInt64();
+        Win32Helper.SetWindowLongPtr(_hwnd, Win32Helper.GWL_EXSTYLE, new IntPtr(style | Win32Helper.WS_EX_NOACTIVATE));
+
         // 2. Pencereyi kompakt, çerçevesiz ve her zaman üstte (AlwaysOnTop) yap
         var appWindow = AppWindow;
         if (appWindow.Presenter is OverlappedPresenter presenter)

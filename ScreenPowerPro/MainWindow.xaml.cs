@@ -92,22 +92,29 @@ public sealed partial class MainWindow : Window
     {
         AppLog.Event("NAV", "DashboardPage sayfasına geçiliyor.");
         ResizeForDashboard();
-        RootFrame.Navigate(typeof(DashboardPage));
+        RootFrame.Navigate(typeof(DashboardPage), null, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
     }
 
     public void NavigateToLibrary()
     {
         AppLog.Event("NAV", "LibraryPage sayfasına geçiliyor.");
-        RootFrame.Navigate(typeof(LibraryPage));
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.Restore();
+            presenter.IsResizable = true;
+            presenter.IsMaximizable = true;
+        }
+        ResizeAndCenter(1160, 600);
+        RootFrame.Navigate(typeof(LibraryPage), null, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
     }
 
     public void NavigateToEditor(string projectDir)
     {
-        AppLog.Event("NAV", $"NavigateToEditor çağrıldı. Hedef proje: '{projectDir}'");
+        AppLog.Event("NAV", $"EditorPage sayfasına geçiliyor. Proje: {projectDir}");
         try
         {
             ResizeForEditor();
-            bool result = RootFrame.Navigate(typeof(EditorPage), projectDir);
+            bool result = RootFrame.Navigate(typeof(EditorPage), projectDir, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
             AppLog.Success($"EditorPage navigasyonu tamamlandı (Result: {result}).");
         }
         catch (Exception ex)
@@ -119,12 +126,26 @@ public sealed partial class MainWindow : Window
     public void NavigateToExport(string projectDir)
     {
         AppLog.Event("NAV", $"ExportPage sayfasına geçiliyor (Proje: '{projectDir}').");
-        RootFrame.Navigate(typeof(ExportPage), projectDir);
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.Restore();
+            presenter.IsResizable = true;
+            presenter.IsMaximizable = true;
+        }
+        ResizeAndCenter(1000, 650);
+        RootFrame.Navigate(typeof(ExportPage), projectDir, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
     }
 
     public void NavigateToExport(ScreenPowerPro.Models.ExportOptions options)
     {
         AppLog.Event("NAV", "ExportPage sayfasına geçiliyor (ExportOptions).");
-        RootFrame.Navigate(typeof(ExportPage), options);
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.Restore();
+            presenter.IsResizable = true;
+            presenter.IsMaximizable = true;
+        }
+        ResizeAndCenter(1000, 650);
+        RootFrame.Navigate(typeof(ExportPage), options, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
     }
 }

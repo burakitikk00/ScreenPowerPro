@@ -175,10 +175,30 @@ public sealed partial class EditorPage : Page
         catch { }
     }
 
+    private void OnDismissGpuWarning(object sender, RoutedEventArgs e)
+    {
+        if (GpuWarningBanner != null)
+        {
+            GpuWarningBanner.Visibility = Visibility.Collapsed;
+        }
+
+        if (CbDontShowGpuWarning != null && CbDontShowGpuWarning.IsChecked == true)
+        {
+            Windows.Storage.ApplicationData.Current.LocalSettings.Values["HideGpuWarning"] = true;
+        }
+    }
+
     private async void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         _isPageLoaded = true;
         AppLog.Info("[EditorPage] OnPageLoaded tetiklendi. Bileşenler bağlanıyor...");
+
+        // GPU Uyarı kontrolü
+        bool hideGpuWarning = Windows.Storage.ApplicationData.Current.LocalSettings.Values["HideGpuWarning"] as bool? ?? false;
+        if (App.ShowIntegratedGpuWarning && GpuWarningBanner != null && !hideGpuWarning)
+        {
+            GpuWarningBanner.Visibility = Visibility.Visible;
+        }
 
         _videoAudioAnimTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _videoAudioAnimTimer.Tick += OnVideoAudioAnimTick;
@@ -2509,6 +2529,31 @@ public sealed partial class EditorPage : Page
         OnTimelinePointerPressed(sender, e);
     }
 
+    private void OnToggleClickLaneClicked(object sender, RoutedEventArgs e)
+    {
+        if (ClickTrack != null)
+        {
+            if (ClickTrack.Visibility == Visibility.Visible)
+            {
+                ClickTrack.Visibility = Visibility.Collapsed;
+                if (IconToggleClickLane != null) IconToggleClickLane.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 120, 120, 120)); // Muted
+                if (TimelineContentGrid != null && TimelineContentGrid.RowDefinitions.Count > 4)
+                {
+                    TimelineContentGrid.RowDefinitions[4].Height = new GridLength(0);
+                }
+            }
+            else
+            {
+                ClickTrack.Visibility = Visibility.Visible;
+                if (IconToggleClickLane != null) IconToggleClickLane.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 210, 255)); // Accent
+                if (TimelineContentGrid != null && TimelineContentGrid.RowDefinitions.Count > 4)
+                {
+                    TimelineContentGrid.RowDefinitions[4].Height = new GridLength(48);
+                }
+            }
+        }
+    }
+
     private void OnTimelinePointerMoved(object sender, PointerRoutedEventArgs e)
     {
         if (_isDraggingPlayhead && sender is UIElement element)
@@ -2939,26 +2984,36 @@ public sealed partial class EditorPage : Page
         }
     }
 
+    private bool _isInitializingClickSound = false;
+
     private void InitializeClickSoundUI()
     {
-        if (ComboClickSounds != null)
+        _isInitializingClickSound = true;
+        try
         {
-            ComboClickSounds.ItemsSource = ClickSoundService.Instance.AvailableSounds;
-            var currentSound = ClickSoundService.Instance.GetSoundByFileName(ViewModel?.CursorClickSoundFile);
-            ComboClickSounds.SelectedItem = currentSound ?? ClickSoundService.Instance.AvailableSounds.FirstOrDefault();
-        }
+            if (ComboClickSounds != null)
+            {
+                ComboClickSounds.ItemsSource = ClickSoundService.Instance.AvailableSounds;
+                var currentSound = ClickSoundService.Instance.GetSoundByFileName(ViewModel?.CursorClickSoundFile);
+                ComboClickSounds.SelectedItem = currentSound ?? ClickSoundService.Instance.AvailableSounds.FirstOrDefault();
+            }
 
-        if (PanelClickSoundDetails != null && ViewModel != null)
+            if (PanelClickSoundDetails != null && ViewModel != null)
+            {
+                PanelClickSoundDetails.Visibility = ViewModel.CursorClickSound ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (TbCursorSoundVolText != null && ViewModel != null)
+            {
+                TbCursorSoundVolText.Text = $"{(int)ViewModel.CursorClickVolume}%";
+            }
+
+            UpdateClickIconState();
+        }
+        finally
         {
-            PanelClickSoundDetails.Visibility = ViewModel.CursorClickSound ? Visibility.Visible : Visibility.Collapsed;
+            _isInitializingClickSound = false;
         }
-
-        if (TbCursorSoundVolText != null && ViewModel != null)
-        {
-            TbCursorSoundVolText.Text = $"{(int)ViewModel.CursorClickVolume}%";
-        }
-
-        UpdateClickIconState();
     }
 
     private void OnClickTrackVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -3077,6 +3132,17 @@ public sealed partial class EditorPage : Page
         bool isOn = TsCursorSound?.IsOn ?? false;
         ViewModel.CursorClickSound = isOn;
         if (PanelClickSoundDetails != null) PanelClickSoundDetails.Visibility = isOn ? Visibility.Visible : Visibility.Collapsed;
+        
+        if (isOn && ClickTrack != null && ClickTrack.Visibility == Visibility.Collapsed)
+        {
+            ClickTrack.Visibility = Visibility.Visible;
+            if (IconToggleClickLane != null) IconToggleClickLane.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 210, 255)); // Accent
+            if (TimelineContentGrid != null && TimelineContentGrid.RowDefinitions.Count > 4)
+            {
+                TimelineContentGrid.RowDefinitions[4].Height = new GridLength(48);
+            }
+        }
+
         UpdateClickIconState();
         ViewModel.SaveProject();
     }
@@ -3092,7 +3158,7 @@ public sealed partial class EditorPage : Page
 
     private void OnComboClickSoundsSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_isPageLoaded || ViewModel == null) return;
+        if (!_isPageLoaded || ViewModel == null || _isInitializingClickSound) return;
         if (ComboClickSounds?.SelectedItem is ClickSoundItem sound)
         {
             ViewModel.CursorClickSoundFile = sound.FileName;

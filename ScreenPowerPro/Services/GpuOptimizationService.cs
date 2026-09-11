@@ -30,12 +30,19 @@ public class GpuOptimizationService
     public string? DedicatedGpuName { get; private set; }
     public List<string> DetectedGpus { get; } = new();
 
+    public bool IsRunningOnIntegratedGpu { get; private set; }
+    public bool RequiresRestartForGpuChange { get; private set; }
+
     public void Initialize()
     {
         try
         {
             DetectGpus();
             EnforceHighPerformancePreference();
+
+            // Entegre GPU'da çalışıp çalışmadığını belirle
+            // Harici GPU yoksa veya harici GPU var ama registry ayarı yeni yapıldıysa (yeniden başlatma gerekiyorsa)
+            IsRunningOnIntegratedGpu = !HasDedicatedGpu || RequiresRestartForGpuChange;
         }
         catch (Exception ex)
         {
@@ -89,13 +96,18 @@ public class GpuOptimizationService
             {
                 const string prefValue = "GpuPreference=2;AutoCrossAdapter=1;";
                 var currentVal = key.GetValue(exePath) as string;
-                if (currentVal == null || !currentVal.Contains("GpuPreference=2"))
+                
+                bool wasAlreadySet = currentVal != null && currentVal.Contains("GpuPreference=2");
+                
+                if (!wasAlreadySet)
                 {
                     key.SetValue(exePath, prefValue, RegistryValueKind.String);
-                    AppLog.Info($"[GPU] Windows Grafik Tercihi Yüksek Performans olarak ayarlandı: {exePath} -> {prefValue}");
+                    RequiresRestartForGpuChange = true;
+                    AppLog.Info($"[GPU] Windows Grafik Tercihi Yüksek Performans olarak ayarlandı: {exePath} -> {prefValue}. Yeniden başlatma gerekiyor.");
                 }
                 else
                 {
+                    RequiresRestartForGpuChange = false;
                     AppLog.Info($"[GPU] Windows Grafik Tercihi zaten Yüksek Performans modunda: {exePath}");
                 }
             }

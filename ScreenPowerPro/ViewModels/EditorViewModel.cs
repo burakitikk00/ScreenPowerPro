@@ -452,6 +452,37 @@ public partial class EditorViewModel : ObservableObject
         set { if (Settings.DisplaySingleShortcutKey != value) { Settings.DisplaySingleShortcutKey = value; OnPropertyChanged(); } }
     }
 
+    // --- Dinamik Zoom Ayarları (Global SettingsManager üzerinden) ---
+    public string ZoomEasingFunction
+    {
+        get => SettingsManager.Instance.ZoomEasingFunction;
+        set { if (SettingsManager.Instance.ZoomEasingFunction != value) { SettingsManager.Instance.ZoomEasingFunction = value; OnPropertyChanged(); } }
+    }
+
+    public double ZoomSpeedMs
+    {
+        get => SettingsManager.Instance.ZoomSpeed * 1000.0;
+        set { if (Math.Abs(SettingsManager.Instance.ZoomSpeed * 1000.0 - value) > 0.01) { SettingsManager.Instance.ZoomSpeed = value / 1000.0; OnPropertyChanged(); } }
+    }
+
+    public double ZoomHoldDurationSec
+    {
+        get => SettingsManager.Instance.ZoomDuration;
+        set { if (Math.Abs(SettingsManager.Instance.ZoomDuration - value) > 0.01) { SettingsManager.Instance.ZoomDuration = value; OnPropertyChanged(); } }
+    }
+
+    public double ZoomMaxScale
+    {
+        get => SettingsManager.Instance.MaxZoomRatio;
+        set { if (Math.Abs(SettingsManager.Instance.MaxZoomRatio - value) > 0.01) { SettingsManager.Instance.MaxZoomRatio = value; OnPropertyChanged(); } }
+    }
+
+    public int PreClickAnticipationMs
+    {
+        get => SettingsManager.Instance.PreClickAnticipationMs;
+        set { if (SettingsManager.Instance.PreClickAnticipationMs != value) { SettingsManager.Instance.PreClickAnticipationMs = value; OnPropertyChanged(); } }
+    }
+
     // --- Geri Alma / Yineleme Durum Bayrakları ---
     public bool CanUndo => _historyIndex > 0;
     public bool CanRedo => _historyIndex >= 0 && _historyIndex < _history.Count - 1;
@@ -897,21 +928,21 @@ public partial class EditorViewModel : ObservableObject
 
             if (SelectedTrackType == "video" || (inVideo && !inMic && !inSys))
             {
-                VideoTrack.Clips = RemoveClipAndShift(VideoTrack.Clips, cid);
+                VideoTrack.Clips = RemoveClip(VideoTrack.Clips, cid);
             }
             else if (SelectedTrackType == "mic" || (inMic && !inVideo && !inSys))
             {
-                MicTrack.Clips = RemoveClipAndShift(MicTrack.Clips, cid);
+                MicTrack.Clips = RemoveClip(MicTrack.Clips, cid);
             }
             else if (SelectedTrackType == "sys" || (inSys && !inVideo && !inMic))
             {
-                SysTrack.Clips = RemoveClipAndShift(SysTrack.Clips, cid);
+                SysTrack.Clips = RemoveClip(SysTrack.Clips, cid);
             }
             else
             {
-                if (inVideo) VideoTrack.Clips = RemoveClipAndShift(VideoTrack.Clips, cid);
-                if (inMic) MicTrack.Clips = RemoveClipAndShift(MicTrack.Clips, cid);
-                if (inSys) SysTrack.Clips = RemoveClipAndShift(SysTrack.Clips, cid);
+                if (inVideo) VideoTrack.Clips = RemoveClip(VideoTrack.Clips, cid);
+                if (inMic) MicTrack.Clips = RemoveClip(MicTrack.Clips, cid);
+                if (inSys) SysTrack.Clips = RemoveClip(SysTrack.Clips, cid);
             }
 
             SelectedClipId = null;
@@ -927,27 +958,9 @@ public partial class EditorViewModel : ObservableObject
         }
     }
 
-    private static List<ClipSegment> RemoveClipAndShift(List<ClipSegment> clips, string clipId)
+    private static List<ClipSegment> RemoveClip(List<ClipSegment> clips, string clipId)
     {
-        int idx = clips.FindIndex(c => c.Id == clipId);
-        if (idx == -1) return clips;
-
-        var removed = clips[idx];
-        double removedDuration = removed.SourceEnd - removed.SourceStart;
-        var newClips = new List<ClipSegment>();
-
-        for (int i = 0; i < clips.Count; i++)
-        {
-            if (i == idx) continue;
-            var c = clips[i];
-            if (c.TrackOffset > removed.TrackOffset)
-            {
-                c.TrackOffset = Math.Max(0, c.TrackOffset - removedDuration);
-            }
-            newClips.Add(c);
-        }
-
-        return newClips;
+        return clips.Where(c => c.Id != clipId).ToList();
     }
 
     /// <summary>

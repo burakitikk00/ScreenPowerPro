@@ -1178,7 +1178,90 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <FontIcon Glyph="&#xE71E;" FontSize="16" Foreground="{StaticResource TertiaryBrush}"/>
-                                        <TextBlock x:Name="TbTitleZoomProps" Text="ZOOM PROPERTIES" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                        <TextBlock x:Name="TbTitleZoomProps" Text="ZOOM SETTINGS" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
+                                            Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                                
+                                <!-- Global Dynamic Zoom Settings -->
+                                <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="14"
+                                    BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                    <StackPanel Spacing="14">
+                                        
+                                        <!-- Easing Function -->
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="Animasyon Eğrisi (Easing)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <ComboBox x:Name="CbZoomEasing" SelectedItem="{x:Bind ViewModel.ZoomEasingFunction, Mode=TwoWay}" HorizontalAlignment="Stretch" Background="{StaticResource SurfaceContainerLowestBrush}">
+                                                <x:String>Linear</x:String>
+                                                <x:String>Quad-Out</x:String>
+                                                <x:String>Cubic-Out</x:String>
+                                                <x:String>Quartic-Out</x:String>
+                                            </ComboBox>
+                                        </StackPanel>
+
+                                        <!-- Zoom Speed (Duration) ms -->
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Yakınlaştırma Hızı" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock Text="{x:Bind ViewModel.ZoomSpeedMs, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
+                                            </Grid>
+                                            <Slider Minimum="200" Maximum="1500" Value="{x:Bind ViewModel.ZoomSpeedMs, Mode=TwoWay}" StepFrequency="50"/>
+                                        </StackPanel>
+
+                                        <!-- Zoom Hold Duration s -->
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Odakta Kalma Süresi (sn)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock Text="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
+                                            </Grid>
+                                            <Slider Minimum="0.5" Maximum="10.0" Value="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=TwoWay}" StepFrequency="0.5"/>
+                                        </StackPanel>
+
+                                        <!-- Max Scale -->
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Maksimum Büyütme" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock Text="{x:Bind ViewModel.ZoomMaxScale, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
+                                            </Grid>
+                                            <Slider Minimum="1.0" Maximum="3.0" Value="{x:Bind ViewModel.ZoomMaxScale, Mode=TwoWay}" StepFrequency="0.1"/>
+                                        </StackPanel>
+
+                                        <!-- Pre-Click Anticipation -->
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Tıklama Öncesi Odak (ms)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock Text="{x:Bind ViewModel.PreClickAnticipationMs, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
+                                            </Grid>
+                                            <Slider Minimum="0" Maximum="1000" Value="{x:Bind ViewModel.PreClickAnticipationMs, Mode=TwoWay}" StepFrequency="50"/>
+                                        </StackPanel>
+
+                                    </StackPanel>
+                                </Border>
+
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE71E;" FontSize="16" Foreground="{StaticResource TertiaryBrush}"/>
+                                        <TextBlock Text="SEÇİLİ ZOOM" FontSize="12" FontWeight="Bold" CharacterSpacing="50"
                                             Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <Button Grid.Column="1" Background="Transparent" BorderThickness="0" Padding="4"
@@ -1280,6 +1363,15 @@
                                     <CompositeTransform x:Name="VideoTransform" ScaleX="1.0" ScaleY="1.0" TranslateX="0" TranslateY="0"/>
                                 </MediaPlayerElement.RenderTransform>
                             </MediaPlayerElement>
+
+                            <!-- Pure Black Screen Overlay for Timeline Gaps -->
+                            <Border
+                                x:Name="BlackGapOverlay"
+                                Background="#000000"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                Visibility="Collapsed"
+                                IsHitTestVisible="False"/>
 
                             <!-- Dynamic Cursor & Click Effect Overlay Canvas -->
                             <Canvas x:Name="CursorOverlayCanvas"
@@ -1419,7 +1511,7 @@
                                     Foreground="{StaticResource TextPrimaryBrush}"/>
                             </Button>
                             <Button x:Name="BtnDeleteZoom" Style="{StaticResource IconButtonStyle}" Click="OnDeleteZoomClicked"
-                                ToolTipService.ToolTip="Kırpılan Parçayı / Efekti Sil (Del)">
+                                ToolTipService.ToolTip="Seçili Klibi veya Efekti Sil (Del / Çöp Kutusu)">
                                 <FontIcon Glyph="&#xE74D;" FontSize="15"
                                     Foreground="{StaticResource ErrorBrush}"/>
                             </Button>
@@ -1472,9 +1564,42 @@
                                             Foreground="{StaticResource TextPrimaryBrush}"/>
                                     </Button>
                                     <Rectangle Width="1" Height="20" Fill="{StaticResource GlassBorderBrush}" Margin="4,0"/>
+                                    
+                                    <!-- Dynamic Audio Volume Flyout Button -->
                                     <Button x:Name="BtnMuteAudio" Style="{StaticResource PlayControlStyle}"
-                                        Click="OnMuteClicked" ToolTipService.ToolTip="Tüm Sesleri Kapat">
-                                        <FontIcon x:Name="MuteIcon" Glyph="&#xE767;" FontSize="16"
+                                        ToolTipService.ToolTip="Ses Seviyesi ve Ayarları">
+                                        <Button.Flyout>
+                                            <Flyout x:Name="VolumeFlyout" Placement="Top">
+                                                <Border Background="#1E1F2A" CornerRadius="10" Padding="14,12"
+                                                        BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"
+                                                        Width="250">
+                                                    <StackPanel Spacing="10">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <Button x:Name="BtnFlyoutMuteToggle" Click="OnFlyoutMuteToggleClicked"
+                                                                    Style="{StaticResource IconButtonStyle}" Width="28" Height="28">
+                                                                <FontIcon x:Name="FlyoutMuteIcon" Glyph="&#xE995;" FontSize="15"
+                                                                          Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                                            </Button>
+                                                            <TextBlock Text="Master Ses" FontSize="12" FontWeight="SemiBold"
+                                                                       VerticalAlignment="Center" Margin="6,0,0,0" Grid.Column="1"
+                                                                       Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                            <TextBlock x:Name="TbVolumePercent" Text="100%" FontSize="12"
+                                                                       FontFamily="Consolas" Grid.Column="2"
+                                                                       VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </Grid>
+                                                        <Slider x:Name="MasterVolumeSlider" Minimum="0" Maximum="100" Value="100"
+                                                                ValueChanged="OnMasterVolumeSliderChanged"
+                                                                HorizontalAlignment="Stretch"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Flyout>
+                                        </Button.Flyout>
+                                        <FontIcon x:Name="MuteIcon" Glyph="&#xE995;" FontSize="16"
                                             Foreground="{StaticResource TextPrimaryBrush}"/>
                                     </Button>
                                 </StackPanel>

@@ -262,4 +262,16 @@ public class AppSettings
     /// </summary>
     [JsonPropertyName("cancelOnOutOfBounds")]
     public bool CancelOnOutOfBounds { get; set; } = true;
+
+    /// <summary>
+    /// Zoom animasyonu öncesi hazırlık/odak süresi (milisaniye).
+    /// </summary>
+    [JsonPropertyName("preClickAnticipationMs")]
+    public int PreClickAnticipationMs { get; set; } = 200;
+
+    /// <summary>
+    /// Zoom animasyon eğrisi/matematiği (Linear, Quad-Out, Cubic-Out, Quartic-Out).
+    /// </summary>
+    [JsonPropertyName("zoomEasingFunction")]
+    public string ZoomEasingFunction { get; set; } = "Cubic-Out";
 }

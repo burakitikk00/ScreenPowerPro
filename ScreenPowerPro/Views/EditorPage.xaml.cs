@@ -70,6 +70,8 @@ public sealed partial class EditorPage : Page
     private double _naturalVideoWidth = 1920.0;
     private double _naturalVideoHeight = 1080.0;
     private double _lastTriggeredClickTimestamp = -1.0;
+    private DateTime _lastPlaybackTick = DateTime.UtcNow;
+    private double _savedMasterVolume = 100.0;
 
     private static Geometry? _arrowGeometry;
     private static Geometry? _crosshairGeometry;
@@ -149,6 +151,7 @@ public sealed partial class EditorPage : Page
         SetSidebarTab("cursor");
         InitializeCursorOverlay();
         SyncCursorButtons();
+        SyncMotionSettings();
 
         if (TimelineScrollViewer != null)
         {
@@ -189,6 +192,10 @@ public sealed partial class EditorPage : Page
                      args.PropertyName == nameof(EditorViewModel.CursorClickSound))
             {
                 SyncCursorButtons();
+            }
+            else if (args.PropertyName == nameof(EditorViewModel.CursorMovementType))
+            {
+                SyncMotionSettings();
             }
         };
 
@@ -376,12 +383,21 @@ public sealed partial class EditorPage : Page
             if (player != null)
             {
                 player.AutoPlay = false;
+                if (player.PlaybackSession != null)
+                {
+                    player.PlaybackSession.PlaybackRate = 1.0;
+                }
                 player.MediaEnded -= OnMediaPlayerEnded;
                 player.MediaEnded += OnMediaPlayerEnded;
                 player.MediaOpened -= OnMediaPlayerOpened;
                 player.MediaOpened += OnMediaPlayerOpened;
                 player.MediaFailed -= OnMediaPlayerFailed;
                 player.MediaFailed += OnMediaPlayerFailed;
+            }
+
+            if (ViewModel != null && Math.Abs(ViewModel.VideoSpeed - 1.0) > 0.01)
+            {
+                ViewModel.VideoSpeed = 1.0;
             }
 
             // Mikrofon ses çalarını başlat
@@ -534,7 +550,14 @@ public sealed partial class EditorPage : Page
         if (PanelTabCanvas != null) PanelTabCanvas.Visibility = (tabTag == "canvas") ? Visibility.Visible : Visibility.Collapsed;
         if (PanelTabAudio != null) PanelTabAudio.Visibility = (tabTag == "audio") ? Visibility.Visible : Visibility.Collapsed;
         if (PanelTabKeys != null) PanelTabKeys.Visibility = (tabTag == "keys") ? Visibility.Visible : Visibility.Collapsed;
-        if (PanelTabMotion != null) PanelTabMotion.Visibility = (tabTag == "motion") ? Visibility.Visible : Visibility.Collapsed;
+        if (PanelTabMotion != null)
+        {
+            PanelTabMotion.Visibility = (tabTag == "motion") ? Visibility.Visible : Visibility.Collapsed;
+            if (tabTag == "motion")
+            {
+                SyncMotionSettings();
+            }
+        }
         if (PanelTabCamera != null) PanelTabCamera.Visibility = (tabTag == "camera") ? Visibility.Visible : Visibility.Collapsed;
         if (PanelTabVolume != null) PanelTabVolume.Visibility = (tabTag == "volume") ? Visibility.Visible : Visibility.Collapsed;
         if (PanelTabWatermark != null) PanelTabWatermark.Visibility = (tabTag == "watermark") ? Visibility.Visible : Visibility.Collapsed;
@@ -851,12 +874,54 @@ public sealed partial class EditorPage : Page
         }
     }
 
+    private List<double> GetTimelineSnapPoints(object? excludeItem = null)
+    {
+        var snaps = new HashSet<double>
+        {
+            0.0,
+            _currentTimeSeconds
+        };
+        if (_totalDurationSeconds > 0) snaps.Add(_totalDurationSeconds);
+
+        if (ViewModel?.VideoTrack?.Clips != null)
+        {
+            foreach (var c in ViewModel.VideoTrack.Clips)
+            {
+                if (c == excludeItem) continue;
+                snaps.Add(c.TrackOffset);
+                snaps.Add(c.TrackOffset + Math.Max(0, c.SourceEnd - c.SourceStart));
+            }
+        }
+
+        if (ViewModel?.MicTrack?.Clips != null)
+        {
+            foreach (var c in ViewModel.MicTrack.Clips)
+            {
+                if (c == excludeItem) continue;
+                snaps.Add(c.TrackOffset);
+                snaps.Add(c.TrackOffset + Math.Max(0, c.SourceEnd - c.SourceStart));
+            }
+        }
+
+        if (ViewModel?.ZoomEffects != null)
+        {
+            foreach (var z in ViewModel.ZoomEffects)
+            {
+                if (z == excludeItem) continue;
+                snaps.Add(z.StartTime);
+                snaps.Add(z.StartTime + z.Duration);
+            }
+        }
+
+        return snaps.ToList();
+    }
+
     private void AddClipVisualBlock(ClipSegment clip, int clipIndex, bool isAudioTrack)
     {
         Canvas targetCanvas = isAudioTrack ? AudioTrack : VideoTrack;
         double duration = Math.Max(0.1, clip.SourceEnd - clip.SourceStart);
-        double startX = 40 + clip.TrackOffset * _timelineScale;
-        double width = Math.Max(duration * _timelineScale, 24);
+        double startX = TimelineMathService.TimeToPixel(clip.TrackOffset, _timelineScale);
+        double width = TimelineMathService.DurationToWidth(duration, _timelineScale, 24);
         double height = isAudioTrack ? 46 : 56;
         double top = isAudioTrack ? 5 : 8;
 
@@ -868,13 +933,14 @@ public sealed partial class EditorPage : Page
             Height = height,
             CornerRadius = new CornerRadius(6),
             Background = isAudioTrack
-                ? (isSelected ? new SolidColorBrush(Color.FromArgb(70, 34, 197, 94)) : new SolidColorBrush(Color.FromArgb(35, 34, 197, 94)))
-                : (isSelected ? new SolidColorBrush(Color.FromArgb(90, 128, 131, 255)) : new SolidColorBrush(Color.FromArgb(50, 128, 131, 255))),
+                ? (isSelected ? new SolidColorBrush(Color.FromArgb(95, 34, 197, 94)) : new SolidColorBrush(Color.FromArgb(45, 34, 197, 94)))
+                : (isSelected ? new SolidColorBrush(Color.FromArgb(115, 128, 131, 255)) : new SolidColorBrush(Color.FromArgb(55, 128, 131, 255))),
             BorderBrush = isSelected
-                ? new SolidColorBrush(isAudioTrack ? Color.FromArgb(255, 74, 222, 128) : Color.FromArgb(255, 192, 193, 255))
+                ? new SolidColorBrush(isAudioTrack ? Color.FromArgb(255, 74, 222, 128) : Color.FromArgb(255, 216, 218, 255))
                 : new SolidColorBrush(isAudioTrack ? Color.FromArgb(120, 34, 197, 94) : Color.FromArgb(120, 192, 193, 255)),
-            BorderThickness = isSelected ? new Thickness(2) : new Thickness(1),
-            Tag = clip
+            BorderThickness = isSelected ? new Thickness(2.5) : new Thickness(1),
+            Tag = clip,
+            IsHitTestVisible = true
         };
 
         var contentGrid = new Grid();
@@ -906,7 +972,7 @@ public sealed partial class EditorPage : Page
                     Height = barH,
                     RadiusX = 1,
                     RadiusY = 1,
-                    Fill = new SolidColorBrush(isSelected ? Color.FromArgb(230, 220, 255, 220) : Color.FromArgb(160, 74, 222, 128))
+                    Fill = new SolidColorBrush(isSelected ? Color.FromArgb(240, 220, 255, 220) : Color.FromArgb(160, 74, 222, 128))
                 };
                 Canvas.SetLeft(bar, b * 3);
                 Canvas.SetTop(bar, (44 - barH) / 2.0);
@@ -915,7 +981,7 @@ public sealed partial class EditorPage : Page
             contentGrid.Children.Add(waveformCanvas);
         }
 
-        // 2. Klip etiketi (Başlık ve Süre)
+        // 2. Klip etiketi (Başlık ve Süre) - Üzerinde veya içinde ASLA 'X' butonu YOK!
         var label = new TextBlock
         {
             Text = isAudioTrack
@@ -924,35 +990,61 @@ public sealed partial class EditorPage : Page
             FontSize = 10,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = isAudioTrack
-                ? new SolidColorBrush(Color.FromArgb(255, 220, 255, 230))
-                : new SolidColorBrush(Color.FromArgb(255, 192, 193, 255)),
-            Margin = new Thickness(10, 4, 10, 0),
+                ? new SolidColorBrush(Color.FromArgb(255, 230, 255, 235))
+                : new SolidColorBrush(Color.FromArgb(255, 220, 222, 255)),
+            Margin = new Thickness(14, 4, 14, 0),
             VerticalAlignment = VerticalAlignment.Top,
             IsHitTestVisible = false
         };
         contentGrid.Children.Add(label);
 
-        // 3. Sol ve Sağ Trim Tutamaçları
+        // 3. Profesyonel NLE Sol ve Sağ Kırpma (Trim Edge Handles) Tutamaçları
         var leftHandle = new Border
         {
-            Width = 8,
+            Width = 10,
             HorizontalAlignment = HorizontalAlignment.Left,
-            Background = new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)),
-            CornerRadius = new CornerRadius(4, 0, 0, 4)
+            Background = isSelected
+                ? new SolidColorBrush(Color.FromArgb(90, 255, 255, 255))
+                : new SolidColorBrush(Color.FromArgb(35, 255, 255, 255)),
+            CornerRadius = new CornerRadius(5, 0, 0, 5),
+            IsHitTestVisible = false,
+            Child = new Border
+            {
+                Width = 2,
+                Height = 16,
+                Background = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                CornerRadius = new CornerRadius(1)
+            }
         };
+
         var rightHandle = new Border
         {
-            Width = 8,
+            Width = 10,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Background = new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)),
-            CornerRadius = new CornerRadius(0, 4, 4, 0)
+            Background = isSelected
+                ? new SolidColorBrush(Color.FromArgb(90, 255, 255, 255))
+                : new SolidColorBrush(Color.FromArgb(35, 255, 255, 255)),
+            CornerRadius = new CornerRadius(0, 5, 5, 0),
+            IsHitTestVisible = false,
+            Child = new Border
+            {
+                Width = 2,
+                Height = 16,
+                Background = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                CornerRadius = new CornerRadius(1)
+            }
         };
+
         contentGrid.Children.Add(leftHandle);
         contentGrid.Children.Add(rightHandle);
 
         clipBlock.Child = contentGrid;
 
-        // ETKİLEŞİM: Sürükleme (Drag), Kırpma (Trim) ve Ctrl+Click ile Kesme Noktası Taşıma
+        // ETKİLEŞİM: Sürükle-Bırak (Drag & Drop), Manyetik Yapışma (Snapping), Kenar Kırpma (Trimming)
         bool isMoving = false;
         bool isTrimmingLeft = false;
         bool isTrimmingRight = false;
@@ -968,6 +1060,7 @@ public sealed partial class EditorPage : Page
 
             ViewModel.SelectedClipId = clip.Id;
             ViewModel.SelectedTrackType = isAudioTrack ? "mic" : "video";
+            _selectedZoom = null;
             RenderTimeline();
 
             var ptr = e.GetCurrentPoint(targetCanvas);
@@ -981,10 +1074,9 @@ public sealed partial class EditorPage : Page
             var ctrlState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
             bool isCtrl = (ctrlState & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
 
-            // Ctrl + Click kesme noktası taşıma kontrolü
-            if (isCtrl && localPt.X <= 16 && clipIndex > 0)
+            // Ctrl + Click ile bitişik iki klibin arayüz kesme noktasını birlikte taşıma
+            if (isCtrl && localPt.X <= 14 && clipIndex > 0)
             {
-                // Sol kesme noktası
                 var trackClips = isAudioTrack ? ViewModel.MicTrack.Clips : ViewModel.VideoTrack.Clips;
                 _isDraggingCutPoint = true;
                 _cutTrackType = isAudioTrack ? "mic" : "video";
@@ -997,11 +1089,11 @@ public sealed partial class EditorPage : Page
                 return;
             }
 
-            if (localPt.X <= 10)
+            if (localPt.X <= 12)
             {
                 isTrimmingLeft = true;
             }
-            else if (localPt.X >= clipBlock.Width - 10)
+            else if (localPt.X >= clipBlock.Width - 12)
             {
                 isTrimmingRight = true;
             }
@@ -1016,7 +1108,8 @@ public sealed partial class EditorPage : Page
             if (_isDraggingCutPoint && _cutLeftClip != null && _cutRightClip != null)
             {
                 var ptr = e.GetCurrentPoint(targetCanvas);
-                double dt = (ptr.Position.X - _cutDragStartPoint.X) / _timelineScale;
+                double rawDx = ptr.Position.X - _cutDragStartPoint.X;
+                double dt = rawDx / _timelineScale;
                 double maxLeftShift = _cutLeftClip.SourceEnd - _cutLeftClip.SourceStart - 0.2;
                 double maxRightShift = _cutRightClip.SourceEnd - _cutRightClip.SourceStart - 0.2;
 
@@ -1033,46 +1126,98 @@ public sealed partial class EditorPage : Page
             if (isMoving)
             {
                 var ptr = e.GetCurrentPoint(targetCanvas);
-                double dt = (ptr.Position.X - startPt.X) / _timelineScale;
-                clip.TrackOffset = Math.Max(0, Math.Round(origOffset + dt, 2));
-                Canvas.SetLeft(clipBlock, 40 + clip.TrackOffset * _timelineScale);
+                double rawDx = ptr.Position.X - startPt.X;
+                double curDur = clip.SourceEnd - clip.SourceStart;
+                double candidateOffset = Math.Max(0, origOffset + (rawDx / _timelineScale));
+
+                // 10-15 Piksel Manyetik Yapışma (Magnetic Snapping)
+                var snapPoints = GetTimelineSnapPoints(clip);
+                var (snapL, snapTimeL) = TimelineMathService.FindSnapTime(candidateOffset, snapPoints, _timelineScale, 15.0);
+                if (snapL)
+                {
+                    candidateOffset = snapTimeL;
+                }
+                else
+                {
+                    var (snapR, snapTimeR) = TimelineMathService.FindSnapTime(candidateOffset + curDur, snapPoints, _timelineScale, 15.0);
+                    if (snapR)
+                    {
+                        candidateOffset = Math.Max(0, snapTimeR - curDur);
+                    }
+                }
+
+                clip.TrackOffset = Math.Max(0, Math.Round(candidateOffset, 2));
+                Canvas.SetLeft(clipBlock, TimelineMathService.TimeToPixel(clip.TrackOffset, _timelineScale));
             }
             else if (isTrimmingLeft)
             {
+                // Sol kenardan kırpma (In-Point değiştirme)
                 var ptr = e.GetCurrentPoint(targetCanvas);
-                double dt = (ptr.Position.X - startPt.X) / _timelineScale;
-                double maxTrim = origEnd - origStart - 0.2;
-                dt = Math.Clamp(dt, -origOffset, maxTrim);
+                double rawDx = ptr.Position.X - startPt.X;
+                double candidateOffset = Math.Max(0, origOffset + (rawDx / _timelineScale));
+
+                var snapPoints = GetTimelineSnapPoints(clip);
+                var (snapped, snapTime) = TimelineMathService.FindSnapTime(candidateOffset, snapPoints, _timelineScale, 15.0);
+                if (snapped) candidateOffset = snapTime;
+
+                double dt = candidateOffset - origOffset;
+                double maxRightTrim = origEnd - origStart - 0.2;
+                dt = Math.Clamp(dt, -origStart, maxRightTrim);
 
                 clip.SourceStart = Math.Round(origStart + dt, 2);
                 clip.TrackOffset = Math.Round(origOffset + dt, 2);
 
-                double newDur = clip.SourceEnd - clip.SourceStart;
-                clipBlock.Width = Math.Max(newDur * _timelineScale, 20);
-                Canvas.SetLeft(clipBlock, 40 + clip.TrackOffset * _timelineScale);
+                double newDur = Math.Max(0.2, clip.SourceEnd - clip.SourceStart);
+                clipBlock.Width = TimelineMathService.DurationToWidth(newDur, _timelineScale, 24);
+                Canvas.SetLeft(clipBlock, TimelineMathService.TimeToPixel(clip.TrackOffset, _timelineScale));
+                label.Text = isAudioTrack
+                    ? $"Audio #{clipIndex + 1} ({newDur:F1}s)"
+                    : $"Video #{clipIndex + 1} ({newDur:F1}s)";
             }
             else if (isTrimmingRight)
             {
+                // Sağ kenardan kırpma (Out-Point değiştirme)
                 var ptr = e.GetCurrentPoint(targetCanvas);
-                double dt = (ptr.Position.X - startPt.X) / _timelineScale;
-                double maxTrim = _totalDurationSeconds - origEnd;
-                dt = Math.Clamp(dt, -(origEnd - origStart - 0.2), maxTrim);
+                double rawDx = ptr.Position.X - startPt.X;
+                double origDur = origEnd - origStart;
+                double candidateEndOffset = origOffset + origDur + (rawDx / _timelineScale);
+
+                var snapPoints = GetTimelineSnapPoints(clip);
+                var (snapped, snapTime) = TimelineMathService.FindSnapTime(candidateEndOffset, snapPoints, _timelineScale, 15.0);
+                if (snapped) candidateEndOffset = snapTime;
+
+                double dt = candidateEndOffset - (origOffset + origDur);
+                double maxExtend = Math.Max(1000, _totalDurationSeconds * 2) - origEnd;
+                dt = Math.Clamp(dt, -(origDur - 0.2), maxExtend);
 
                 clip.SourceEnd = Math.Round(origEnd + dt, 2);
-                double newDur = clip.SourceEnd - clip.SourceStart;
-                clipBlock.Width = Math.Max(newDur * _timelineScale, 20);
+                double newDur = Math.Max(0.2, clip.SourceEnd - clip.SourceStart);
+                clipBlock.Width = TimelineMathService.DurationToWidth(newDur, _timelineScale, 24);
+                label.Text = isAudioTrack
+                    ? $"Audio #{clipIndex + 1} ({newDur:F1}s)"
+                    : $"Video #{clipIndex + 1} ({newDur:F1}s)";
             }
         };
 
         clipBlock.PointerReleased += (s, e) =>
         {
             clipBlock.ReleasePointerCapture(e.Pointer);
+
+            if (isMoving)
+            {
+                // Klipler taşındığında veya araya bırakıldığında sıralamayı (Order) güncelle
+                var trackClips = isAudioTrack ? ViewModel.MicTrack.Clips : ViewModel.VideoTrack.Clips;
+                trackClips.Sort((a, b) => a.TrackOffset.CompareTo(b.TrackOffset));
+            }
+
             if (isMoving || isTrimmingLeft || isTrimmingRight || _isDraggingCutPoint)
             {
                 ViewModel.PushHistory();
                 ViewModel.SaveProject();
                 RenderTimeline();
+                UpdateGapBlackScreen();
             }
+
             isMoving = false;
             isTrimmingLeft = false;
             isTrimmingRight = false;
@@ -1099,8 +1244,8 @@ public sealed partial class EditorPage : Page
 
     private Border AddZoomPill(ZoomEffect zoom)
     {
-        double x = 40 + zoom.StartTime * _timelineScale;
-        double width = Math.Max(zoom.Duration * _timelineScale, 20);
+        double x = TimelineMathService.TimeToPixel(zoom.StartTime, _timelineScale);
+        double width = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 24);
 
         bool isSelected = _selectedZoom == zoom;
 
@@ -1110,122 +1255,195 @@ public sealed partial class EditorPage : Page
             Height = 34,
             CornerRadius = new CornerRadius(17),
             Background = isSelected
-                ? new SolidColorBrush(Color.FromArgb(100, 208, 188, 255))
-                : new SolidColorBrush(Color.FromArgb(50, 160, 120, 255)),
+                ? new SolidColorBrush(Color.FromArgb(120, 208, 188, 255))
+                : new SolidColorBrush(Color.FromArgb(55, 160, 120, 255)),
             BorderBrush = isSelected
                 ? new SolidColorBrush(Color.FromArgb(255, 208, 188, 255))
-                : new SolidColorBrush(Color.FromArgb(128, 208, 188, 255)),
-            BorderThickness = isSelected ? new Thickness(2) : new Thickness(1),
+                : new SolidColorBrush(Color.FromArgb(130, 208, 188, 255)),
+            BorderThickness = isSelected ? new Thickness(2.5) : new Thickness(1),
             Tag = zoom,
             IsHitTestVisible = true
         };
 
+        var contentGrid = new Grid();
+
+        // 1. Zoom Etiketi
         var label = new TextBlock
         {
-            Text = $"{zoom.Scale:F1}x",
+            Text = $"{zoom.Name} ({zoom.Scale:F1}x)",
             FontSize = 11,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromArgb(255, 208, 188, 255)),
+            Foreground = new SolidColorBrush(Color.FromArgb(255, 235, 225, 255)),
             HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false
+        };
+        contentGrid.Children.Add(label);
+
+        // 2. Sol Kenar Tutamacı (In-Point / Start Time Trimming)
+        var leftHandle = new Border
+        {
+            Width = 10,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Background = isSelected
+                ? new SolidColorBrush(Color.FromArgb(80, 255, 255, 255))
+                : new SolidColorBrush(Colors.Transparent),
+            CornerRadius = new CornerRadius(17, 0, 0, 17),
+            IsHitTestVisible = false,
+            Child = new Border
+            {
+                Width = 2,
+                Height = 14,
+                Background = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                CornerRadius = new CornerRadius(1)
+            }
         };
 
-        if (isSelected)
+        // 3. Sağ Kenar Tutamacı (Out-Point / Duration Trimming)
+        var rightHandle = new Border
         {
-            var grid = new Grid();
-            grid.Children.Add(label);
-
-            var closeBtn = new Button
+            Width = 10,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Background = isSelected
+                ? new SolidColorBrush(Color.FromArgb(80, 255, 255, 255))
+                : new SolidColorBrush(Colors.Transparent),
+            CornerRadius = new CornerRadius(0, 17, 17, 0),
+            IsHitTestVisible = false,
+            Child = new Border
             {
-                Content = new FontIcon { Glyph = "\uE711", FontSize = 10, Foreground = new SolidColorBrush(Color.FromArgb(200, 208, 188, 255)) },
-                Background = new SolidColorBrush(Color.FromArgb(150, 208, 188, 255)),
-                BorderThickness = new Thickness(0),
-                Width = 18,
-                Height = 18,
-                CornerRadius = new CornerRadius(9),
-                Padding = new Thickness(0),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, -4, -4, 0),
-                Tag = zoom
-            };
-            closeBtn.Click += (s, e) => { if (s is Button b && b.Tag is ZoomEffect z) DeleteZoom(z); };
-            grid.Children.Add(closeBtn);
+                Width = 2,
+                Height = 14,
+                Background = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                CornerRadius = new CornerRadius(1)
+            }
+        };
 
-            var resizeHandle = new Border
+        // DİKKAT: Üzerinde / içinde kesinlikle bir "X" (silme) butonu YOKTUR!
+        contentGrid.Children.Add(leftHandle);
+        contentGrid.Children.Add(rightHandle);
+
+        pill.Child = contentGrid;
+
+        bool isDragging = false;
+        bool isTrimmingLeft = false;
+        bool isTrimmingRight = false;
+        Point startPoint = default;
+        double origStart = 0;
+        double origDur = 0;
+
+        pill.PointerPressed += (s, e) =>
+        {
+            e.Handled = true;
+            SelectZoom(zoom);
+            ViewModel.SelectedClipId = null;
+
+            var ptr = e.GetCurrentPoint(ZoomTrack);
+            startPoint = ptr.Position;
+            origStart = zoom.StartTime;
+            origDur = zoom.Duration;
+
+            var localPt = e.GetCurrentPoint(pill).Position;
+
+            if (localPt.X <= 12)
             {
-                Width = 8,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Background = new SolidColorBrush(Colors.Transparent)
-            };
-            grid.Children.Add(resizeHandle);
-
-            pill.Child = grid;
-
-            bool isDragging = false;
-            bool isResizing = false;
-            Point startPoint = default;
-            double initialX = 0;
-            double initialWidth = 0;
-
-            pill.PointerPressed += (s, e) =>
+                isTrimmingLeft = true;
+            }
+            else if (localPt.X >= pill.Width - 12)
             {
-                e.Handled = true;
-                SelectZoom(zoom);
-                var ptr = e.GetCurrentPoint(ZoomTrack);
-                startPoint = ptr.Position;
-                initialX = Canvas.GetLeft(pill);
-                initialWidth = pill.Width;
+                isTrimmingRight = true;
+            }
+            else
+            {
+                isDragging = true;
+            }
 
-                if (e.GetCurrentPoint(pill).Position.X >= pill.Width - 8)
+            pill.CapturePointer(e.Pointer);
+        };
+
+        pill.PointerMoved += (s, e) =>
+        {
+            var ptr = e.GetCurrentPoint(ZoomTrack);
+            double rawDx = ptr.Position.X - startPoint.X;
+
+            if (isDragging)
+            {
+                double candidateStart = Math.Max(0, origStart + (rawDx / _timelineScale));
+                var snapPoints = GetTimelineSnapPoints(zoom);
+
+                // Sol kenar yapışması
+                var (snapL, snapTimeL) = TimelineMathService.FindSnapTime(candidateStart, snapPoints, _timelineScale, 15.0);
+                if (snapL)
                 {
-                    isResizing = true;
+                    candidateStart = snapTimeL;
                 }
                 else
                 {
-                    isDragging = true;
+                    // Sağ kenar yapışması
+                    var (snapR, snapTimeR) = TimelineMathService.FindSnapTime(candidateStart + origDur, snapPoints, _timelineScale, 15.0);
+                    if (snapR)
+                    {
+                        candidateStart = Math.Max(0, snapTimeR - origDur);
+                    }
                 }
-                pill.CapturePointer(e.Pointer);
-            };
 
-            pill.PointerMoved += (s, e) =>
+                zoom.StartTime = Math.Max(0, Math.Round(candidateStart, 2));
+                Canvas.SetLeft(pill, TimelineMathService.TimeToPixel(zoom.StartTime, _timelineScale));
+                if (NbZoomStart != null) NbZoomStart.Value = zoom.StartTime;
+                if (NbZoomEnd != null) NbZoomEnd.Value = zoom.StartTime + zoom.Duration;
+            }
+            else if (isTrimmingLeft)
             {
-                if (isDragging)
-                {
-                    var ptr = e.GetCurrentPoint(ZoomTrack);
-                    double dx = ptr.Position.X - startPoint.X;
-                    double newX = Math.Max(40, initialX + dx);
-                    Canvas.SetLeft(pill, newX);
-                    zoom.StartTime = (newX - 40) / _timelineScale;
-                    NbZoomStart.Value = zoom.StartTime;
-                }
-                else if (isResizing)
-                {
-                    var ptr = e.GetCurrentPoint(ZoomTrack);
-                    double dx = ptr.Position.X - startPoint.X;
-                    double newWidth = Math.Max(20, initialWidth + dx);
-                    pill.Width = newWidth;
-                    zoom.Duration = newWidth / _timelineScale;
-                    NbZoomEnd.Value = zoom.StartTime + zoom.Duration;
-                }
-            };
+                double candidateStart = origStart + (rawDx / _timelineScale);
+                var snapPoints = GetTimelineSnapPoints(zoom);
+                var (snapped, snapTime) = TimelineMathService.FindSnapTime(candidateStart, snapPoints, _timelineScale, 15.0);
+                if (snapped) candidateStart = snapTime;
 
-            pill.PointerReleased += (s, e) =>
+                double fixedEnd = origStart + origDur;
+                candidateStart = Math.Clamp(candidateStart, 0, fixedEnd - 0.2);
+
+                zoom.StartTime = Math.Round(candidateStart, 2);
+                zoom.Duration = Math.Round(fixedEnd - zoom.StartTime, 2);
+
+                pill.Width = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 24);
+                Canvas.SetLeft(pill, TimelineMathService.TimeToPixel(zoom.StartTime, _timelineScale));
+                if (NbZoomStart != null) NbZoomStart.Value = zoom.StartTime;
+                if (NbZoomEnd != null) NbZoomEnd.Value = zoom.StartTime + zoom.Duration;
+            }
+            else if (isTrimmingRight)
             {
-                isDragging = false;
-                isResizing = false;
-                pill.ReleasePointerCapture(e.Pointer);
-            };
-        }
-        else
+                double candidateEnd = (origStart + origDur) + (rawDx / _timelineScale);
+                var snapPoints = GetTimelineSnapPoints(zoom);
+                var (snapped, snapTime) = TimelineMathService.FindSnapTime(candidateEnd, snapPoints, _timelineScale, 15.0);
+                if (snapped) candidateEnd = snapTime;
+
+                candidateEnd = Math.Max(zoom.StartTime + 0.2, candidateEnd);
+                zoom.Duration = Math.Round(candidateEnd - zoom.StartTime, 2);
+
+                pill.Width = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 24);
+                if (NbZoomEnd != null) NbZoomEnd.Value = zoom.StartTime + zoom.Duration;
+            }
+        };
+
+        pill.PointerReleased += (s, e) =>
         {
-            pill.Child = label;
-            pill.PointerPressed += (s, e) =>
+            pill.ReleasePointerCapture(e.Pointer);
+
+            if (isDragging || isTrimmingLeft || isTrimmingRight)
             {
-                e.Handled = true;
-                SelectZoom(zoom);
-            };
-        }
+                ViewModel.PushHistory();
+                ViewModel.SaveProject();
+                RenderTimeline();
+                UpdateZoomSimulation();
+            }
+
+            isDragging = false;
+            isTrimmingLeft = false;
+            isTrimmingRight = false;
+        };
 
         Canvas.SetLeft(pill, x);
         Canvas.SetTop(pill, 11);
@@ -1260,13 +1478,71 @@ public sealed partial class EditorPage : Page
 
     private void DeleteZoom(ZoomEffect zoom)
     {
-        ViewModel?.ZoomEffects?.Remove(zoom);
+        if (ViewModel?.ZoomEffects == null) return;
+        ViewModel.PushHistory();
+        ViewModel.ZoomEffects.Remove(zoom);
         if (_selectedZoom == zoom)
         {
             _selectedZoom = null;
             ZoomLevelBadge.Text = "1.0x";
         }
+        ViewModel.SaveProject();
         RenderZoomPills();
+        UpdateZoomSimulation();
+    }
+
+    private bool IsCurrentTimeInVideoGap(double time)
+    {
+        if (ViewModel?.VideoTrack?.Clips == null || ViewModel.VideoTrack.Clips.Count == 0)
+            return true;
+
+        foreach (var clip in ViewModel.VideoTrack.Clips)
+        {
+            double start = clip.TrackOffset;
+            double end = clip.TrackOffset + Math.Max(0.01, clip.SourceEnd - clip.SourceStart);
+            if (time >= start && time < end)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void UpdateGapBlackScreen()
+    {
+        if (BlackGapOverlay == null) return;
+        bool isGap = IsCurrentTimeInVideoGap(_currentTimeSeconds);
+        BlackGapOverlay.Visibility = isGap ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!isGap && ViewModel?.VideoTrack?.Clips != null)
+        {
+            var activeClip = ViewModel.VideoTrack.Clips.FirstOrDefault(c =>
+                _currentTimeSeconds >= c.TrackOffset &&
+                _currentTimeSeconds < c.TrackOffset + (c.SourceEnd - c.SourceStart));
+
+            if (activeClip != null && VideoPlayer?.MediaPlayer != null)
+            {
+                double sourceTime = activeClip.SourceStart + (_currentTimeSeconds - activeClip.TrackOffset);
+                var targetTs = TimeSpan.FromSeconds(Math.Max(0, sourceTime));
+                if (Math.Abs((VideoPlayer.MediaPlayer.Position - targetTs).TotalMilliseconds) > 300)
+                {
+                    try { VideoPlayer.MediaPlayer.Position = targetTs; } catch { }
+                }
+
+                if (_isPlaying && VideoPlayer.MediaPlayer.PlaybackSession.PlaybackState != Windows.Media.Playback.MediaPlaybackState.Playing)
+                {
+                    try { VideoPlayer.MediaPlayer.Play(); } catch { }
+                }
+            }
+        }
+        else if (isGap)
+        {
+            if (VideoPlayer?.MediaPlayer != null && VideoPlayer.MediaPlayer.PlaybackSession.CanPause &&
+                VideoPlayer.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing)
+            {
+                try { VideoPlayer.MediaPlayer.Pause(); } catch { }
+            }
+        }
     }
 
     private void OnZoomTrackDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
@@ -1310,10 +1586,20 @@ public sealed partial class EditorPage : Page
 
         _isPlaying = true;
         _lastTriggeredClickTimestamp = -1;
+        _lastPlaybackTick = DateTime.UtcNow;
         PlayPauseIcon.Glyph = "\uE769";
         if (PlayOverlay != null) PlayOverlay.Opacity = 0;
 
-        try { VideoPlayer?.MediaPlayer?.Play(); } catch { }
+        UpdateGapBlackScreen();
+
+        try
+        {
+            if (!IsCurrentTimeInVideoGap(_currentTimeSeconds))
+            {
+                VideoPlayer?.MediaPlayer?.Play();
+            }
+        }
+        catch { }
 
         try
         {
@@ -1353,9 +1639,14 @@ public sealed partial class EditorPage : Page
 
     private void OnPlaybackTimerTick(object? sender, object e)
     {
-        if (VideoPlayer?.MediaPlayer == null) return;
-        var pos = VideoPlayer.MediaPlayer.Position;
-        _currentTimeSeconds = pos.TotalSeconds;
+        if (!_isPlaying) return;
+
+        var now = DateTime.UtcNow;
+        double dt = (now - _lastPlaybackTick).TotalSeconds;
+        _lastPlaybackTick = now;
+        if (dt <= 0 || dt > 0.5) dt = 0.025;
+
+        _currentTimeSeconds += dt;
 
         if (_currentTimeSeconds >= _totalDurationSeconds && _totalDurationSeconds > 0)
         {
@@ -1364,26 +1655,29 @@ public sealed partial class EditorPage : Page
             return;
         }
 
+        UpdateGapBlackScreen();
+
+        var ts = TimeSpan.FromSeconds(_currentTimeSeconds);
         if (_isPlaying)
         {
             if (_micPlayer?.PlaybackSession != null && _micPlayer.PlaybackSession.NaturalDuration > TimeSpan.Zero)
             {
-                if (pos <= _micPlayer.PlaybackSession.NaturalDuration)
+                if (ts <= _micPlayer.PlaybackSession.NaturalDuration)
                 {
-                    if (Math.Abs((_micPlayer.Position - pos).TotalMilliseconds) > 600)
+                    if (Math.Abs((_micPlayer.Position - ts).TotalMilliseconds) > 600)
                     {
-                        try { _micPlayer.Position = pos; } catch { }
+                        try { _micPlayer.Position = ts; } catch { }
                     }
                 }
             }
 
             if (_sysPlayer?.PlaybackSession != null && _sysPlayer.PlaybackSession.NaturalDuration > TimeSpan.Zero)
             {
-                if (pos <= _sysPlayer.PlaybackSession.NaturalDuration)
+                if (ts <= _sysPlayer.PlaybackSession.NaturalDuration)
                 {
-                    if (Math.Abs((_sysPlayer.Position - pos).TotalMilliseconds) > 600)
+                    if (Math.Abs((_sysPlayer.Position - ts).TotalMilliseconds) > 600)
                     {
-                        try { _sysPlayer.Position = pos; } catch { }
+                        try { _sysPlayer.Position = ts; } catch { }
                     }
                 }
             }
@@ -1537,6 +1831,21 @@ public sealed partial class EditorPage : Page
             var ptr = e.GetCurrentPoint(element);
 
             // Eğer boş bir alana tıklandıysa veya cetvele tıklandıysa:
+            if (ReferenceEquals(e.OriginalSource, VideoTrack) || ReferenceEquals(e.OriginalSource, AudioTrack) ||
+                ReferenceEquals(e.OriginalSource, ZoomTrack) || ReferenceEquals(e.OriginalSource, TimeRuler))
+            {
+                if (_selectedZoom != null || !string.IsNullOrEmpty(ViewModel?.SelectedClipId))
+                {
+                    _selectedZoom = null;
+                    if (ViewModel != null)
+                    {
+                        ViewModel.SelectedClipId = null;
+                        ViewModel.SelectedTrackType = null;
+                    }
+                    RenderTimeline();
+                }
+            }
+
             // 1. Playhead seek
             double clickSec = Math.Max(0, (ptr.Position.X - 40) / _timelineScale);
             SeekToTime(clickSec);
@@ -1600,17 +1909,11 @@ public sealed partial class EditorPage : Page
     {
         _currentTimeSeconds = Math.Clamp(time, 0, _totalDurationSeconds);
         _lastTriggeredClickTimestamp = -1;
+        _lastPlaybackTick = DateTime.UtcNow;
+
+        UpdateGapBlackScreen();
+
         var ts = TimeSpan.FromSeconds(_currentTimeSeconds);
-
-        try
-        {
-            if (VideoPlayer?.MediaPlayer != null)
-            {
-                VideoPlayer.MediaPlayer.Position = ts;
-            }
-        }
-        catch { }
-
         try
         {
             if (_micPlayer?.PlaybackSession != null && ts <= _micPlayer.PlaybackSession.NaturalDuration)
@@ -1790,40 +2093,52 @@ public sealed partial class EditorPage : Page
     private void OnSpeedSelected(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn) return;
-        ResetSpeedButton(BtnSpeedSlow);
-        ResetSpeedButton(BtnSpeedMedium);
-        ResetSpeedButton(BtnSpeedFast);
-        btn.Background = new SolidColorBrush(Color.FromArgb(255, 13, 14, 21));
-        btn.Foreground = new SolidColorBrush(Color.FromArgb(255, 192, 193, 255));
+        HighlightSpeedButton(btn);
 
         if (ViewModel != null)
         {
-            double speed = btn.Tag switch
-            {
-                "Slow" => 0.5,
-                "Fast" => 1.5,
-                _ => 1.0
-            };
-            ViewModel.VideoSpeed = speed;
-            if (VideoPlayer?.MediaPlayer?.PlaybackSession != null)
-            {
-                VideoPlayer.MediaPlayer.PlaybackSession.PlaybackRate = speed;
-            }
-            if (_micPlayer?.PlaybackSession != null)
-            {
-                _micPlayer.PlaybackSession.PlaybackRate = speed;
-            }
-            if (_sysPlayer?.PlaybackSession != null)
-            {
-                _sysPlayer.PlaybackSession.PlaybackRate = speed;
-            }
+            ViewModel.CursorMovementType = btn.Tag?.ToString() ?? "Medium";
+            ViewModel.SaveProject();
         }
     }
 
-    private void ResetSpeedButton(Button btn)
+    private void HighlightSpeedButton(Button selectedBtn)
     {
-        btn.Background = new SolidColorBrush(Colors.Transparent);
-        btn.Foreground = new SolidColorBrush(Color.FromArgb(130, 199, 196, 215));
+        var speedButtons = new[] { BtnSpeedSlow, BtnSpeedMedium, BtnSpeedFast };
+        var selectedBg = Application.Current.Resources.TryGetValue("SurfaceContainerLowestBrush", out var bg) && bg is Brush bBg
+            ? bBg
+            : new SolidColorBrush(Color.FromArgb(255, 13, 14, 21));
+        var selectedFg = Application.Current.Resources.TryGetValue("PrimaryAccentBrush", out var fg) && fg is Brush bFg
+            ? bFg
+            : new SolidColorBrush(Color.FromArgb(255, 192, 193, 255));
+        var mutedFg = Application.Current.Resources.TryGetValue("TextMutedBrush", out var mfg) && mfg is Brush bMfg
+            ? bMfg
+            : new SolidColorBrush(Color.FromArgb(130, 199, 196, 215));
+
+        foreach (var b in speedButtons)
+        {
+            if (b == null) continue;
+            bool isSelected = b == selectedBtn;
+            b.Background = isSelected ? selectedBg : new SolidColorBrush(Colors.Transparent);
+            b.Foreground = isSelected ? selectedFg : mutedFg;
+        }
+    }
+
+    private void SyncMotionSettings()
+    {
+        if (ViewModel == null) return;
+        var movementType = ViewModel.CursorMovementType ?? "Medium";
+        Button? target = movementType.ToLowerInvariant() switch
+        {
+            "slow" => BtnSpeedSlow,
+            "fast" => BtnSpeedFast,
+            _ => BtnSpeedMedium
+        };
+
+        if (target != null)
+        {
+            HighlightSpeedButton(target);
+        }
     }
 
     private void OnBgColorSelected(object sender, TappedRoutedEventArgs e)
@@ -1913,6 +2228,7 @@ public sealed partial class EditorPage : Page
         {
             ViewModel.DeleteSelected();
             RenderTimeline();
+            UpdateGapBlackScreen();
         }
     }
 
@@ -1922,6 +2238,7 @@ public sealed partial class EditorPage : Page
         UpdateFromViewModel();
         RenderTimeline();
         UpdateZoomSimulation();
+        UpdateGapBlackScreen();
     }
 
     private void OnRedoClicked(object sender, RoutedEventArgs e)
@@ -1930,12 +2247,14 @@ public sealed partial class EditorPage : Page
         UpdateFromViewModel();
         RenderTimeline();
         UpdateZoomSimulation();
+        UpdateGapBlackScreen();
     }
 
     private void OnSplitClicked(object sender, RoutedEventArgs e)
     {
         ViewModel?.CutAtPlayhead();
         RenderTimeline();
+        UpdateGapBlackScreen();
     }
 
     private void OnVideoTrackMuteClicked(object sender, RoutedEventArgs e)
@@ -1977,6 +2296,74 @@ public sealed partial class EditorPage : Page
         if (MuteIcon != null)
         {
             MuteIcon.Glyph = !allMuted ? "\uE74F" : "\uE767";
+        }
+    }
+
+    private void OnMasterVolumeSliderChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        double vol = e.NewValue;
+        if (TbVolumePercent != null) TbVolumePercent.Text = $"{(int)vol}%";
+
+        float ratio = (float)(vol / 100.0);
+        string glyph;
+        if (ratio >= 0.75f)
+        {
+            glyph = "\uE995"; // Speaker with 3 waves (High)
+        }
+        else if (ratio >= 0.30f)
+        {
+            glyph = "\uE994"; // Speaker with 2 waves (Medium)
+        }
+        else if (ratio > 0.0f)
+        {
+            glyph = "\uE993"; // Speaker with 1 wave (Low)
+        }
+        else
+        {
+            glyph = "\uE74F"; // Speaker Mute / X
+        }
+
+        if (MuteIcon != null)
+        {
+            MuteIcon.Glyph = glyph;
+            MuteIcon.Foreground = new SolidColorBrush(ratio > 0
+                ? Color.FromArgb(255, 230, 230, 245)
+                : Color.FromArgb(255, 239, 68, 68));
+        }
+
+        if (FlyoutMuteIcon != null)
+        {
+            FlyoutMuteIcon.Glyph = glyph;
+            FlyoutMuteIcon.Foreground = new SolidColorBrush(ratio > 0
+                ? Color.FromArgb(255, 192, 193, 255)
+                : Color.FromArgb(255, 239, 68, 68));
+        }
+
+        if (_micPlayer != null && ViewModel != null && !ViewModel.MicMuted)
+        {
+            _micPlayer.Volume = ratio * (ViewModel.MicVolume / 100.0);
+        }
+        if (_sysPlayer != null && ViewModel != null)
+        {
+            _sysPlayer.Volume = ratio * (ViewModel.SysVolume / 100.0);
+        }
+        if (VideoPlayer?.MediaPlayer != null && ViewModel != null && !ViewModel.VideoTrack.Muted)
+        {
+            VideoPlayer.MediaPlayer.Volume = ratio;
+        }
+    }
+
+    private void OnFlyoutMuteToggleClicked(object sender, RoutedEventArgs e)
+    {
+        if (MasterVolumeSlider == null) return;
+        if (MasterVolumeSlider.Value > 0)
+        {
+            _savedMasterVolume = MasterVolumeSlider.Value;
+            MasterVolumeSlider.Value = 0;
+        }
+        else
+        {
+            MasterVolumeSlider.Value = _savedMasterVolume > 0 ? _savedMasterVolume : 100;
         }
     }
 

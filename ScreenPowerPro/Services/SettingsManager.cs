@@ -83,4 +83,32 @@ public class SettingsManager : INotifyPropertyChanged
             }
         }
     }
+
+    public int PreClickAnticipationMs
+    {
+        get => _settingsService.Current.PreClickAnticipationMs;
+        set
+        {
+            if (_settingsService.Current.PreClickAnticipationMs != value)
+            {
+                _settingsService.Current.PreClickAnticipationMs = value;
+                _settingsService.Save();
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public string ZoomEasingFunction
+    {
+        get => _settingsService.Current.ZoomEasingFunction;
+        set
+        {
+            if (_settingsService.Current.ZoomEasingFunction != value)
+            {
+                _settingsService.Current.ZoomEasingFunction = value;
+                _settingsService.Save();
+                OnPropertyChanged();
+            }
+        }
+    }
 }

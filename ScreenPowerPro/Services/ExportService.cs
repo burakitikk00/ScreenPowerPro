@@ -55,7 +55,7 @@ public class ExportService
         double totalDuration = 0;
         if (manifest.Timeline?.VideoTrack?.Clips != null && manifest.Timeline.VideoTrack.Clips.Count > 0)
         {
-            totalDuration = manifest.Timeline.VideoTrack.Clips.Sum(c => Math.Max(0, c.SourceEnd - c.SourceStart));
+            totalDuration = manifest.Timeline.VideoTrack.Clips.Max(c => c.TrackOffset + Math.Max(0, c.SourceEnd - c.SourceStart));
         }
 
         string resolvedVid = FFmpegHelper.ResolveMediaPath(projectDir, manifest.VideoPath, "display-0.mp4");

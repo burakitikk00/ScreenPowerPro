@@ -156,10 +156,42 @@ public static class FFmpegHelper
         var filterComplex = new StringBuilder();
         string currentVideoStream = "[0:v]";
 
+        var videoClips = manifest.Timeline?.VideoTrack?.Clips;
+        if (videoClips is { Count: > 0 } &&
+            (videoClips.Count > 1 || videoClips[0].TrackOffset > 0.05 || videoClips[0].SourceStart > 0.05))
+        {
+            double totalDur = videoClips.Max(c => c.TrackOffset + Math.Max(0.01, c.SourceEnd - c.SourceStart));
+            string totalDurStr = totalDur.ToString("F2", CultureInfo.InvariantCulture);
+
+            filterComplex.Append($"color=c=black:s={targetWidth}x{targetHeight}:r={targetFps}:d={totalDurStr}[vbg]");
+
+            string prevStream = "[vbg]";
+            for (int i = 0; i < videoClips.Count; i++)
+            {
+                var c = videoClips[i];
+                double dur = Math.Max(0.01, c.SourceEnd - c.SourceStart);
+                double startOffset = c.TrackOffset;
+                double endOffset = c.TrackOffset + dur;
+
+                string sStart = c.SourceStart.ToString("F2", CultureInfo.InvariantCulture);
+                string sEnd = c.SourceEnd.ToString("F2", CultureInfo.InvariantCulture);
+                string tStart = startOffset.ToString("F2", CultureInfo.InvariantCulture);
+                string tEnd = endOffset.ToString("F2", CultureInfo.InvariantCulture);
+
+                filterComplex.Append($";[0:v]trim=start={sStart}:end={sEnd},setpts=PTS-STARTPTS,scale={targetWidth}:{targetHeight}[vclip{i}]");
+                string nextStream = (i == videoClips.Count - 1) ? "[vcomp]" : $"[vcomp{i}]";
+                filterComplex.Append($";{prevStream}[vclip{i}]overlay=0:0:enable='between(t,{tStart},{tEnd})'{nextStream}");
+                prevStream = nextStream;
+            }
+
+            currentVideoStream = "[vcomp]";
+        }
+
         // 3.1. Sanal İmleç Overlay (Zoom'dan önce uygulanır; böylece zoom yapıldığında imleç de zoomlanır)
         if (hasCursorOverlay && cursorInputIndex > 0)
         {
-            filterComplex.Append($"[0:v][{cursorInputIndex}:v]overlay=0:0[vwithcursor]");
+            if (filterComplex.Length > 0) filterComplex.Append(';');
+            filterComplex.Append($"{currentVideoStream}[{cursorInputIndex}:v]overlay=0:0[vwithcursor]");
             currentVideoStream = "[vwithcursor]";
         }
 

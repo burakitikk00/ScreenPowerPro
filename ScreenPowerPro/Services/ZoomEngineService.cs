@@ -19,7 +19,7 @@ public class ZoomEngineService
     // Dinamik ayarlar için SettingsManager kullanımı:
     public static double DefaultScale => SettingsManager.Instance.MaxZoomRatio;           // Varsayılan zoom yakınlaşma katsayısı
     public const double NearClickDistancePx = 550.0;  // Aynı bölge tıklama birleştirme mesafesi (piksel)
-    public const double ZoomPreviewLeadSec = 0.30;    // Tıklamadan kaç saniye önce zoom başlasın (yumuşak giriş)
+    public static double ZoomPreviewLeadSec => SettingsManager.Instance.PreClickAnticipationMs / 1000.0;    // Tıklamadan kaç saniye önce zoom başlasın (yumuşak giriş)
     public static double PostClickFollowSec => SettingsManager.Instance.ZoomDuration;     // Son tıklamadan sonra zoomun ekranda kalma süresi (sn)
     public static double DefaultTransitionTime => SettingsManager.Instance.ZoomSpeed; // Yumuşak yakınlaşma ve uzaklaşma süresi (sn)
     public static bool CancelOnOutOfBounds => SettingsManager.Instance.CancelOnOutOfBounds; // Sınır ihlalinde zoom iptali
@@ -239,7 +239,7 @@ public class ZoomEngineService
                         Scale = actualScale,
                         TargetX = Math.Round(currentTargetX, 1),
                         TargetY = Math.Round(currentTargetY, 1),
-                        Easing = autoZoomMode == "instant" ? "instant" : "cubic-out"
+                        Easing = autoZoomMode == "instant" ? "instant" : SettingsManager.Instance.ZoomEasingFunction.ToLowerInvariant()
                     };
                 }
                 else
@@ -262,7 +262,7 @@ public class ZoomEngineService
                         Scale = actualScale,
                         TargetX = Math.Round(currentTargetX, 1),
                         TargetY = Math.Round(currentTargetY, 1),
-                        Easing = autoZoomMode == "instant" ? "instant" : "cubic-out"
+                        Easing = autoZoomMode == "instant" ? "instant" : SettingsManager.Instance.ZoomEasingFunction.ToLowerInvariant()
                     };
                 }
             }
@@ -413,6 +413,31 @@ public class ZoomEngineService
             : 1.0 - Math.Pow(-2.0 * t + 2.0, 3.0) / 2.0;
     }
 
+    public static double EaseOutQuad(double t)
+    {
+        double p = Math.Clamp(t, 0.0, 1.0);
+        return p * (2.0 - p);
+    }
+
+    public static double EaseOutQuart(double t)
+    {
+        double f = 1.0 - Math.Clamp(t, 0.0, 1.0);
+        return 1.0 - (f * f * f * f);
+    }
+
+    public static double ApplyEasing(double p, string easing)
+    {
+        return easing switch
+        {
+            "linear" => p,
+            "quad-out" => EaseOutQuad(p),
+            "cubic-out" => EaseOutCubic(p),
+            "quartic-out" => EaseOutQuart(p),
+            "ease-in-out" => EaseInOutCubic(p),
+            _ => EaseOutCubic(p)
+        };
+    }
+
     /// <summary>
     /// Belirtilen video saniyesinde aktif bir zoom/pan durumu varsa koordinat ve ölçek değerini
     /// Cubic-Ease-Out ve Sine-Ease-Out yumuşak geçişleriyle hesaplar.
@@ -524,7 +549,7 @@ public class ZoomEngineService
                 if (timeSec < inEnd && transIn > 0.0001)
                 {
                     double p = Math.Clamp((timeSec - start) / transIn, 0.0, 1.0);
-                    double ease = EaseOutCubic(p);
+                    double ease = ApplyEasing(p, e.Easing);
 
                     prevScale = hasPrev ? sorted[i - 1].Scale : 1.0;
                     double prevX = hasPrev ? Math.Clamp(sorted[i - 1].TargetX, halfW, vW - halfW) : defaultCenterX;
@@ -557,7 +582,7 @@ public class ZoomEngineService
                 if (timeSec > outStart && transOut > 0.0001)
                 {
                     double p = Math.Clamp((timeSec - outStart) / transOut, 0.0, 1.0);
-                    double ease = EaseOutSine(p);
+                    double ease = ApplyEasing(p, e.Easing);
 
                     if (hasNext)
                     {
@@ -677,8 +702,14 @@ public class ZoomEngineService
             }
 
             string pIn = $"((in_time-{sStart})/{sTransIn})";
-            // Cubic-ease-out benzeri ivmeli giriş
-            string easeIn = $"({pIn}*(2-{pIn}))";
+            string easeIn = e.Easing switch
+            {
+                "linear" => pIn,
+                "quad-out" => $"({pIn}*(2-{pIn}))",
+                "cubic-out" => $"(1-pow(1-{pIn},3))",
+                "quartic-out" => $"(1-pow(1-{pIn},4))",
+                _ => $"(1-pow(1-{pIn},3))"
+            };
             string zIn = $"1+{sScaleDelta}*{easeIn}";
 
             string zOut;
@@ -694,7 +725,14 @@ public class ZoomEngineService
                 string clampNextY = $"max(0,min(({sNextY}-(ih/zoom/2)),ih-(ih/zoom)))";
 
                 string pOut = $"((in_time-{sOutStart})/{sTransOut})";
-                string easeOut = $"({pOut}*{pOut}*(3-2*{pOut}))";
+                string easeOut = e.Easing switch
+                {
+                    "linear" => pOut,
+                    "quad-out" => $"({pOut}*(2-{pOut}))",
+                    "cubic-out" => $"(1-pow(1-{pOut},3))",
+                    "quartic-out" => $"(1-pow(1-{pOut},4))",
+                    _ => $"({pOut}*{pOut}*(3-2*{pOut}))"
+                };
 
                 zOut = sScale; 
                 curX = $"if(between(in_time,{sStart},{sInEnd}),(iw/2-(iw/zoom/2))+({holdX}-(iw/2-(iw/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{holdX},if(between(in_time,{sOutStart},{sEnd}),{holdX}+({clampNextX}-{holdX})*{easeOut},{xExpr})))";
@@ -703,7 +741,14 @@ public class ZoomEngineService
             else
             {
                 string pOut = $"(({sEnd}-in_time)/{sTransOut})";
-                string easeOut = $"({pOut}*(2-{pOut}))";
+                string easeOut = e.Easing switch
+                {
+                    "linear" => pOut,
+                    "quad-out" => $"({pOut}*(2-{pOut}))",
+                    "cubic-out" => $"(1-pow(1-{pOut},3))",
+                    "quartic-out" => $"(1-pow(1-{pOut},4))",
+                    _ => $"({pOut}*(2-{pOut}))"
+                };
                 zOut = $"1+{sScaleDelta}*{easeOut}";
 
                 curX = $"if(between(in_time,{sStart},{sInEnd}),(iw/2-(iw/zoom/2))+({holdX}-(iw/2-(iw/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{holdX},if(between(in_time,{sOutStart},{sEnd}),(iw/2-(iw/zoom/2))+({holdX}-(iw/2-(iw/zoom/2)))*{easeOut},{xExpr})))";

@@ -32,6 +32,7 @@ public partial class App : Application
         services.AddSingleton<ExportService>();
         services.AddSingleton<AudioLevelMonitorService>();
         services.AddSingleton<AudioWaveformService>();
+        services.AddSingleton<TimelineMathService>();
 
         // Register ViewModels
         services.AddSingleton<DashboardViewModel>();

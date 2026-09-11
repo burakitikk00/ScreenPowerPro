@@ -8,8 +8,10 @@ using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using ScreenPowerPro.Helpers;
 using ScreenPowerPro.Models;
+using ScreenPowerPro.Core.Capture;
 
 namespace ScreenPowerPro.Services;
+
 
 public enum RecordingMode
 {
@@ -31,8 +33,11 @@ public class ScreenRecorderService : IDisposable
     private WaveFileWriter? _loopbackWriter;
     private WaveFileWriter? _micWriter;
 
+    private WindowCaptureService? _windowCaptureService;
+
     private System.Timers.Timer? _durationTimer;
     private Stopwatch? _recordStopwatch;
+
 
     public bool IsRecording { get; private set; }
     public double ElapsedSeconds => _recordStopwatch?.Elapsed.TotalSeconds ?? 0;
@@ -70,18 +75,27 @@ public class ScreenRecorderService : IDisposable
 
         var settings = _settingsService.Current;
 
-        // 1. Hide Desktop Icons / Taskbar if enabled in settings
-        if (settings.HideDesktopIcons)
+
+        // Bounds Checking for Crop (Sınırları aşmayı önleme)
+        if (mode == RecordingMode.Region)
         {
-            Win32Helper.SetDesktopIconsVisible(false);
-        }
-        if (settings.HideTaskbar)
-        {
-            Win32Helper.SetTaskbarVisible(false);
+            int screenW = Win32Helper.GetSystemMetrics(Win32Helper.SM_CXSCREEN);
+            int screenH = Win32Helper.GetSystemMetrics(Win32Helper.SM_CYSCREEN);
+            if (screenW <= 0) screenW = 1920;
+            if (screenH <= 0) screenH = 1080;
+
+            cropX = Math.Clamp(cropX, 0, Math.Max(0, screenW - 32));
+            cropY = Math.Clamp(cropY, 0, Math.Max(0, screenH - 32));
+            cropWidth = Math.Clamp(cropWidth, 32, screenW - cropX);
+            cropHeight = Math.Clamp(cropHeight, 32, screenH - cropY);
+
+            if (cropWidth % 2 != 0) cropWidth--;
+            if (cropHeight % 2 != 0) cropHeight--;
         }
 
         await Task.Run(() =>
         {
+
             // 2. Start Microphone audio recording if enabled
             if (settings.MicAudioEnabled)
             {
@@ -214,13 +228,32 @@ public class ScreenRecorderService : IDisposable
             int fps = settings.Fps > 0 ? settings.Fps : 60;
 
             string videoInputArgs;
+            bool isWgcMode = false;
             if (mode == RecordingMode.Window && targetWindowHandle.HasValue && targetWindowHandle.Value != IntPtr.Zero)
             {
-                // Capture specific window by title or gdigrab
-                var sb = new System.Text.StringBuilder(256);
-                Win32Helper.GetWindowText(targetWindowHandle.Value, sb, 256);
-                string title = sb.ToString();
-                videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -i title=\"{title}\"";
+                // WGC (Windows Graphics Capture) ile Uygulama Yakalama
+                try
+                {
+                    _windowCaptureService = new WindowCaptureService();
+                    var (w, h) = _windowCaptureService.PrepareCapture(targetWindowHandle.Value);
+                    if (w <= 0 || h <= 0)
+                    {
+                        Win32Helper.GetWindowRect(targetWindowHandle.Value, out var rect);
+                        w = rect.Width > 0 ? rect.Width : 1920;
+                        h = rect.Height > 0 ? rect.Height : 1080;
+                    }
+
+                    // FFmpeg'e RAW BGRA stream basacağız
+                    videoInputArgs = $"-f rawvideo -pixel_format bgra -video_size {w}x{h} -framerate {fps} -i -";
+                    isWgcMode = true;
+                }
+                catch
+                {
+                    _windowCaptureService?.Dispose();
+                    _windowCaptureService = null;
+                    isWgcMode = false;
+                    videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -i desktop";
+                }
             }
             else if (mode == RecordingMode.Region)
             {
@@ -232,6 +265,7 @@ public class ScreenRecorderService : IDisposable
                 videoInputArgs = $"-f gdigrab -draw_mouse {drawMouse} -framerate {fps} -i desktop";
             }
 
+
             int crf = settings.RecordingQuality switch
             {
                 "Ultra" => 15,
@@ -242,7 +276,9 @@ public class ScreenRecorderService : IDisposable
             };
             // Fragmented MP4 (+frag_keyframe+empty_moov+default_base_moof) ensures instant indexing per GOP,
             // completely eliminating "moov atom not found" corruption even if terminated or power is lost.
-            string fullFfmpegArgs = $"-y {videoInputArgs} -c:v libx264 -preset ultrafast -tune zerolatency -crf {crf} -pix_fmt yuv420p -movflags +frag_keyframe+empty_moov+default_base_moof \"{_currentVideoPath}\"";
+            // scale=trunc(iw/2)*2:trunc(ih/2)*2 prevents x264 crash when window dimensions are odd.
+            string vfFilter = "-vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2\"";
+            string fullFfmpegArgs = $"-y {videoInputArgs} {vfFilter} -c:v libx264 -preset ultrafast -tune zerolatency -crf {crf} -pix_fmt yuv420p -movflags +frag_keyframe+empty_moov+default_base_moof \"{_currentVideoPath}\"";
 
             var psi = new ProcessStartInfo
             {
@@ -259,7 +295,14 @@ public class ScreenRecorderService : IDisposable
             _ffmpegProcess.ErrorDataReceived += (s, e) => { };
             _ffmpegProcess.Start();
             _ffmpegProcess.BeginErrorReadLine();
+
+            if (isWgcMode && _windowCaptureService != null)
+            {
+                bool captureCursor = !settings.HideMouseCursor;
+                _windowCaptureService.StartCapture(_ffmpegProcess.StandardInput.BaseStream, captureCursor);
+            }
         });
+
 
         // 5. Start Elapsed Stopwatch & Timer
         _recordStopwatch = Stopwatch.StartNew();
@@ -387,11 +430,16 @@ public class ScreenRecorderService : IDisposable
             await NormalizeVideoFaststartAsync(_currentVideoPath);
         }
 
-        // Restore Desktop Icons & Taskbar
-        Win32Helper.SetDesktopIconsVisible(true);
-        Win32Helper.SetTaskbarVisible(true);
+
+        if (_windowCaptureService != null)
+        {
+            _windowCaptureService.StopCapture();
+            _windowCaptureService.Dispose();
+            _windowCaptureService = null;
+        }
 
         if (!string.IsNullOrEmpty(_currentProjectDir))
+
         {
             RecordingStopped?.Invoke(_currentProjectDir);
         }

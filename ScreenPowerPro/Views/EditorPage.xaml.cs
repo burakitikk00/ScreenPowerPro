@@ -2034,6 +2034,29 @@ public sealed partial class EditorPage : Page
             TxtExportPath.Text = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "ScreenRecording.mp4");
         }
 
+        if (_naturalVideoHeight > 0)
+        {
+            if (ExportRes4K != null) ExportRes4K.IsEnabled = _naturalVideoHeight >= 2000;
+            if (ExportRes2K != null) ExportRes2K.IsEnabled = _naturalVideoHeight >= 1400;
+            if (ExportRes1080p != null) ExportRes1080p.IsEnabled = _naturalVideoHeight >= 1000;
+            if (ExportRes720p != null) ExportRes720p.IsEnabled = true;
+
+            if (CmbExportResolution.SelectedItem is ComboBoxItem selectedItem && !selectedItem.IsEnabled)
+            {
+                if (ExportRes1080p != null && ExportRes1080p.IsEnabled) CmbExportResolution.SelectedItem = ExportRes1080p;
+                else if (ExportRes720p != null) CmbExportResolution.SelectedItem = ExportRes720p;
+            }
+            
+            bool hasDisabled = false;
+            if (ExportRes4K != null && !ExportRes4K.IsEnabled) hasDisabled = true;
+            if (ExportRes2K != null && !ExportRes2K.IsEnabled) hasDisabled = true;
+            
+            if (TbExportResInfo != null)
+            {
+                TbExportResInfo.Visibility = hasDisabled ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
         UpdateExportSummaryBadge();
         ExportModalOverlay.Visibility = Visibility.Visible;
     }

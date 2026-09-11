@@ -185,6 +185,75 @@
 
                                     <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
 
+                                    <!-- Max Zoom Ratio -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="220" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Zoom Yakınlaşma Katsayısı (Scale)" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Hedef büyütme oranı (1.2x - 3.0x)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Slider Value="{x:Bind ViewModel.MaxZoomRatio, Mode=TwoWay}" Minimum="1.2" Maximum="3.0" StepFrequency="0.1" Width="160" />
+                                            <TextBlock Text="{x:Bind ViewModel.MaxZoomRatio, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center" Width="36" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- Zoom Speed / Transition -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="220" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Zoom Geçiş Süresi" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Yakınlaşma ve uzaklaşma animasyonunun tamamlanma süresi (sn)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Slider Value="{x:Bind ViewModel.ZoomSpeed, Mode=TwoWay}" Minimum="0.1" Maximum="1.0" StepFrequency="0.05" Width="160" />
+                                            <TextBlock Text="{x:Bind ViewModel.ZoomSpeed, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center" Width="36" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- Zoom Duration (Hold) -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="220" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Zoom Ekranda Kalma Süresi" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Son tıklamadan sonra zoomun ekranda sabit kalma süresi (sn)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Slider Value="{x:Bind ViewModel.ZoomDuration, Mode=TwoWay}" Minimum="1.0" Maximum="6.0" StepFrequency="0.5" Width="160" />
+                                            <TextBlock Text="{x:Bind ViewModel.ZoomDuration, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center" Width="36" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
+                                    <!-- Cancel on Out of Bounds -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Sanal Sınır İhlalinde Zoomu İptal Et" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Fare tıklanan bölgenin dışına çıktığında beklemeden pürüzsüzce uzaklaşır" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.CancelOnOutOfBounds, Mode=TwoWay}" MinWidth="0" />
+                                    </Grid>
+
+                                    <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
+
                                     <!-- Countdown Seconds -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>

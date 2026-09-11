@@ -236,4 +236,30 @@ public class AppSettings
     /// </summary>
     [JsonPropertyName("excludeAppFromRecording")]
     public bool ExcludeAppFromRecording { get; set; } = true;
+
+    // --- Dinamik Zoom Ayarları ---
+    
+    /// <summary>
+    /// Zoom yakınlaşma katsayısı (Örn: 1.5x, 2.0x).
+    /// </summary>
+    [JsonPropertyName("maxZoomRatio")]
+    public double MaxZoomRatio { get; set; } = 1.5;
+
+    /// <summary>
+    /// Zoom ve Pan geçiş hızı (sn).
+    /// </summary>
+    [JsonPropertyName("zoomSpeed")]
+    public double ZoomSpeed { get; set; } = 0.35;
+
+    /// <summary>
+    /// Zoomun ekranda kalma süresi (sn).
+    /// </summary>
+    [JsonPropertyName("zoomDuration")]
+    public double ZoomDuration { get; set; } = 2.5;
+
+    /// <summary>
+    /// Fare video sınırlarının dışına çıkarsa zoomu iptal edip uzaklaştırma.
+    /// </summary>
+    [JsonPropertyName("cancelOnOutOfBounds")]
+    public bool CancelOnOutOfBounds { get; set; } = true;
 }

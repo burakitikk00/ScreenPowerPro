@@ -164,6 +164,15 @@ public class ZoomEffect
 
     [JsonPropertyName("easing")]
     public string Easing { get; set; } = "ease-in-out"; // ease-in-out, instant, linear
+
+    [JsonPropertyName("dragEndTime")]
+    public double DragEndTime { get; set; } = 0;
+
+    [JsonPropertyName("targetX2")]
+    public double TargetX2 { get; set; } = 0;
+
+    [JsonPropertyName("targetY2")]
+    public double TargetY2 { get; set; } = 0;
 }
 
 /// <summary>

@@ -21,6 +21,7 @@ public partial class App : Application
 
         // Register Services
         services.AddSingleton<SettingsService>();
+        services.AddSingleton(SettingsManager.Instance);
         services.AddSingleton<LocalizationService>();
         services.AddSingleton<DeviceManagerService>();
         services.AddSingleton<ProjectService>();

@@ -36,6 +36,19 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _autoZoom;
 
+    // --- Dinamik Zoom Parametreleri ---
+    [ObservableProperty]
+    private double _zoomSpeed = 0.35;
+
+    [ObservableProperty]
+    private double _maxZoomRatio = 1.5;
+
+    [ObservableProperty]
+    private double _zoomDuration = 2.5;
+
+    [ObservableProperty]
+    private bool _cancelOnOutOfBounds = true;
+
     [ObservableProperty]
     private bool _hideDesktopIcons;
 
@@ -113,6 +126,10 @@ public partial class SettingsViewModel : ObservableObject
         Language = s.Language ?? "tr";
         AutoZoomMode = s.AutoZoomMode ?? "smooth";
         AutoZoom = s.AutoZoom;
+        ZoomSpeed = s.ZoomSpeed;
+        MaxZoomRatio = s.MaxZoomRatio;
+        ZoomDuration = s.ZoomDuration;
+        CancelOnOutOfBounds = s.CancelOnOutOfBounds;
         HideDesktopIcons = s.HideDesktopIcons;
         HideTaskbar = s.HideTaskbar;
         HideMouseCursor = s.HideMouseCursor;
@@ -160,6 +177,10 @@ public partial class SettingsViewModel : ObservableObject
         s.ExportLocation = ExportLocation;
         s.AutoZoomMode = AutoZoomMode;
         s.AutoZoom = !string.Equals(AutoZoomMode, "none", StringComparison.OrdinalIgnoreCase);
+        s.ZoomSpeed = ZoomSpeed;
+        s.MaxZoomRatio = MaxZoomRatio;
+        s.ZoomDuration = ZoomDuration;
+        s.CancelOnOutOfBounds = CancelOnOutOfBounds;
         s.HideDesktopIcons = HideDesktopIcons;
         s.HideTaskbar = HideTaskbar;
         s.HideMouseCursor = HideMouseCursor;
@@ -177,6 +198,13 @@ public partial class SettingsViewModel : ObservableObject
         s.SelectedCameraDevice = SelectedCameraDevice;
 
         _settingsService.Save();
+
+        // Anlık dinamik motor senkronizasyonu
+        SettingsManager.Instance.ZoomSpeed = ZoomSpeed;
+        SettingsManager.Instance.MaxZoomRatio = MaxZoomRatio;
+        SettingsManager.Instance.ZoomDuration = ZoomDuration;
+        SettingsManager.Instance.CancelOnOutOfBounds = CancelOnOutOfBounds;
+
         SaveStatusMessage = "Ayarlar başarıyla kaydedildi.";
     }
 

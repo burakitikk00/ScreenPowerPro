@@ -341,7 +341,6 @@ public sealed partial class RecordingSetupToolbarWindow : Window
         bool newVal = !_settingsService.Current.HideDesktopIcons;
         _settingsService.Current.HideDesktopIcons = newVal;
         _settingsService.Save();
-        Win32Helper.SetDesktopIconsVisible(!newVal);
         RefreshMenuCheckmarks();
     }
 
@@ -350,7 +349,6 @@ public sealed partial class RecordingSetupToolbarWindow : Window
         bool newVal = !_settingsService.Current.HideTaskbar;
         _settingsService.Current.HideTaskbar = newVal;
         _settingsService.Save();
-        Win32Helper.SetTaskbarVisible(!newVal);
         RefreshMenuCheckmarks();
     }
 

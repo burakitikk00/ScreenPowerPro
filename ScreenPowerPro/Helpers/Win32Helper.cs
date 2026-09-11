@@ -93,45 +93,6 @@ public static class Win32Helper
     [DllImport("user32.dll")]
     public static extern bool GetCursorPos(out POINT lpPoint);
 
-    // Desktop icons toggle
-    public static void SetDesktopIconsVisible(bool visible)
-    {
-        try
-        {
-            IntPtr hProgman = FindWindow("Progman", null);
-            IntPtr hShellView = FindWindowEx(hProgman, IntPtr.Zero, "SHELLDLL_DefView", null);
-            if (hShellView == IntPtr.Zero)
-            {
-                // In Win10/11 SHELLDLL_DefView may be a child of WorkerW
-                IntPtr hWorkerW = IntPtr.Zero;
-                do
-                {
-                    hWorkerW = FindWindowEx(IntPtr.Zero, hWorkerW, "WorkerW", null);
-                    hShellView = FindWindowEx(hWorkerW, IntPtr.Zero, "SHELLDLL_DefView", null);
-                } while (hShellView == IntPtr.Zero && hWorkerW != IntPtr.Zero);
-            }
-
-            if (hShellView != IntPtr.Zero)
-            {
-                ShowWindow(hShellView, visible ? SW_SHOW : SW_HIDE);
-            }
-        }
-        catch { }
-    }
-
-    // Taskbar toggle
-    public static void SetTaskbarVisible(bool visible)
-    {
-        try
-        {
-            IntPtr hTaskbar = FindWindow("Shell_TrayWnd", null);
-            if (hTaskbar != IntPtr.Zero)
-            {
-                ShowWindow(hTaskbar, visible ? SW_SHOW : SW_HIDE);
-            }
-        }
-        catch { }
-    }
 
     // Window Enumeration
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
@@ -257,6 +218,12 @@ public static class Win32Helper
 
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr hWnd);
+
+    public const int SM_CXSCREEN = 0;
+    public const int SM_CYSCREEN = 1;
+
+    [DllImport("user32.dll")]
+    public static extern int GetSystemMetrics(int nIndex);
 
     // --- DWM & Rounded Corners ---
     public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;

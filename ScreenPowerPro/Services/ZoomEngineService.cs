@@ -3,24 +3,27 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using ScreenPowerPro.Core.Tracking;
 using ScreenPowerPro.Models;
 
 namespace ScreenPowerPro.Services;
 
 /// <summary>
 /// Zoom ve pan animasyonlarının keyframe tabanlı hesaplandığı,
-/// yumuşak geçişlerin (easeInOutCubic / smoothstep) uygulandığı ve FFmpeg filtre ifadelerinin
-/// üretildiği merkezi zoom motoru servisi.
+/// doğrusal olmayan yumuşak geçişlerin (EaseOutCubic / EaseOutSine) uygulandığı,
+/// akıllı durum makinesi (üst üste zoom engelleme ve sanal sınır ihlali kontrolü) ve
+/// FFmpeg filtre ifadelerinin üretildiği merkezi zoom motoru servisi.
 /// </summary>
 public class ZoomEngineService
 {
-    // Varsayılan süre ve ölçek sabitleri
-    public const double DefaultZoomDuration = 2.5;    // Varsayılan zoom kalma süresi (sn)
-    public const double DefaultScale = 1.5;           // Varsayılan zoom yakınlaşma katsayısı
+    // Dinamik ayarlar için SettingsManager kullanımı:
+    public static double DefaultScale => SettingsManager.Instance.MaxZoomRatio;           // Varsayılan zoom yakınlaşma katsayısı
     public const double NearClickDistancePx = 550.0;  // Aynı bölge tıklama birleştirme mesafesi (piksel)
-    public const double ZoomPreviewLeadSec = 0.35;    // Tıklamadan kaç saniye önce zoom başlasın (yumuşak giriş)
-    public const double PostClickFollowSec = 2.2;     // Son tıklamadan sonra zoomun fareyi takip etme süresi (sn)
-    public const double DefaultTransitionTime = 0.40; // Yumuşak yakınlaşma ve uzaklaşma süresi (sn)
+    public const double ZoomPreviewLeadSec = 0.30;    // Tıklamadan kaç saniye önce zoom başlasın (yumuşak giriş)
+    public static double PostClickFollowSec => SettingsManager.Instance.ZoomDuration;     // Son tıklamadan sonra zoomun ekranda kalma süresi (sn)
+    public static double DefaultTransitionTime => SettingsManager.Instance.ZoomSpeed; // Yumuşak yakınlaşma ve uzaklaşma süresi (sn)
+    public static bool CancelOnOutOfBounds => SettingsManager.Instance.CancelOnOutOfBounds; // Sınır ihlalinde zoom iptali
+
 
     /// <summary>
     /// Keyframe veri yapısı: Belirli bir andaki zaman, ölçek ve hedef koordinatlar.
@@ -44,7 +47,19 @@ public class ZoomEngineService
     }
 
     /// <summary>
+    /// MouseFrameData telemetrisi için MouseInterpolator kullanarak enterpole koordinatı döner.
+    /// </summary>
+    public static (double X, double Y)? GetInterpolatedCursorPosition(IReadOnlyList<MouseFrameData>? frames, double currentSec)
+    {
+        if (frames == null || frames.Count == 0) return null;
+        var interpolator = new MouseInterpolator(frames);
+        var pt = interpolator.GetInterpolatedPosition(currentSec * 1000.0);
+        return (pt.X, pt.Y);
+    }
+
+    /// <summary>
     /// Telemetri fare hareketleri listesinden belirtilen saniyedeki enterpole edilmiş koordinatı döner.
+    /// İki milisaniye kaydı arasında Linear Interpolation (Lerp) uygular.
     /// İkili arama (binary search) ile O(log N) hızında çalışır.
     /// </summary>
     public static (double X, double Y)? GetInterpolatedCursorPosition(IReadOnlyList<MouseMoveEvent>? moves, double currentSec)
@@ -82,9 +97,9 @@ public class ZoomEngineService
         var m2 = moves[idx + 1];
         double dt = m2.Timestamp - m1.Timestamp;
 
-        if (dt > 0.0001 && currentSec >= m1.Timestamp && currentSec <= m2.Timestamp)
+        if (dt > 0.00001 && currentSec >= m1.Timestamp && currentSec <= m2.Timestamp)
         {
-            double t = (currentSec - m1.Timestamp) / dt;
+            double t = Math.Clamp((currentSec - m1.Timestamp) / dt, 0.0, 1.0);
             double x = m1.X + (m2.X - m1.X) * t;
             double y = m1.Y + (m2.Y - m1.Y) * t;
             return (x, y);
@@ -95,80 +110,242 @@ public class ZoomEngineService
 
     /// <summary>
     /// Fare tıklama olaylarını analiz ederek akıllı, birleştirilmiş ve akıcı zoom efektleri listesi üretir.
-    /// Üst üste aynı bölgede yapılan tıklamalarda zoom seviyesini bozmadan korur, süreyi uzatır.
+    /// KURAL: Üst üste aynı bölgede yapılan tıklamalarda zoom seviyesini (Scale) artırmaz,
+    /// sadece ekranda kalma süresini uzatır.
     /// </summary>
     public List<ZoomEffect> GenerateZoomEffectsFromClicks(
         IEnumerable<MouseClickEvent> clicks,
+        IEnumerable<MouseMoveEvent>? moves = null,
         string autoZoomMode = "smooth",
-        double defaultScale = DefaultScale,
-        double maxVideoDurationSec = 0)
+        double? defaultScale = null,
+        double maxVideoDurationSec = 0,
+        double defaultCenterX = 960,
+        double defaultCenterY = 540)
     {
+        double actualScale = defaultScale ?? DefaultScale;
         if (string.Equals(autoZoomMode, "none", StringComparison.OrdinalIgnoreCase))
         {
             return new List<ZoomEffect>();
         }
 
-        var downClicks = clicks
-            .Where(c => c.Type == "left_down" || c.Type == "right_down")
-            .OrderBy(c => c.Timestamp)
-            .ToList();
-
+        var allClicks = clicks.OrderBy(c => c.Timestamp).ToList();
+        var downClicks = allClicks.Where(c => c.Type == "left_down" || c.Type == "right_down").ToList();
         if (downClicks.Count == 0) return new List<ZoomEffect>();
+
+        var allMoves = moves?.OrderBy(m => m.Timestamp).ToList() ?? new List<MouseMoveEvent>();
 
         var effects = new List<ZoomEffect>();
         int zoomIndex = 1;
-        bool isInstant = string.Equals(autoZoomMode, "instant", StringComparison.OrdinalIgnoreCase);
 
-        foreach (var click in downClicks)
-        {
-            if (effects.Count > 0)
+        double vW = defaultCenterX * 2.0 > 0 ? defaultCenterX * 2.0 : 1920.0;
+        double vH = defaultCenterY * 2.0 > 0 ? defaultCenterY * 2.0 : 1080.0;
+        double viewW = vW / actualScale;
+        double viewH = vH / actualScale;
+        double halfW = viewW / 2.0;
+        double halfH = viewH / 2.0;
+
+        // Settings Manager'dan değerleri al
+        double idleTimeout = PostClickFollowSec;
+        double boundaryDeadzone = 300.0; // 300px sanal güvenli bölge
+        double velocityMaxDist = 200.0;
+        double velocityTimeWindow = 0.05; // 50ms
+
+        bool isZoomed = false;
+        double currentZoomStartTime = 0;
+        double lastActivityTime = 0;
+        double currentTargetX = defaultCenterX;
+        double currentTargetY = defaultCenterY;
+        
+        ZoomEffect? currentEffect = null;
+
+        // Tıklama ve hareketleri kronolojik sıraya diz
+        var events = new List<(double Time, bool IsClick, double X, double Y, MouseClickEvent? Click, MouseMoveEvent? Move)>();
+        foreach (var c in downClicks) events.Add((c.Timestamp, true, c.X, c.Y, c, null));
+        foreach (var m in allMoves) events.Add((m.Timestamp, false, m.X, m.Y, null, m));
+        
+        events = events.OrderBy(e => e.Time).ToList();
+
+        double lastMoveX = -1;
+        double lastMoveY = -1;
+        double lastMoveTime = -1;
+
+        Action<double> FinalizeCurrentZoom = (double endTime) => {
+            if (currentEffect != null)
             {
-                var last = effects[^1];
-                double lastEnd = last.StartTime + last.Duration;
-                double dist = Math.Sqrt(Math.Pow(click.X - last.TargetX, 2) + Math.Pow(click.Y - last.TargetY, 2));
+                double dur = endTime - currentEffect.StartTime;
+                if (dur < 0.5) dur = 0.5; // Min süre
+                currentEffect.Duration = Math.Round(dur, 3);
+                effects.Add(currentEffect);
+                currentEffect = null;
+            }
+            isZoomed = false;
+        };
 
-                bool isDuringOrNearLastZoom = click.Timestamp <= (lastEnd + 1.0);
-                bool isSameRegion = dist <= NearClickDistancePx;
+        foreach (var ev in events)
+        {
+            double time = ev.Time;
+            double x = ev.X;
+            double y = ev.Y;
 
-                if (isDuringOrNearLastZoom && isSameRegion)
+            if (isZoomed)
+            {
+                // 1. Idle Timeout (Zaman Aşımı) Kontrolü
+                if ((time - lastActivityTime) > idleTimeout)
                 {
-                    double newEnd = click.Timestamp + (isInstant ? 0.6 : PostClickFollowSec);
-                    if (maxVideoDurationSec > 0) newEnd = Math.Min(newEnd, maxVideoDurationSec);
-
-                    if (newEnd > lastEnd)
+                    FinalizeCurrentZoom(lastActivityTime + idleTimeout);
+                }
+                
+                // 2. Velocity Check (İvme/Hız Kontrolü)
+                else if (!ev.IsClick && lastMoveTime > 0 && (time - lastMoveTime) <= velocityTimeWindow * 2)
+                {
+                    double dist = Math.Sqrt(Math.Pow(x - lastMoveX, 2) + Math.Pow(y - lastMoveY, 2));
+                    double speed = dist / (time - lastMoveTime); // px / sec
+                    if (speed > (velocityMaxDist / velocityTimeWindow)) // Hızlı hareket (örn. 4000 px/sec)
                     {
-                        last.Duration = Math.Round(newEnd - last.StartTime, 3);
+                        FinalizeCurrentZoom(time);
                     }
-
-                    last.TargetX = Math.Round(last.TargetX * 0.35 + click.X * 0.65, 1);
-                    last.TargetY = Math.Round(last.TargetY * 0.35 + click.Y * 0.65, 1);
-                    continue;
+                }
+                
+                // 3. Boundary Exit (Sınır Çıkışı)
+                else if (!ev.IsClick && CancelOnOutOfBounds)
+                {
+                    double distFromCenter = Math.Sqrt(Math.Pow(x - currentTargetX, 2) + Math.Pow(y - currentTargetY, 2));
+                    if (distFromCenter > boundaryDeadzone)
+                    {
+                        FinalizeCurrentZoom(time);
+                    }
                 }
             }
 
-            double leadTime = isInstant ? 0.08 : ZoomPreviewLeadSec;
-            double startTimeSec = Math.Max(0, click.Timestamp - leadTime);
-            double duration = isInstant ? 0.8 : (PostClickFollowSec + leadTime);
-
-            if (maxVideoDurationSec > 0 && startTimeSec + duration > maxVideoDurationSec)
+            if (ev.IsClick)
             {
-                duration = Math.Max(0.5, maxVideoDurationSec - startTimeSec);
+                double tx = Math.Clamp(x, halfW, vW - halfW);
+                double ty = Math.Clamp(y, halfH, vH - halfH);
+                lastActivityTime = time;
+
+                if (!isZoomed)
+                {
+                    // Yeni bir zoom oturumu başlat
+                    isZoomed = true;
+                    currentZoomStartTime = Math.Max(0, time - (autoZoomMode == "instant" ? 0.08 : ZoomPreviewLeadSec));
+                    currentTargetX = tx;
+                    currentTargetY = ty;
+
+                    currentEffect = new ZoomEffect
+                    {
+                        Id = Guid.NewGuid().ToString("N")[..8],
+                        Name = $"Zoom {zoomIndex++}",
+                        StartTime = Math.Round(currentZoomStartTime, 3),
+                        Scale = actualScale,
+                        TargetX = Math.Round(currentTargetX, 1),
+                        TargetY = Math.Round(currentTargetY, 1),
+                        Easing = autoZoomMode == "instant" ? "instant" : "cubic-out"
+                    };
+                }
+                else
+                {
+                    // Zaten zoom durumundayız. BÜYÜTME (Scale artmaz). Sadece Panning yap.
+                    // Mevcut zoom'u burada sonlandırıp ardışık yeni bir ZoomEffect başlatarak
+                    // Render katmanının smooth pan yapmasını sağlıyoruz.
+                    double transitionStart = time;
+                    FinalizeCurrentZoom(transitionStart);
+                    
+                    isZoomed = true;
+                    currentTargetX = tx;
+                    currentTargetY = ty;
+                    
+                    currentEffect = new ZoomEffect
+                    {
+                        Id = Guid.NewGuid().ToString("N")[..8],
+                        Name = $"Zoom {zoomIndex++}",
+                        StartTime = Math.Round(transitionStart, 3),
+                        Scale = actualScale,
+                        TargetX = Math.Round(currentTargetX, 1),
+                        TargetY = Math.Round(currentTargetY, 1),
+                        Easing = autoZoomMode == "instant" ? "instant" : "cubic-out"
+                    };
+                }
             }
-
-            effects.Add(new ZoomEffect
+            else
             {
-                Id = Guid.NewGuid().ToString("N")[..8],
-                Name = $"Zoom {zoomIndex++}",
-                StartTime = Math.Round(startTimeSec, 3),
-                Duration = Math.Round(duration, 3),
-                TargetX = Math.Round((double)click.X, 1),
-                TargetY = Math.Round((double)click.Y, 1),
-                Scale = defaultScale,
-                Easing = isInstant ? "instant" : "ease-in-out"
-            });
+                // Hareketi anlamlıysa activity zamanını güncelle (örn > 10px hareket)
+                if (lastMoveTime > 0)
+                {
+                    double dist = Math.Sqrt(Math.Pow(x - lastMoveX, 2) + Math.Pow(y - lastMoveY, 2));
+                    if (dist > 10)
+                    {
+                        lastActivityTime = time;
+                    }
+                }
+                
+                lastMoveX = x;
+                lastMoveY = y;
+                lastMoveTime = time;
+            }
+        }
+
+        if (isZoomed)
+        {
+            FinalizeCurrentZoom(lastActivityTime + idleTimeout);
+        }
+
+        if (maxVideoDurationSec > 0)
+        {
+            foreach (var e in effects)
+            {
+                if (e.StartTime + e.Duration > maxVideoDurationSec)
+                {
+                    e.Duration = Math.Max(0.5, maxVideoDurationSec - e.StartTime);
+                }
+            }
+            effects.RemoveAll(e => e.StartTime >= maxVideoDurationSec);
         }
 
         return effects;
+    }
+
+    /// <summary>
+    /// MouseFrameData telemetrisi için akıllı zoom efektleri listesi üretir.
+    /// </summary>
+    public List<ZoomEffect> GenerateZoomEffectsFromFrames(
+        IEnumerable<MouseFrameData> frames,
+        string autoZoomMode = "smooth",
+        double? defaultScale = null,
+        double maxVideoDurationSec = 0)
+    {
+
+        var clickEvents = frames
+            .Where(f => f.EventType == MouseEventType.LeftDown || f.EventType == MouseEventType.RightDown)
+            .Select(f => MouseClickEvent.FromFrameData(f));
+
+        var moveEvents = frames
+            .Where(f => f.EventType == MouseEventType.Move)
+            .Select(f => MouseMoveEvent.FromFrameData(f));
+
+        return GenerateZoomEffectsFromClicks(clickEvents, moveEvents, autoZoomMode, defaultScale, maxVideoDurationSec);
+    }
+
+    /// <summary>
+    /// Akıllı zoom durum makinesi örneği oluşturur.
+    /// </summary>
+    public static SmartZoomStateMachine CreateSmartZoomStateMachine(
+        float? targetScale = null,
+        double? zoomInMs = null,
+        double? zoomOutMs = null,
+        double? holdMs = null,
+        float boundaryW = 320f,
+        float boundaryH = 240f)
+    {
+        var settings = SettingsManager.Instance;
+        double speedMs = settings.ZoomSpeed * 1000.0;
+        return new SmartZoomStateMachine
+        {
+            TargetScale = targetScale ?? (float)settings.MaxZoomRatio,
+            ZoomInDurationMs = zoomInMs ?? Math.Max(100.0, speedMs * 0.7),
+            ZoomOutDurationMs = zoomOutMs ?? Math.Max(100.0, speedMs * 0.85),
+            DefaultHoldDurationMs = holdMs ?? (settings.ZoomDuration * 1000.0),
+            VirtualBoundarySize = new System.Drawing.SizeF(boundaryW, boundaryH)
+        };
     }
 
     /// <summary>
@@ -208,6 +385,24 @@ public class ZoomEngineService
     }
 
     /// <summary>
+    /// Cubic-Ease-Out: 1 - (1 - t)^3
+    /// Tıklama anında ekranın ani değil, doğrusal olmayan pürüzsüz bir ivmeyle büyümesini sağlar.
+    /// </summary>
+    public static double EaseOutCubic(double t)
+    {
+        double f = 1.0 - Math.Clamp(t, 0.0, 1.0);
+        return 1.0 - (f * f * f);
+    }
+
+    /// <summary>
+    /// Sine-Ease-Out: sin(t * PI / 2)
+    /// </summary>
+    public static double EaseOutSine(double t)
+    {
+        return Math.Sin(Math.Clamp(t, 0.0, 1.0) * (Math.PI / 2.0));
+    }
+
+    /// <summary>
     /// Cubic Ease In/Out enterpolasyon eğrisi hesabı.
     /// </summary>
     public static double EaseInOutCubic(double t)
@@ -220,8 +415,12 @@ public class ZoomEngineService
 
     /// <summary>
     /// Belirtilen video saniyesinde aktif bir zoom/pan durumu varsa koordinat ve ölçek değerini
-    /// akıcı ease-in ve ease-out geçişleriyle hesaplar.
-    /// Fare takibi ile fareyi merkezde tutar ve farenin her zaman zoom içinde kalmasını garanti eder.
+    /// Cubic-Ease-Out ve Sine-Ease-Out yumuşak geçişleriyle hesaplar.
+    /// 
+    /// AKILLI ZOOM VE SINIR İHLALİ (BOUNDARY CHECK):
+    /// Tıklanan nokta merkez alınarak bir Sanal Sınır Kutusu oluşturulur.
+    /// Görüntü büyüdükten sonra kullanıcının faresi bu sınır kutusunun dışına çıkarsa
+    /// zoom işlemi pürüzsüzce iptal edilir (Zoom-Out) ve orijinal ekrana dönülür.
     /// </summary>
     public ActiveZoomState? GetActiveZoomAtTime(
         IReadOnlyList<ZoomEffect>? effects,
@@ -257,6 +456,21 @@ public class ZoomEngineService
             double end = start + dur;
 
             bool hasNext = (i < sorted.Count - 1 && sorted[i + 1].StartTime <= end + 0.15);
+            
+            double targetScale = Math.Max(1.0, e.Scale);
+            double viewW = vW / targetScale;
+            double viewH = vH / targetScale;
+            double halfW = viewW / 2.0;
+            double halfH = viewH / 2.0;
+
+            double tx = e.TargetX > 0 ? e.TargetX : defaultCenterX;
+            double ty = e.TargetY > 0 ? e.TargetY : defaultCenterY;
+
+            tx = Math.Clamp(tx, halfW, vW - halfW);
+            ty = Math.Clamp(ty, halfH, vH - halfH);
+
+            bool isContinuousPanNext = hasNext && Math.Abs(sorted[i + 1].Scale - targetScale) < 0.01;
+            
             if (hasNext)
             {
                 end = sorted[i + 1].StartTime;
@@ -264,41 +478,55 @@ public class ZoomEngineService
             }
 
             bool hasPrev = (i > 0 && start <= (sorted[i - 1].StartTime + sorted[i - 1].Duration + 0.15));
+            double prevScale = hasPrev ? sorted[i - 1].Scale : 1.0;
+            bool isContinuousPanPrev = hasPrev && Math.Abs(prevScale - targetScale) < 0.01;
+
+            double transIn = hasPrev ? (isContinuousPanPrev ? Math.Min(DefaultTransitionTime, dur * 0.35) : 0.25) : Math.Min(DefaultTransitionTime, dur * 0.30);
+            double transOut = hasNext ? (isContinuousPanNext ? 0.0 : 0.25) : Math.Min(DefaultTransitionTime, dur * 0.30);
+
+            double inEnd = start + transIn;
+            double outStart = end - transOut;
+
+            // KURAL: Sınır ihlali kontrolünü artık GenerateZoomEffectsFromClicks içinde state machine yapıyor.
+            // Bu yüzden buradaki checkStart ve outStart dinamik küçültme mantığını kaldırdık, 
+            // sadece üretilen net Duration'lara itimat ediyoruz.
+
 
             if (timeSec >= start && timeSec <= end)
             {
-                double targetScale = Math.Max(1.0, e.Scale);
-                double viewW = vW / targetScale;
-                double viewH = vH / targetScale;
-                double halfW = viewW / 2.0;
-                double halfH = viewH / 2.0;
-
-                double tx = e.TargetX > 0 ? e.TargetX : defaultCenterX;
-                double ty = e.TargetY > 0 ? e.TargetY : defaultCenterY;
-
-                if (cursorX >= 0 && cursorY >= 0)
+                if (e.DragEndTime > 0 && timeSec >= inEnd && timeSec <= e.DragEndTime && moves != null)
                 {
-                    double timeInEffect = timeSec - start;
-                    double followFactor = Math.Clamp(timeInEffect / 0.25, 0.4, 1.0);
-                    tx = tx * (1.0 - followFactor) + cursorX * followFactor;
-                    ty = ty * (1.0 - followFactor) + cursorY * followFactor;
+                    double boundHalfW = Math.Max(240.0, halfW * 0.75);
+                    double boundHalfH = Math.Max(180.0, halfH * 0.75);
+                    double simX = e.TargetX;
+                    double simY = e.TargetY;
+                    foreach (var m in moves.Where(m => m.Timestamp >= inEnd && m.Timestamp <= timeSec))
+                    {
+                        if (m.X > simX + boundHalfW) simX = m.X - boundHalfW;
+                        else if (m.X < simX - boundHalfW) simX = m.X + boundHalfW;
+
+                        if (m.Y > simY + boundHalfH) simY = m.Y - boundHalfH;
+                        else if (m.Y < simY - boundHalfH) simY = m.Y + boundHalfH;
+                        
+                        simX = Math.Clamp(simX, halfW, vW - halfW);
+                        simY = Math.Clamp(simY, halfH, vH - halfH);
+                    }
+                    tx = simX;
+                    ty = simY;
+                }
+                else if (e.DragEndTime > 0 && timeSec > e.DragEndTime)
+                {
+                    tx = e.TargetX2 > 0 ? e.TargetX2 : e.TargetX;
+                    ty = e.TargetY2 > 0 ? e.TargetY2 : e.TargetY;
                 }
 
-                tx = Math.Clamp(tx, halfW, vW - halfW);
-                ty = Math.Clamp(ty, halfH, vH - halfH);
-
-                double transIn = hasPrev ? 0.30 : Math.Min(DefaultTransitionTime, dur * 0.35);
-                double transOut = hasNext ? 0.30 : Math.Min(DefaultTransitionTime, dur * 0.35);
-
-                double inEnd = start + transIn;
-                double outStart = end - transOut;
-
-                if (timeSec < inEnd && transIn > 0.001)
+                // 1. ZOOM-IN EVRESİ: Doğrusal olmayan Cubic-Ease-Out animasyonu
+                if (timeSec < inEnd && transIn > 0.0001)
                 {
-                    double p = (timeSec - start) / transIn;
-                    double ease = EaseInOutCubic(p);
+                    double p = Math.Clamp((timeSec - start) / transIn, 0.0, 1.0);
+                    double ease = EaseOutCubic(p);
 
-                    double prevScale = hasPrev ? sorted[i - 1].Scale : 1.0;
+                    prevScale = hasPrev ? sorted[i - 1].Scale : 1.0;
                     double prevX = hasPrev ? Math.Clamp(sorted[i - 1].TargetX, halfW, vW - halfW) : defaultCenterX;
                     double prevY = hasPrev ? Math.Clamp(sorted[i - 1].TargetY, halfH, vH - halfH) : defaultCenterY;
 
@@ -314,6 +542,7 @@ public class ZoomEngineService
                     };
                 }
 
+                // 2. HOLD (SABİT ZOOM) EVRESİ
                 if (timeSec >= inEnd && timeSec <= outStart)
                 {
                     return new ActiveZoomState
@@ -324,10 +553,11 @@ public class ZoomEngineService
                     };
                 }
 
-                if (timeSec > outStart && transOut > 0.001)
+                // 3. ZOOM-OUT EVRESİ: Sine-Ease-Out ile pürüzsüz orijinal ekrana dönüş
+                if (timeSec > outStart && transOut > 0.0001)
                 {
-                    double p = (timeSec - outStart) / transOut;
-                    double ease = EaseInOutCubic(p);
+                    double p = Math.Clamp((timeSec - outStart) / transOut, 0.0, 1.0);
+                    double ease = EaseOutSine(p);
 
                     if (hasNext)
                     {
@@ -397,14 +627,20 @@ public class ZoomEngineService
             double end = start + dur;
 
             bool hasNext = (i < sorted.Count - 1 && sorted[i + 1].StartTime <= end + 0.15);
+            bool isContinuousPanNext = hasNext && Math.Abs(sorted[i + 1].Scale - e.Scale) < 0.01;
+
             if (hasNext)
             {
                 end = sorted[i + 1].StartTime;
                 dur = Math.Max(0.3, end - start);
             }
 
-            double transIn = Math.Min(DefaultTransitionTime, dur * 0.35);
-            double transOut = Math.Min(DefaultTransitionTime, dur * 0.35);
+            bool hasPrev = (i > 0 && start <= (sorted[i - 1].StartTime + sorted[i - 1].Duration + 0.15));
+            double prevScale = hasPrev ? sorted[i - 1].Scale : 1.0;
+            bool isContinuousPanPrev = hasPrev && Math.Abs(prevScale - e.Scale) < 0.01;
+
+            double transIn = hasPrev ? (isContinuousPanPrev ? Math.Min(DefaultTransitionTime, dur * 0.35) : 0.25) : Math.Min(DefaultTransitionTime, dur * 0.30);
+            double transOut = hasNext ? (isContinuousPanNext ? 0.0 : 0.25) : Math.Min(DefaultTransitionTime, dur * 0.30);
 
             double tInEnd = start + transIn;
             double tOutStart = end - transOut;
@@ -426,8 +662,23 @@ public class ZoomEngineService
             string clampX = $"max(0,min(({sTargetX}-(iw/zoom/2)),iw-(iw/zoom)))";
             string clampY = $"max(0,min(({sTargetY}-(ih/zoom/2)),ih-(ih/zoom)))";
 
+            string holdX = clampX;
+            string holdY = clampY;
+
+            if (e.DragEndTime > 0 && e.TargetX2 > 0 && e.TargetY2 > 0)
+            {
+                string sDragEnd = e.DragEndTime.ToString("F3", CultureInfo.InvariantCulture);
+                string clampX2 = $"max(0,min(({e.TargetX2.ToString("F1", CultureInfo.InvariantCulture)}-(iw/zoom/2)),iw-(iw/zoom)))";
+                string clampY2 = $"max(0,min(({e.TargetY2.ToString("F1", CultureInfo.InvariantCulture)}-(ih/zoom/2)),ih-(ih/zoom)))";
+                
+                string dragProgress = $"min(1, max(0, (in_time-{sInEnd})/max(0.001, {sDragEnd}-{sInEnd})))";
+                holdX = $"({clampX} + {dragProgress} * ({clampX2} - {clampX}))";
+                holdY = $"({clampY} + {dragProgress} * ({clampY2} - {clampY}))";
+            }
+
             string pIn = $"((in_time-{sStart})/{sTransIn})";
-            string easeIn = $"({pIn}*{pIn}*(3-2*{pIn}))";
+            // Cubic-ease-out benzeri ivmeli giriş
+            string easeIn = $"({pIn}*(2-{pIn}))";
             string zIn = $"1+{sScaleDelta}*{easeIn}";
 
             string zOut;
@@ -446,17 +697,17 @@ public class ZoomEngineService
                 string easeOut = $"({pOut}*{pOut}*(3-2*{pOut}))";
 
                 zOut = sScale; 
-                curX = $"if(between(in_time,{sStart},{sInEnd}),(iw/2-(iw/zoom/2))+({clampX}-(iw/2-(iw/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{clampX},if(between(in_time,{sOutStart},{sEnd}),{clampX}+({clampNextX}-{clampX})*{easeOut},{xExpr})))";
-                curY = $"if(between(in_time,{sStart},{sInEnd}),(ih/2-(ih/zoom/2))+({clampY}-(ih/2-(ih/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{clampY},if(between(in_time,{sOutStart},{sEnd}),{clampY}+({clampNextY}-{clampY})*{easeOut},{yExpr})))";
+                curX = $"if(between(in_time,{sStart},{sInEnd}),(iw/2-(iw/zoom/2))+({holdX}-(iw/2-(iw/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{holdX},if(between(in_time,{sOutStart},{sEnd}),{holdX}+({clampNextX}-{holdX})*{easeOut},{xExpr})))";
+                curY = $"if(between(in_time,{sStart},{sInEnd}),(ih/2-(ih/zoom/2))+({holdY}-(ih/2-(ih/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{holdY},if(between(in_time,{sOutStart},{sEnd}),{holdY}+({clampNextY}-{holdY})*{easeOut},{yExpr})))";
             }
             else
             {
                 string pOut = $"(({sEnd}-in_time)/{sTransOut})";
-                string easeOut = $"({pOut}*{pOut}*(3-2*{pOut}))";
+                string easeOut = $"({pOut}*(2-{pOut}))";
                 zOut = $"1+{sScaleDelta}*{easeOut}";
 
-                curX = $"if(between(in_time,{sStart},{sInEnd}),(iw/2-(iw/zoom/2))+({clampX}-(iw/2-(iw/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{clampX},if(between(in_time,{sOutStart},{sEnd}),(iw/2-(iw/zoom/2))+({clampX}-(iw/2-(iw/zoom/2)))*{easeOut},{xExpr})))";
-                curY = $"if(between(in_time,{sStart},{sInEnd}),(ih/2-(ih/zoom/2))+({clampY}-(ih/2-(ih/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{clampY},if(between(in_time,{sOutStart},{sEnd}),(ih/2-(ih/zoom/2))+({clampY}-(ih/2-(ih/zoom/2)))*{easeOut},{yExpr})))";
+                curX = $"if(between(in_time,{sStart},{sInEnd}),(iw/2-(iw/zoom/2))+({holdX}-(iw/2-(iw/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{holdX},if(between(in_time,{sOutStart},{sEnd}),(iw/2-(iw/zoom/2))+({holdX}-(iw/2-(iw/zoom/2)))*{easeOut},{xExpr})))";
+                curY = $"if(between(in_time,{sStart},{sInEnd}),(ih/2-(ih/zoom/2))+({holdY}-(ih/2-(ih/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{holdY},if(between(in_time,{sOutStart},{sEnd}),(ih/2-(ih/zoom/2))+({holdY}-(ih/2-(ih/zoom/2)))*{easeOut},{yExpr})))";
             }
 
             string curZ = $"if(between(in_time,{sStart},{sInEnd}),{zIn},if(between(in_time,{sInEnd},{sOutStart}),{sScale},if(between(in_time,{sOutStart},{sEnd}),{zOut},{zExpr})))";

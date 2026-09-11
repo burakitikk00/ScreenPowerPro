@@ -93,6 +93,7 @@ public sealed partial class SettingsWindow : Window
         if (TbExportFormatLabel != null) TbExportFormatLabel.Text = _locService["Settings_ExportFormat"];
         if (TbExportResolutionLabel != null) TbExportResolutionLabel.Text = _locService["Settings_ExportResolution"];
         if (TbExportFpsLabel != null) TbExportFpsLabel.Text = _locService["Settings_Fps"];
+        if (TbRecordingResolutionLabel != null) TbRecordingResolutionLabel.Text = _locService["Settings_RecordingResolution"] ?? "Target Recording Resolution";
     }
 
     private void LoadSettingsToUI()
@@ -121,6 +122,18 @@ public sealed partial class SettingsWindow : Window
             _ => "3s"
         };
         SetComboSelection(CmbCountdown, countText);
+
+        var displayArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
+        if (displayArea != null && displayArea.OuterBounds.Width < 3840)
+        {
+            ComboItemRecord4K.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            ComboItemRecord4K.Visibility = Visibility.Visible;
+        }
+
+        SetComboSelection(CmbRecordingResolution, s.Resolution ?? "Original");
 
         // Shortcuts
         TbShortcutStartStop.Text = string.IsNullOrEmpty(s.ShortcutStartStop) ? "F9" : s.ShortcutStartStop;
@@ -293,7 +306,6 @@ public sealed partial class SettingsWindow : Window
         bool isOn = SwitchHideDesktopIcons.IsOn;
         _settingsService.Current.HideDesktopIcons = isOn;
         _settingsService.Save();
-        Win32Helper.SetDesktopIconsVisible(!isOn);
     }
 
     private void OnHideTaskbarToggled(object sender, RoutedEventArgs e)
@@ -302,7 +314,6 @@ public sealed partial class SettingsWindow : Window
         bool isOn = SwitchHideTaskbar.IsOn;
         _settingsService.Current.HideTaskbar = isOn;
         _settingsService.Save();
-        Win32Helper.SetTaskbarVisible(!isOn);
     }
 
     private void OnRecordingQualityChanged(object sender, SelectionChangedEventArgs e)
@@ -326,6 +337,16 @@ public sealed partial class SettingsWindow : Window
                 "5s" => 5,
                 _ => 0
             };
+            _settingsService.Save();
+        }
+    }
+
+    private void OnRecordingResolutionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing) return;
+        if (CmbRecordingResolution.SelectedItem is ComboBoxItem item && item.Content is string val)
+        {
+            _settingsService.Current.Resolution = val;
             _settingsService.Save();
         }
     }

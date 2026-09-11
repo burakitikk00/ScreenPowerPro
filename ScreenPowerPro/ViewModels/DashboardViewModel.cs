@@ -274,13 +274,30 @@ public partial class DashboardViewModel : ObservableObject
         // 1. Create project dir
         string projectDir = _projectService.CreateNewProjectDirectory();
 
-        // 2. Start input tracker with recording crop origin
-        _inputTracker.StartTracking(cropX, cropY);
+        // 2. Prepare input tracker in Preparing state (prevents pre-recording events from leaking)
+        _inputTracker.Prepare(cropX, cropY);
 
-        // 3. Start recorder
+        // 3. Hook RecordingStarted to start input tracking at exact 0.0ms video start
+        Action? onStarted = null;
+        onStarted = () =>
+        {
+            _recorderService.RecordingStarted -= onStarted;
+            _inputTracker.StartRecording();
+        };
+        _recorderService.RecordingStarted += onStarted;
+
+        // 4. Start recorder
         IntPtr? winHandle = SelectedMode == RecordingMode.Window && SelectedWindow != null ? SelectedWindow.Handle : null;
-        await _recorderService.StartRecordingAsync(projectDir, SelectedMode, winHandle, cropX, cropY, cropW, cropH);
-
-        RequestStartRecording?.Invoke(projectDir);
+        try
+        {
+            await _recorderService.StartRecordingAsync(projectDir, SelectedMode, winHandle, cropX, cropY, cropW, cropH);
+            RequestStartRecording?.Invoke(projectDir);
+        }
+        catch
+        {
+            _recorderService.RecordingStarted -= onStarted;
+            _inputTracker.StopTracking();
+            throw;
+        }
     }
 }

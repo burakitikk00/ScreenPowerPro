@@ -78,11 +78,14 @@ public class ExportService
         string? cursorOverlayPath = null;
         try
         {
+            int srcWidth = manifest.Metadata?.Width > 0 ? manifest.Metadata.Width : 1920;
+            int srcHeight = manifest.Metadata?.Height > 0 ? manifest.Metadata.Height : 1080;
+
             cursorOverlayPath = await _cursorRenderService.RenderCursorOverlayAsync(
                 projectDir ?? AppContext.BaseDirectory,
                 manifest,
-                targetWidth,
-                targetHeight,
+                srcWidth,
+                srcHeight,
                 targetFps,
                 totalDuration,
                 cancellationToken,

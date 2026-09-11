@@ -1753,11 +1753,13 @@
                         </StackPanel>
                         <ComboBox x:Name="CmbExportResolution" HorizontalAlignment="Stretch" CornerRadius="8"
                                   Background="#14151E" BorderBrush="#26FFFFFF" SelectionChanged="OnExportSettingChanged">
-                            <ComboBoxItem Tag="4K" Content="4K Ultra HD (3840 × 2160)" />
-                            <ComboBoxItem Tag="2K" Content="2K Quad HD (2560 × 1440)" />
-                            <ComboBoxItem Tag="1080p" Content="1080p Full HD (1920 × 1080)" IsSelected="True" />
-                            <ComboBoxItem Tag="720p" Content="720p HD (1280 × 720)" />
+                            <ComboBoxItem x:Name="ExportRes4K" Tag="4K" Content="4K Ultra HD (3840 × 2160)" />
+                            <ComboBoxItem x:Name="ExportRes2K" Tag="2K" Content="2K Quad HD (2560 × 1440)" />
+                            <ComboBoxItem x:Name="ExportRes1080p" Tag="1080p" Content="1080p Full HD (1920 × 1080)" IsSelected="True" />
+                            <ComboBoxItem x:Name="ExportRes720p" Tag="720p" Content="720p HD (1280 × 720)" />
                         </ComboBox>
+                        <TextBlock x:Name="TbExportResInfo" Text="Orijinal kayıttan yüksek çözünürlükler (kaliteyi artırmayacağı için) devre dışı bırakılmıştır."
+                                   Foreground="{StaticResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
                     </StackPanel>
 
                     <!-- Frame Rate & Format (Grid with 2 columns) -->

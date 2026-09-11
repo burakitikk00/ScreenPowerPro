@@ -239,6 +239,21 @@
                             </ComboBox>
                         </StackPanel>
                     </Grid>
+
+                    <!-- Target Recording Resolution -->
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock x:Name="TbRecordingResolutionLabel" Text="Target Recording Resolution" FontSize="13" Foreground="#C7C4D7" FontWeight="Medium"/>
+                            <FontIcon Glyph="&#xE946;" FontSize="12" Foreground="#8E8E9F" ToolTipService.ToolTip="Kaydedilecek hedeflenen çözünürlük. Zoom kalitesi için 1080p çıktı alacaksanız bile ekranınız destekliyorsa 4K kaydetmeniz önerilir."/>
+                        </StackPanel>
+                        <ComboBox x:Name="CmbRecordingResolution" SelectionChanged="OnRecordingResolutionChanged"
+                                  HorizontalAlignment="Stretch" Background="#101117" BorderBrush="#262736" CornerRadius="8" Height="40">
+                            <ComboBoxItem Content="Original" />
+                            <ComboBoxItem Content="4K" x:Name="ComboItemRecord4K" />
+                            <ComboBoxItem Content="1080p" />
+                            <ComboBoxItem Content="720p" />
+                        </ComboBox>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- ================= TAB 3: SHORTCUT KEYS ================= -->

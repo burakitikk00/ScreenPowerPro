@@ -92,6 +92,9 @@ public class TimelineModel
     [JsonPropertyName("sysTrack")]
     public TrackState SysTrack { get; set; } = new();
 
+    [JsonPropertyName("clickTrack")]
+    public TrackState ClickTrack { get; set; } = new();
+
     [JsonPropertyName("settings")]
     public TimelineSettings Settings { get; set; } = new();
 }
@@ -202,6 +205,12 @@ public class TimelineSettings
 
     [JsonPropertyName("cursorClickSound")]
     public bool CursorClickSound { get; set; } = false;
+
+    [JsonPropertyName("cursorClickSoundFile")]
+    public string CursorClickSoundFile { get; set; } = "universfield-computer-mouse-click-02-383961.mp3";
+
+    [JsonPropertyName("cursorClickVolume")]
+    public double CursorClickVolume { get; set; } = 80; // 0 - 100
 
     [JsonPropertyName("hideCursorWhenIdle")]
     public bool HideCursorWhenIdle { get; set; } = false;

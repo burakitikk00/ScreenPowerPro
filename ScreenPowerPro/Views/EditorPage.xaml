@@ -74,7 +74,7 @@
             <!-- Main workspace: FocuSee Left Sidebar + Video Preview -->
             <RowDefinition Height="*" />
             <!-- Timeline -->
-            <RowDefinition Height="270" />
+            <RowDefinition Height="315" />
         </Grid.RowDefinitions>
 
         <!-- ====================================================
@@ -472,8 +472,28 @@
                                         <TextBlock x:Name="TbCursorClickSound" Text="Cursor Click Sound" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                         <ToggleSwitch x:Name="TsCursorSound" Grid.Column="1"
                                             IsOn="{x:Bind ViewModel.CursorClickSound, Mode=TwoWay}"
+                                            Toggled="OnCursorSoundToggled"
                                             OnContent="" OffContent="" Margin="0"/>
                                     </Grid>
+                                    <!-- Click Sound Details (Tone selector & Volume) -->
+                                    <StackPanel x:Name="PanelClickSoundDetails" Spacing="8" Margin="0,0,0,4">
+                                        <TextBlock Text="Tıklama Sesi Tonu" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                        <ComboBox x:Name="ComboClickSounds" HorizontalAlignment="Stretch"
+                                            SelectionChanged="OnComboClickSoundsSelectionChanged"/>
+                                        <Grid Margin="0,2,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Ses Seviyesi" FontSize="11" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="TbCursorSoundVolText" Grid.Column="1" Text="80%" FontSize="11" Foreground="{StaticResource PrimaryAccentBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Slider x:Name="SliderCursorClickVol" Minimum="0" Maximum="100"
+                                            Value="{x:Bind ViewModel.CursorClickVolume, Mode=TwoWay}"
+                                            ValueChanged="OnCursorClickVolSliderChanged"/>
+                                        <Button x:Name="BtnTestClickSound" Content="🔊 Sesi Dinle" HorizontalAlignment="Stretch" FontSize="11"
+                                            Click="OnTestClickSoundClicked"/>
+                                    </StackPanel>
                                     <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -1581,12 +1601,6 @@
                                 <FontIcon Glyph="&#xE74D;" FontSize="15"
                                     Foreground="{StaticResource ErrorBrush}"/>
                             </Button>
-                            <Rectangle Width="1" Height="18" Fill="{StaticResource GlassBorderBrush}" Margin="4,0"/>
-                            <Button x:Name="BtnAddZoom" Style="{StaticResource IconButtonStyle}" Click="OnAddZoomClicked"
-                                ToolTipService.ToolTip="Zoom Efekti Ekle (+)">
-                                <FontIcon Glyph="&#xE710;" FontSize="15"
-                                    Foreground="{StaticResource TertiaryBrush}"/>
-                            </Button>
                         </StackPanel>
 
                         <!-- Play controls + timecode (center) -->
@@ -1733,10 +1747,61 @@
                                             ValueChanged="OnVideoTrackVolumeChanged"
                                             ToolTipService.ToolTip="Video Ses Seviyesi"
                                             Margin="0,0,2,0"/>
-                                        <Button x:Name="BtnVideoMute" Click="OnVideoTrackMuteClicked" Style="{StaticResource IconButtonStyle}" Width="24" Height="24"
-                                            ToolTipService.ToolTip="Video Sesini Kapat/Aç">
-                                            <FontIcon x:Name="IconVideoMute" Glyph="&#xE767;" FontSize="12"
-                                                Foreground="{StaticResource TextMutedBrush}"/>
+                                        <Button x:Name="BtnVideoMute" Click="OnVideoTrackMuteClicked" PointerWheelChanged="OnVideoTrackBtnWheelChanged"
+                                            Style="{StaticResource IconButtonStyle}" Width="32" Height="26"
+                                            ToolTipService.ToolTip="Video Sesini Kapat/Aç (Sağ Tık: Seviye Ayarı)">
+                                            <Button.ContextFlyout>
+                                                <Flyout Placement="Top" Opened="OnVideoFlyoutOpened">
+                                                    <Border Background="{StaticResource SurfaceHighBrush}" Padding="12" CornerRadius="10" Width="190"
+                                                        BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                                        <StackPanel Spacing="8">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Text="Video Sesi" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                                                <TextBlock Tag="FlyoutVideoVolLabel" Grid.Column="1" Text="100%" FontSize="11" FontWeight="Bold" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center"/>
+                                                            </Grid>
+                                                            <Slider Tag="FlyoutVideoVolSlider" Minimum="0" Maximum="100" Value="100"
+                                                                ValueChanged="OnFlyoutVideoVolSliderChanged"/>
+                                                            <Button Content="Sesi Kapat / Aç" HorizontalAlignment="Stretch" FontSize="11" Padding="4,4"
+                                                                Click="OnVideoTrackMuteClicked"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Flyout>
+                                            </Button.ContextFlyout>
+                                            <Grid Width="26" Height="18" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                <FontIcon x:Name="IconVideoMute" Glyph="&#xE767;" FontSize="11"
+                                                    Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                                <!-- Animated Sound Wave / Equalizer Bars -->
+                                                <StackPanel Orientation="Horizontal" Spacing="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,1,0">
+                                                    <Border x:Name="VideoAudioBar1" Width="2" Height="4" CornerRadius="1" VerticalAlignment="Bottom">
+                                                        <Border.Background>
+                                                            <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                                                <GradientStop Color="#10B981" Offset="0"/>
+                                                                <GradientStop Color="#00D2FF" Offset="1"/>
+                                                            </LinearGradientBrush>
+                                                        </Border.Background>
+                                                    </Border>
+                                                    <Border x:Name="VideoAudioBar2" Width="2" Height="8" CornerRadius="1" VerticalAlignment="Bottom">
+                                                        <Border.Background>
+                                                            <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                                                <GradientStop Color="#10B981" Offset="0"/>
+                                                                <GradientStop Color="#00D2FF" Offset="1"/>
+                                                            </LinearGradientBrush>
+                                                        </Border.Background>
+                                                    </Border>
+                                                    <Border x:Name="VideoAudioBar3" Width="2" Height="5" CornerRadius="1" VerticalAlignment="Bottom">
+                                                        <Border.Background>
+                                                            <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                                                <GradientStop Color="#10B981" Offset="0"/>
+                                                                <GradientStop Color="#00D2FF" Offset="1"/>
+                                                            </LinearGradientBrush>
+                                                        </Border.Background>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Grid>
                                         </Button>
                                     </StackPanel>
                                 </Grid>
@@ -1830,6 +1895,69 @@
                                     </Button>
                                 </Grid>
                             </Border>
+
+                            <!-- Click sound track header (48px) -->
+                            <Border Height="48"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource GlassBorderBrush}"
+                                BorderThickness="0,0,0,1"
+                                Padding="12,0">
+                                <Grid VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE962;" FontSize="15"
+                                            Foreground="#00D2FF"/>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock x:Name="TbTrackClick" Text="Fare Tıklama Sesleri" FontSize="12" FontWeight="SemiBold"
+                                                Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TbTrackClickSub" Text="Bilgisayar Tık 02" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <!-- Mini ses seviyesi slider (timeline sol paneli) -->
+                                        <Slider x:Name="SliderClickTrackVol" Width="52" Minimum="0" Maximum="100"
+                                            Value="{x:Bind ViewModel.CursorClickVolume, Mode=TwoWay}"
+                                            ValueChanged="OnClickTrackVolumeChanged"
+                                            ToolTipService.ToolTip="Tıklama Ses Seviyesi"
+                                            Margin="0,0,2,0"/>
+                                        <Button x:Name="BtnClickMute" Click="OnClickTrackMuteClicked" PointerWheelChanged="OnClickTrackBtnWheelChanged"
+                                            Style="{StaticResource IconButtonStyle}" Width="26" Height="26"
+                                            ToolTipService.ToolTip="Tıklama Sesini Aç/Kapat (Sağ Tık: Ses Seçimi ve Ayarlar)">
+                                            <Button.ContextFlyout>
+                                                <Flyout Placement="Top" Opened="OnClickFlyoutOpened">
+                                                    <Border Background="{StaticResource SurfaceHighBrush}" Padding="12" CornerRadius="10" Width="220"
+                                                        BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                                        <StackPanel Spacing="8">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Text="Tıklama Sesi" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                                                <TextBlock Tag="FlyoutClickVolLabel" Grid.Column="1" Text="80%" FontSize="11" FontWeight="Bold" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center"/>
+                                                            </Grid>
+                                                            <Slider Tag="FlyoutClickVolSlider" Minimum="0" Maximum="100" Value="80"
+                                                                ValueChanged="OnFlyoutClickVolSliderChanged"/>
+                                                            <TextBlock Text="Ses Dosyası:" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                            <ComboBox Tag="FlyoutClickSoundCombo" HorizontalAlignment="Stretch" FontSize="11"
+                                                                SelectionChanged="OnFlyoutClickSoundSelectionChanged"/>
+                                                            <Button Tag="FlyoutClickTestBtn" Content="🔊 Sesi Dinle" HorizontalAlignment="Stretch" FontSize="11" Padding="4,4"
+                                                                Click="OnTestClickSoundClicked"/>
+                                                            <Button Content="Sesi Kapat / Aç" HorizontalAlignment="Stretch" FontSize="11" Padding="4,4"
+                                                                Click="OnClickTrackMuteClicked"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Flyout>
+                                            </Button.ContextFlyout>
+                                            <FontIcon x:Name="IconClickMute" Glyph="&#xE767;" FontSize="12"
+                                                Foreground="{StaticResource TextMutedBrush}"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </StackPanel>
                     </Border>
 
@@ -1848,6 +1976,8 @@
                                 <RowDefinition Height="56"/>
                                 <!-- Zoom track -->
                                 <RowDefinition Height="56"/>
+                                <!-- Click sound track -->
+                                <RowDefinition Height="48"/>
                             </Grid.RowDefinitions>
 
                             <!-- TIME RULER (Row 0) -->
@@ -1865,6 +1995,7 @@
                             <Canvas Grid.Row="1"
                                 x:Name="VideoTrack"
                                 Background="#080D0E15"
+                                PointerEntered="OnVideoTrackPointerEntered"
                                 PointerPressed="OnTimelinePointerPressed"
                                 PointerMoved="OnTimelinePointerMoved"
                                 PointerReleased="OnTimelinePointerReleased">
@@ -1888,6 +2019,7 @@
                             <Canvas Grid.Row="2"
                                 x:Name="AudioTrack"
                                 Background="#0500FF88"
+                                PointerEntered="OnAudioTrackPointerEntered"
                                 PointerPressed="OnAudioTrackPointerPressed"
                                 PointerMoved="OnTimelinePointerMoved"
                                 PointerReleased="OnTimelinePointerReleased">
@@ -1898,17 +2030,28 @@
                             <Canvas Grid.Row="3"
                                 x:Name="ZoomTrack"
                                 Background="#030D0E15"
+                                PointerEntered="OnZoomTrackPointerEntered"
+                                PointerPressed="OnZoomTrackPointerPressed"
                                 DoubleTapped="OnZoomTrackDoubleTapped">
                                 <!-- Zoom pills are added dynamically in code-behind -->
                             </Canvas>
 
-                            <!-- PLAYHEAD (spans all 4 rows, rendered on top) -->
-                            <Canvas Grid.Row="0" Grid.RowSpan="4"
+                            <!-- CLICK SOUND TRACK (Row 4) -->
+                            <Canvas Grid.Row="4"
+                                x:Name="ClickTrack"
+                                Background="#0400D2FF"
+                                PointerEntered="OnClickTrackPointerEntered"
+                                PointerPressed="OnClickTrackPointerPressed">
+                                <!-- Click sound markers are added dynamically in code-behind -->
+                            </Canvas>
+
+                            <!-- PLAYHEAD (spans all 5 rows, rendered on top) -->
+                            <Canvas Grid.Row="0" Grid.RowSpan="5"
                                 IsHitTestVisible="False" ZIndex="100">
                                 <Rectangle
                                     x:Name="PlayheadLine"
                                     Width="2"
-                                    Height="206"
+                                    Height="254"
                                     Fill="{StaticResource SecondaryBrush}"
                                     Canvas.Left="200"
                                     Canvas.Top="0"/>

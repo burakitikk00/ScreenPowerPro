@@ -173,6 +173,30 @@ public partial class EditorViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedClipId));
     }
 
+    public void SelectAllClipsInTrack(string trackType)
+    {
+        SelectedClipIds.Clear();
+        SelectedClipId = null;
+        List<ClipSegment>? clips = trackType switch
+        {
+            "video" => VideoTrack.Clips,
+            "mic" or "audio" => MicTrack.Clips,
+            "sys" => SysTrack.Clips,
+            _ => null
+        };
+
+        if (clips != null && clips.Count > 0)
+        {
+            foreach (var c in clips)
+            {
+                SelectedClipIds.Add(c.Id);
+            }
+            SelectedClipId = clips.LastOrDefault()?.Id;
+            SelectedTrackType = trackType == "audio" ? "mic" : trackType;
+        }
+        OnPropertyChanged(nameof(SelectedClipId));
+    }
+
     [ObservableProperty]
     private string? _selectedTrackType; // "video", "mic", "sys"
 
@@ -210,6 +234,9 @@ public partial class EditorViewModel : ObservableObject
 
     [ObservableProperty]
     private TrackState _sysTrack = new();
+
+    [ObservableProperty]
+    private TrackState _clickTrack = new();
 
     // --- Zaman Çizelgesi ve Görsel Ayarlar ---
     [ObservableProperty]
@@ -251,6 +278,20 @@ public partial class EditorViewModel : ObservableObject
         get => Settings.CursorClickSound;
         set { if (Settings.CursorClickSound != value) { Settings.CursorClickSound = value; OnPropertyChanged(); } }
     }
+
+    public string CursorClickSoundFile
+    {
+        get => string.IsNullOrEmpty(Settings.CursorClickSoundFile) ? "universfield-computer-mouse-click-02-383961.mp3" : Settings.CursorClickSoundFile;
+        set { if (Settings.CursorClickSoundFile != value) { Settings.CursorClickSoundFile = value; OnPropertyChanged(); } }
+    }
+
+    public double CursorClickVolume
+    {
+        get => Settings.CursorClickVolume;
+        set { if (Math.Abs(Settings.CursorClickVolume - value) > 0.01) { Settings.CursorClickVolume = value; OnPropertyChanged(); } }
+    }
+
+    public IReadOnlyList<ClickSoundItem> AvailableClickSounds => ClickSoundService.Instance.AvailableSounds;
 
     public bool HideCursorWhenIdle
     {
@@ -646,6 +687,7 @@ public partial class EditorViewModel : ObservableObject
         VideoTrack = manifest.Timeline.VideoTrack ?? new TrackState();
         MicTrack = manifest.Timeline.MicTrack ?? new TrackState();
         SysTrack = manifest.Timeline.SysTrack ?? new TrackState();
+        ClickTrack = manifest.Timeline.ClickTrack ?? new TrackState();
 
         InitClipsFromDuration(TotalDurationSec);
 
@@ -1091,6 +1133,8 @@ public partial class EditorViewModel : ObservableObject
             MicTrack.Muted = !MicTrack.Muted;
         else if (string.Equals(trackType, "sys", StringComparison.OrdinalIgnoreCase))
             SysTrack.Muted = !SysTrack.Muted;
+        else if (string.Equals(trackType, "click", StringComparison.OrdinalIgnoreCase))
+            CursorClickSound = !CursorClickSound;
 
         OnPropertyChanged(nameof(VideoTrack));
         OnPropertyChanged(nameof(MicTrack));
@@ -1170,6 +1214,7 @@ public partial class EditorViewModel : ObservableObject
         manifest.Timeline.VideoTrack = VideoTrack;
         manifest.Timeline.MicTrack = MicTrack;
         manifest.Timeline.SysTrack = SysTrack;
+        manifest.Timeline.ClickTrack = ClickTrack;
 
         _projectService.SaveProject(ProjectDir, manifest);
     }
@@ -1249,6 +1294,8 @@ public partial class EditorViewModel : ObservableObject
         OnPropertyChanged(nameof(CursorStyle));
         OnPropertyChanged(nameof(ClickEffect));
         OnPropertyChanged(nameof(CursorClickSound));
+        OnPropertyChanged(nameof(CursorClickSoundFile));
+        OnPropertyChanged(nameof(CursorClickVolume));
         OnPropertyChanged(nameof(HideCursorWhenIdle));
         OnPropertyChanged(nameof(MotionBlur));
         OnPropertyChanged(nameof(MotionBlurAmount));

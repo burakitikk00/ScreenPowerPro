@@ -431,14 +431,32 @@ public class ZoomEngineService
         string clean = easing.Trim().ToLowerInvariant().Replace(" ", "");
         if (clean.StartsWith("cubic-bezier(") && clean.EndsWith(")"))
         {
-            var parts = clean.Substring(13, clean.Length - 14).Split(',');
-            if (parts.Length == 4 &&
-                double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double x1) &&
-                double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double y1) &&
-                double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double x2) &&
-                double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double y2))
+            var raw = clean.Substring(13, clean.Length - 14);
+            var parts = raw.Split(',');
+            if (parts.Length == 4)
             {
-                return (Math.Clamp(x1, 0.0, 1.0), y1, Math.Clamp(x2, 0.0, 1.0), y2);
+                if (double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double x1) &&
+                    double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double y1) &&
+                    double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double x2) &&
+                    double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double y2))
+                {
+                    return (Math.Clamp(x1, 0.0, 1.0), y1, Math.Clamp(x2, 0.0, 1.0), y2);
+                }
+            }
+            else if (parts.Length == 8)
+            {
+                // Turkish comma locale fallback: "0,22,0,61,0,36,1,00"
+                string s1 = $"{parts[0]}.{parts[1]}";
+                string s2 = $"{parts[2]}.{parts[3]}";
+                string s3 = $"{parts[4]}.{parts[5]}";
+                string s4 = $"{parts[6]}.{parts[7]}";
+                if (double.TryParse(s1, NumberStyles.Float, CultureInfo.InvariantCulture, out double x1) &&
+                    double.TryParse(s2, NumberStyles.Float, CultureInfo.InvariantCulture, out double y1) &&
+                    double.TryParse(s3, NumberStyles.Float, CultureInfo.InvariantCulture, out double x2) &&
+                    double.TryParse(s4, NumberStyles.Float, CultureInfo.InvariantCulture, out double y2))
+                {
+                    return (Math.Clamp(x1, 0.0, 1.0), y1, Math.Clamp(x2, 0.0, 1.0), y2);
+                }
             }
         }
         else if (clean == "linear") return (0.0, 0.0, 1.0, 1.0);

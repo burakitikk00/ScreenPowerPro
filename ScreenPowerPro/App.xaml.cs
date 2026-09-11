@@ -17,6 +17,7 @@ public partial class App : Application
     {
         ScreenPowerPro.Helpers.AppLog.InitializeConsole();
         ScreenPowerPro.Helpers.AppLog.Info("Uygulama başlatılıyor (App ctor)...");
+        new GpuOptimizationService().Initialize();
 
         UnhandledException += (s, e) =>
         {
@@ -60,6 +61,7 @@ public partial class App : Application
         services.AddSingleton<AudioLevelMonitorService>();
         services.AddSingleton<AudioWaveformService>();
         services.AddSingleton<TimelineMathService>();
+        services.AddSingleton<GpuOptimizationService>();
 
         // Register ViewModels
         services.AddSingleton<DashboardViewModel>();

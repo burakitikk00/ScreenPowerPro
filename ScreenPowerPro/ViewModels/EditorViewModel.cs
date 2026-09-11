@@ -124,6 +124,55 @@ public partial class EditorViewModel : ObservableObject
     [ObservableProperty]
     private string? _selectedClipId;
 
+    public ObservableCollection<string> SelectedClipIds { get; } = new();
+
+    public bool IsClipSelected(string? id)
+    {
+        if (string.IsNullOrEmpty(id)) return false;
+        return SelectedClipIds.Contains(id) || SelectedClipId == id;
+    }
+
+    public void SelectClip(string? id, bool isMultiSelect = false)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            ClearClipSelection();
+            return;
+        }
+
+        if (!isMultiSelect)
+        {
+            SelectedClipIds.Clear();
+            SelectedClipIds.Add(id);
+            SelectedClipId = id;
+        }
+        else
+        {
+            if (SelectedClipIds.Contains(id))
+            {
+                SelectedClipIds.Remove(id);
+                SelectedClipId = SelectedClipIds.LastOrDefault();
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(SelectedClipId) && !SelectedClipIds.Contains(SelectedClipId))
+                {
+                    SelectedClipIds.Add(SelectedClipId);
+                }
+                SelectedClipIds.Add(id);
+                SelectedClipId = id;
+            }
+        }
+        OnPropertyChanged(nameof(SelectedClipId));
+    }
+
+    public void ClearClipSelection()
+    {
+        SelectedClipIds.Clear();
+        SelectedClipId = null;
+        OnPropertyChanged(nameof(SelectedClipId));
+    }
+
     [ObservableProperty]
     private string? _selectedTrackType; // "video", "mic", "sys"
 
@@ -918,34 +967,51 @@ public partial class EditorViewModel : ObservableObject
     [RelayCommand]
     public void DeleteSelected()
     {
-        if (!string.IsNullOrEmpty(SelectedClipId))
+        var idsToDelete = new List<string>();
+        if (SelectedClipIds.Count > 0)
+        {
+            idsToDelete.AddRange(SelectedClipIds);
+        }
+        else if (!string.IsNullOrEmpty(SelectedClipId))
+        {
+            idsToDelete.Add(SelectedClipId);
+        }
+
+        if (idsToDelete.Count > 0)
         {
             PushHistory();
-            string cid = SelectedClipId;
-            bool inVideo = VideoTrack.Clips.Any(c => c.Id == cid);
-            bool inMic = MicTrack.Clips.Any(c => c.Id == cid);
-            bool inSys = SysTrack.Clips.Any(c => c.Id == cid);
+            foreach (var cid in idsToDelete)
+            {
+                var vClip = VideoTrack.Clips.FirstOrDefault(c => c.Id == cid);
+                if (vClip != null && vClip.IsLocked) continue;
+                var mClip = MicTrack.Clips.FirstOrDefault(c => c.Id == cid);
+                if (mClip != null && mClip.IsLocked) continue;
 
-            if (SelectedTrackType == "video" || (inVideo && !inMic && !inSys))
-            {
-                VideoTrack.Clips = RemoveClip(VideoTrack.Clips, cid);
-            }
-            else if (SelectedTrackType == "mic" || (inMic && !inVideo && !inSys))
-            {
-                MicTrack.Clips = RemoveClip(MicTrack.Clips, cid);
-            }
-            else if (SelectedTrackType == "sys" || (inSys && !inVideo && !inMic))
-            {
-                SysTrack.Clips = RemoveClip(SysTrack.Clips, cid);
-            }
-            else
-            {
-                if (inVideo) VideoTrack.Clips = RemoveClip(VideoTrack.Clips, cid);
-                if (inMic) MicTrack.Clips = RemoveClip(MicTrack.Clips, cid);
-                if (inSys) SysTrack.Clips = RemoveClip(SysTrack.Clips, cid);
+                bool inVideo = vClip != null;
+                bool inMic = mClip != null;
+                bool inSys = SysTrack.Clips.Any(c => c.Id == cid);
+
+                if (SelectedTrackType == "video" || (inVideo && !inMic && !inSys))
+                {
+                    VideoTrack.Clips = RemoveClip(VideoTrack.Clips, cid);
+                }
+                else if (SelectedTrackType == "mic" || (inMic && !inVideo && !inSys))
+                {
+                    MicTrack.Clips = RemoveClip(MicTrack.Clips, cid);
+                }
+                else if (SelectedTrackType == "sys" || (inSys && !inVideo && !inMic))
+                {
+                    SysTrack.Clips = RemoveClip(SysTrack.Clips, cid);
+                }
+                else
+                {
+                    if (inVideo) VideoTrack.Clips = RemoveClip(VideoTrack.Clips, cid);
+                    if (inMic) MicTrack.Clips = RemoveClip(MicTrack.Clips, cid);
+                    if (inSys) SysTrack.Clips = RemoveClip(SysTrack.Clips, cid);
+                }
             }
 
-            SelectedClipId = null;
+            ClearClipSelection();
             SelectedTrackType = null;
             SaveProject();
         }

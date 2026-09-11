@@ -134,6 +134,9 @@ public class ClipSegment
 
     [JsonPropertyName("trackOffset")]
     public double TrackOffset { get; set; }
+
+    [JsonPropertyName("isLocked")]
+    public bool IsLocked { get; set; }
 }
 
 /// <summary>

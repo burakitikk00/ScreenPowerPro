@@ -1222,7 +1222,8 @@
                                                 <TextBlock Text="Odakta Kalma Süresi (sn)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
                                                 <TextBlock Text="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
                                             </Grid>
-                                            <Slider Minimum="0.5" Maximum="10.0" Value="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=TwoWay}" StepFrequency="0.5"/>
+                                            <Slider Minimum="0.5" Maximum="10.0" Value="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=TwoWay}" StepFrequency="0.5"
+                                                ValueChanged="OnGlobalZoomDurationChanged"/>
                                         </StackPanel>
 
                                         <!-- Max Scale -->
@@ -1235,7 +1236,8 @@
                                                 <TextBlock Text="Maksimum Büyütme" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
                                                 <TextBlock Text="{x:Bind ViewModel.ZoomMaxScale, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
                                             </Grid>
-                                            <Slider Minimum="1.0" Maximum="3.0" Value="{x:Bind ViewModel.ZoomMaxScale, Mode=TwoWay}" StepFrequency="0.1"/>
+                                            <Slider Minimum="1.0" Maximum="3.0" Value="{x:Bind ViewModel.ZoomMaxScale, Mode=TwoWay}" StepFrequency="0.1"
+                                                ValueChanged="OnGlobalZoomMaxScaleChanged"/>
                                         </StackPanel>
 
                                         <!-- Pre-Click Anticipation -->
@@ -1300,14 +1302,16 @@
                                                 <NumberBox x:Name="NbZoomStart" Minimum="0" SmallChange="0.1"
                                                     BorderBrush="{StaticResource GlassBorderBrush}"
                                                     Background="{StaticResource SurfaceContainerLowestBrush}"
-                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                    Foreground="{StaticResource TextPrimaryBrush}"
+                                                    ValueChanged="OnZoomStartChanged"/>
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Spacing="4">
                                                 <TextBlock x:Name="TbZoomEnd" Text="End (sec)" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
                                                 <NumberBox x:Name="NbZoomEnd" Minimum="0" SmallChange="0.1"
                                                     BorderBrush="{StaticResource GlassBorderBrush}"
                                                     Background="{StaticResource SurfaceContainerLowestBrush}"
-                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                    Foreground="{StaticResource TextPrimaryBrush}"
+                                                    ValueChanged="OnZoomEndChanged"/>
                                             </StackPanel>
                                         </Grid>
                                     </StackPanel>
@@ -1691,9 +1695,36 @@
                                             <TextBlock x:Name="TbTrackAudioSub" Text="Waveform / Mic" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
                                         </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
-                                        <Button x:Name="BtnAudioMute" Click="OnAudioTrackMuteClicked" Style="{StaticResource IconButtonStyle}" Width="24" Height="24"
-                                            ToolTipService.ToolTip="Ses Parçasını Kapat/Aç">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <Slider x:Name="SliderAudioTrackVol" Width="52" Minimum="0" Maximum="100"
+                                            Value="{x:Bind ViewModel.MicVolume, Mode=TwoWay}"
+                                            ValueChanged="OnAudioTrackVolumeChanged"
+                                            ToolTipService.ToolTip="Mikrofon Ses Seviyesi"
+                                            Margin="0,0,2,0"/>
+                                        <Button x:Name="BtnAudioMute" Click="OnAudioTrackMuteClicked" PointerWheelChanged="OnAudioTrackBtnWheelChanged"
+                                            Style="{StaticResource IconButtonStyle}" Width="26" Height="26"
+                                            ToolTipService.ToolTip="Ses Parçasını Kapat/Aç (Tekerlek veya Sağ Tık: Seviye)">
+                                            <Button.ContextFlyout>
+                                                <Flyout Placement="Top">
+                                                    <Border Background="{StaticResource SurfaceHighBrush}" Padding="12" CornerRadius="10" Width="190"
+                                                        BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                                                        <StackPanel Spacing="8">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Text="Mikrofon Sesi" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                                                <TextBlock x:Name="TbFlyoutMicVolVal" Grid.Column="1" Text="100%" FontSize="11" FontWeight="Bold" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center"/>
+                                                            </Grid>
+                                                            <Slider x:Name="FlyoutAudioVolSlider" Minimum="0" Maximum="100" Value="{x:Bind ViewModel.MicVolume, Mode=TwoWay}"
+                                                                ValueChanged="OnAudioTrackVolumeChanged"/>
+                                                            <Button Content="Sesi Kapat / Aç" HorizontalAlignment="Stretch" FontSize="11" Padding="4,4"
+                                                                Click="OnAudioTrackMuteClicked"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Flyout>
+                                            </Button.ContextFlyout>
                                             <FontIcon x:Name="IconAudioMute" Glyph="&#xE767;" FontSize="12"
                                                 Foreground="{StaticResource TextMutedBrush}"/>
                                         </Button>

@@ -771,83 +771,6 @@
                                         OnContent="" OffContent="" Margin="0"/>
                                 </Grid>
                             </Border>
-
-                            <!-- Volume Enhancement -->
-                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="8">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="TbVolEnhance" Text="Volume Enhancement" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TbVolEnhanceVal" Grid.Column="1" Text="1.0x" FontSize="12" FontWeight="SemiBold"
-                                            Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <Button x:Name="BtnResetVolEnhance" Grid.Column="2" Content="Reset" FontSize="11" Padding="6,2"
-                                            Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextMutedBrush}"
-                                            Click="OnResetVolumeEnhanceClicked"/>
-                                    </Grid>
-                                    <Slider x:Name="SliderVolEnhance" Minimum="0.5" Maximum="3.0" Value="{x:Bind ViewModel.VolumeEnhancement, Mode=TwoWay}" StepFrequency="0.1"
-                                        ValueChanged="OnVolumeEnhanceChanged"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Microphone Level Slider -->
-                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="8">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="TbMicLevel" Text="Microphone Level" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                        <TextBlock x:Name="TbMicVolVal" Grid.Column="1" Text="100%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
-                                    </Grid>
-                                    <Slider x:Name="MicVolumeSlider" Minimum="0" Maximum="100" Value="100"
-                                        ValueChanged="OnMicVolumeChanged"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Audio AI: Noise Reduction & Vocal Enhancement -->
-                            <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
-                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
-                                <StackPanel Spacing="12">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock x:Name="TbNoiseReduction" Text="Noise Reduction (AI)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <TextBlock x:Name="TbNoiseReductionSub" Text="Filters background noise" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
-                                        </StackPanel>
-                                        <ToggleSwitch x:Name="TsNoiseReduction" Grid.Column="1"
-                                            IsOn="{x:Bind ViewModel.AudioNoiseReduction, Mode=TwoWay}"
-                                            OnContent="" OffContent="" Margin="0"/>
-                                    </Grid>
-                                    <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
-                                    <StackPanel Spacing="8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0">
-                                                <TextBlock x:Name="TbVocalEnhancement" Text="Vocal Enhancement" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                                <TextBlock x:Name="TbVocalEnhancementSub" Text="Ses netliğini ve frekansını yükseltir" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
-                                            </StackPanel>
-                                            <ToggleSwitch x:Name="TsVocalEnhance" Grid.Column="1"
-                                                IsOn="{x:Bind ViewModel.VocalEnhancement, Mode=TwoWay}"
-                                                OnContent="" OffContent="" Margin="0"/>
-                                        </Grid>
-                                        <Slider x:Name="SliderVocalEnhance" Minimum="0" Maximum="100"
-                                            Value="{x:Bind ViewModel.VocalEnhancementAmount, Mode=TwoWay}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
                         </StackPanel>
 
                         <!-- ==================== TAB 4: SHORTCUT KEYS ==================== -->
@@ -1209,7 +1132,7 @@
                                                 <TextBlock Text="Yakınlaştırma Hızı" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
                                                 <TextBlock Text="{x:Bind ViewModel.ZoomSpeedMs, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
                                             </Grid>
-                                            <Slider Minimum="200" Maximum="1500" Value="{x:Bind ViewModel.ZoomSpeedMs, Mode=TwoWay}" StepFrequency="50"/>
+                                            <Slider x:Name="SliderZoomSpeed" Maximum="1500" Minimum="200" Value="{x:Bind ViewModel.ZoomSpeedMs, Mode=TwoWay}" StepFrequency="50"/>
                                         </StackPanel>
 
                                         <!-- Zoom Hold Duration s -->
@@ -1222,8 +1145,7 @@
                                                 <TextBlock Text="Odakta Kalma Süresi (sn)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
                                                 <TextBlock Text="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
                                             </Grid>
-                                            <Slider Minimum="0.5" Maximum="10.0" Value="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=TwoWay}" StepFrequency="0.5"
-                                                ValueChanged="OnGlobalZoomDurationChanged"/>
+                                            <Slider x:Name="SliderZoomHoldDuration" Maximum="10.0" Minimum="0.5" Value="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=TwoWay}" StepFrequency="0.5"/>
                                         </StackPanel>
 
                                         <!-- Max Scale -->
@@ -1236,8 +1158,7 @@
                                                 <TextBlock Text="Maksimum Büyütme" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
                                                 <TextBlock Text="{x:Bind ViewModel.ZoomMaxScale, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
                                             </Grid>
-                                            <Slider Minimum="1.0" Maximum="3.0" Value="{x:Bind ViewModel.ZoomMaxScale, Mode=TwoWay}" StepFrequency="0.1"
-                                                ValueChanged="OnGlobalZoomMaxScaleChanged"/>
+                                            <Slider x:Name="SliderZoomMaxScale" Maximum="2.2" Minimum="1.0" Value="{x:Bind ViewModel.ZoomMaxScale, Mode=TwoWay}" StepFrequency="0.1"/>
                                         </StackPanel>
 
                                         <!-- Pre-Click Anticipation -->
@@ -1250,7 +1171,7 @@
                                                 <TextBlock Text="Tıklama Öncesi Odak (ms)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
                                                 <TextBlock Text="{x:Bind ViewModel.PreClickAnticipationMs, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
                                             </Grid>
-                                            <Slider Minimum="0" Maximum="1000" Value="{x:Bind ViewModel.PreClickAnticipationMs, Mode=TwoWay}" StepFrequency="50"/>
+                                            <Slider Maximum="1000" Minimum="0" Value="{x:Bind ViewModel.PreClickAnticipationMs, Mode=TwoWay}" StepFrequency="50"/>
                                         </StackPanel>
 
                                     </StackPanel>
@@ -1287,8 +1208,7 @@
                                                         Foreground="{StaticResource PrimaryAccentBrush}"/>
                                                 </Border>
                                             </Grid>
-                                            <Slider x:Name="SelectedZoomSlider" Minimum="1" Maximum="4" Value="1.5" StepFrequency="0.1"
-                                                ValueChanged="OnSelectedZoomFactorChanged"/>
+                                            <Slider x:Name="SelectedZoomSlider" Maximum="2.2" Minimum="1.0" Value="1.5" StepFrequency="0.1"/>
                                         </StackPanel>
 
                                         <!-- Start / End Sec -->
@@ -1314,6 +1234,148 @@
                                                     ValueChanged="OnZoomEndChanged"/>
                                             </StackPanel>
                                         </Grid>
+
+                                        <!-- Easing Preset ComboBox -->
+                                        <StackPanel Spacing="6" Margin="0,4,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Animasyon Eğrisi (Easing)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock x:Name="TbBezierPresetName" Text="Cubic-Out" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
+                                            </Grid>
+                                            <ComboBox x:Name="CbSelectedZoomEasing" HorizontalAlignment="Stretch" 
+                                                Background="{StaticResource SurfaceContainerLowestBrush}"
+                                                SelectionChanged="OnSelectedZoomEasingChanged">
+                                                <x:String>Linear</x:String>
+                                                <x:String>Quad-Out</x:String>
+                                                <x:String>Cubic-Out</x:String>
+                                                <x:String>Quartic-Out</x:String>
+                                                <x:String>Ease-In-Out</x:String>
+                                                <x:String>Özel (Custom Eğri)</x:String>
+                                            </ComboBox>
+                                        </StackPanel>
+
+                                        <!-- Interactive Bézier Curve Graph -->
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Eğri Düzenleyici (Bézier)" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                <TextBlock x:Name="TbBezierCoords" Text="P1: 0.22, 0.61 | P2: 0.36, 1.00" FontSize="10" Foreground="{StaticResource PrimaryAccentBrush}" Grid.Column="1"/>
+                                            </Grid>
+                                            <Border Background="{StaticResource SurfaceContainerLowestBrush}"
+                                                BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"
+                                                CornerRadius="8" Padding="6" Height="140" HorizontalAlignment="Stretch">
+                                                <Canvas x:Name="CanvasBezierGraph" Background="Transparent"
+                                                    PointerPressed="OnBezierGraphPointerPressed"
+                                                    PointerMoved="OnBezierGraphPointerMoved"
+                                                    PointerReleased="OnBezierGraphPointerReleased"
+                                                    PointerExited="OnBezierGraphPointerExited">
+                                                    <!-- Grid Lines -->
+                                                    <Line x:Name="GridLineH1" X1="0" Y1="32" X2="240" Y2="32" Stroke="#22FFFFFF" StrokeDashArray="2,2"/>
+                                                    <Line x:Name="GridLineH2" X1="0" Y1="64" X2="240" Y2="64" Stroke="#22FFFFFF" StrokeDashArray="2,2"/>
+                                                    <Line x:Name="GridLineH3" X1="0" Y1="96" X2="240" Y2="96" Stroke="#22FFFFFF" StrokeDashArray="2,2"/>
+                                                    <Line x:Name="GridLineDiag" X1="10" Y1="118" X2="210" Y2="10" Stroke="#15FFFFFF" StrokeDashArray="3,3"/>
+                                                    
+                                                    <!-- Handles Lines -->
+                                                    <Line x:Name="LineHandleP1" Stroke="#88A855F7" StrokeThickness="1.5"/>
+                                                    <Line x:Name="LineHandleP2" Stroke="#8806B6D4" StrokeThickness="1.5"/>
+                                                    
+                                                    <!-- Bézier Curve Path -->
+                                                    <Path x:Name="PathBezierCurve" Stroke="{StaticResource PrimaryAccentBrush}" StrokeThickness="2.5">
+                                                        <Path.Data>
+                                                            <PathGeometry>
+                                                                <PathFigure x:Name="FigBezierCurve" StartPoint="10,118">
+                                                                    <BezierSegment x:Name="SegBezierCurve" Point1="50,50" Point2="150,20" Point3="210,10"/>
+                                                                </PathFigure>
+                                                            </PathGeometry>
+                                                        </Path.Data>
+                                                    </Path>
+
+                                                    <!-- P1 Handle Thumb -->
+                                                    <Border x:Name="ThumbP1" Width="14" Height="14" CornerRadius="7" 
+                                                        Background="#A855F7" BorderBrush="#FFFFFF" BorderThickness="2"
+                                                        Canvas.Left="43" Canvas.Top="43">
+                                                        <ToolTipService.ToolTip>
+                                                            <ToolTip Content="Kontrol Noktası 1 (Sürükle)"/>
+                                                        </ToolTipService.ToolTip>
+                                                    </Border>
+
+                                                    <!-- P2 Handle Thumb -->
+                                                    <Border x:Name="ThumbP2" Width="14" Height="14" CornerRadius="7" 
+                                                        Background="#06B6D4" BorderBrush="#FFFFFF" BorderThickness="2"
+                                                        Canvas.Left="143" Canvas.Top="13">
+                                                        <ToolTipService.ToolTip>
+                                                            <ToolTip Content="Kontrol Noktası 2 (Sürükle)"/>
+                                                        </ToolTipService.ToolTip>
+                                                    </Border>
+                                                </Canvas>
+                                            </Border>
+                                        </StackPanel>
+
+                                        <!-- Real-Time Zoom Preview -->
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="Canlı Zoom Önizleme" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                <Border Background="#2A10B981" CornerRadius="4" Padding="6,1" Grid.Column="1">
+                                                    <TextBlock x:Name="TbLivePreviewStatus" Text="CANLI" FontSize="9" FontWeight="Bold" Foreground="#10B981"/>
+                                                </Border>
+                                            </Grid>
+                                            <Border x:Name="PreviewContainerBorder" Background="#0A0B10" BorderBrush="{StaticResource GlassBorderBrush}" 
+                                                BorderThickness="1" CornerRadius="8" Height="90" SizeChanged="OnPreviewContainerSizeChanged">
+                                                <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                                    <!-- Mini Screen Display Content -->
+                                                    <Grid x:Name="PreviewTargetBox" HorizontalAlignment="Center" VerticalAlignment="Center" Width="80" Height="48" RenderTransformOrigin="0.5,0.5">
+                                                        <Border Background="#1C1D28" CornerRadius="6" BorderBrush="#33FFFFFF" BorderThickness="1">
+                                                            <Grid Padding="6">
+                                                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="2">
+                                                                    <FontIcon Glyph="&#xE71E;" FontSize="14" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                                                    <TextBlock Text="Zoom Hedefi" FontSize="8.5" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </Grid>
+                                                    
+                                                    <!-- Speed / Scale badge overlay -->
+                                                    <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8" 
+                                                        Background="#99000000" CornerRadius="4" Padding="6,2">
+                                                        <TextBlock x:Name="TbPreviewScaleIndicator" Text="1.0x" FontSize="10" 
+                                                            FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </StackPanel>
+
+                                        <!-- Apply to Selected Zooms Button -->
+                                        <Button x:Name="BtnApplyToSelectedZooms" HorizontalAlignment="Stretch"
+                                            Background="#26C0C1FF" BorderBrush="{StaticResource PrimaryAccentBrush}" BorderThickness="1"
+                                            CornerRadius="8" Padding="10,8" Margin="0,6,0,0"
+                                            Click="OnApplyToSelectedZoomsClicked">
+                                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                                <FontIcon Glyph="&#xE8D7;" FontSize="13" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                                <TextBlock Text="Seçili Zoomlara Uygula" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Apply to All Button -->
+                                        <Button x:Name="BtnApplyZoomToAll" HorizontalAlignment="Stretch"
+                                            Background="{StaticResource SurfaceContainerLowestBrush}"
+                                            BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1"
+                                            CornerRadius="8" Padding="10,8" Margin="0,4,0,0"
+                                            Click="OnApplyZoomToAllClicked">
+                                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                                <FontIcon Glyph="&#xE896;" FontSize="13" Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                                <TextBlock Text="Tüm Zoomlara Uygula" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            </StackPanel>
+                                        </Button>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -1616,8 +1678,7 @@
                             <FontIcon x:Name="IconZoomOut" Glyph="&#xE71F;" FontSize="13"
                                 Foreground="{StaticResource TextMutedBrush}" ToolTipService.ToolTip="Timeline Daralt"/>
                             <Slider x:Name="TimelineZoomSlider"
-                                Width="100" Minimum="1" Maximum="100" Value="50"
-                                ValueChanged="OnTimelineZoomChanged"/>
+                                Width="100" Minimum="0" Maximum="100" Value="50"/>
                             <FontIcon x:Name="IconZoomIn" Glyph="&#xE8A3;" FontSize="13"
                                 Foreground="{StaticResource TextMutedBrush}" ToolTipService.ToolTip="Timeline Genişlet (Ctrl+Tekerlek)"/>
                         </StackPanel>
@@ -1665,7 +1726,13 @@
                                             <TextBlock x:Name="TbTrackVideoSub" Text="Screen Recording" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
                                         </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <!-- Mini video ses seviyesi slider -->
+                                        <Slider x:Name="SliderVideoTrackVol" Width="52" Minimum="0" Maximum="100"
+                                            Value="{x:Bind ViewModel.SysVolume, Mode=TwoWay}"
+                                            ValueChanged="OnVideoTrackVolumeChanged"
+                                            ToolTipService.ToolTip="Video Ses Seviyesi"
+                                            Margin="0,0,2,0"/>
                                         <Button x:Name="BtnVideoMute" Click="OnVideoTrackMuteClicked" Style="{StaticResource IconButtonStyle}" Width="24" Height="24"
                                             ToolTipService.ToolTip="Video Sesini Kapat/Aç">
                                             <FontIcon x:Name="IconVideoMute" Glyph="&#xE767;" FontSize="12"
@@ -1696,16 +1763,19 @@
                                         </StackPanel>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <!-- Mini ses seviyesi slider (timeline sol paneli) -->
                                         <Slider x:Name="SliderAudioTrackVol" Width="52" Minimum="0" Maximum="100"
                                             Value="{x:Bind ViewModel.MicVolume, Mode=TwoWay}"
                                             ValueChanged="OnAudioTrackVolumeChanged"
                                             ToolTipService.ToolTip="Mikrofon Ses Seviyesi"
                                             Margin="0,0,2,0"/>
+                                        <!-- Sağ tıkla flyout açılır; x:Bind/x:Name flyout içinde WinUI 3'te crash yapıyor,
+                                             bu nedenle Opened event ile kod tarafında doldurulur -->
                                         <Button x:Name="BtnAudioMute" Click="OnAudioTrackMuteClicked" PointerWheelChanged="OnAudioTrackBtnWheelChanged"
                                             Style="{StaticResource IconButtonStyle}" Width="26" Height="26"
-                                            ToolTipService.ToolTip="Ses Parçasını Kapat/Aç (Tekerlek veya Sağ Tık: Seviye)">
+                                            ToolTipService.ToolTip="Ses Parçasını Kapat/Aç (Sağ Tık: Seviye Ayarı)">
                                             <Button.ContextFlyout>
-                                                <Flyout Placement="Top">
+                                                <Flyout Placement="Top" Opened="OnAudioFlyoutOpened">
                                                     <Border Background="{StaticResource SurfaceHighBrush}" Padding="12" CornerRadius="10" Width="190"
                                                         BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                                                         <StackPanel Spacing="8">
@@ -1715,10 +1785,12 @@
                                                                     <ColumnDefinition Width="Auto"/>
                                                                 </Grid.ColumnDefinitions>
                                                                 <TextBlock Text="Mikrofon Sesi" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                                                <TextBlock x:Name="TbFlyoutMicVolVal" Grid.Column="1" Text="100%" FontSize="11" FontWeight="Bold" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center"/>
+                                                                <!-- Yüzde etiketi kod tarafında güncellenir -->
+                                                                <TextBlock Tag="FlyoutVolLabel" Grid.Column="1" Text="100%" FontSize="11" FontWeight="Bold" Foreground="{StaticResource PrimaryAccentBrush}" VerticalAlignment="Center"/>
                                                             </Grid>
-                                                            <Slider x:Name="FlyoutAudioVolSlider" Minimum="0" Maximum="100" Value="{x:Bind ViewModel.MicVolume, Mode=TwoWay}"
-                                                                ValueChanged="OnAudioTrackVolumeChanged"/>
+                                                            <!-- x:Bind yerine ValueChanged event ile kod tarafında güncellenir -->
+                                                            <Slider Tag="FlyoutVolSlider" Minimum="0" Maximum="100" Value="100"
+                                                                ValueChanged="OnFlyoutAudioVolSliderChanged"/>
                                                             <Button Content="Sesi Kapat / Aç" HorizontalAlignment="Stretch" FontSize="11" Padding="4,4"
                                                                 Click="OnAudioTrackMuteClicked"/>
                                                         </StackPanel>

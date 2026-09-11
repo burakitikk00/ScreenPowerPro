@@ -13,6 +13,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Xaml.Shapes;
+using ScreenPowerPro.Helpers;
 using ScreenPowerPro.Models;
 using ScreenPowerPro.Services;
 using ScreenPowerPro.ViewModels;
@@ -34,8 +35,21 @@ public sealed partial class EditorPage : Page
     private double _totalDurationSeconds = 0;
     private double _currentTimeSeconds = 0;
     private ZoomEffect? _selectedZoom = null;
+    private readonly List<ZoomEffect> _selectedZooms = new();
+    private readonly HashSet<string> _selectedZoomIds = new();
     private bool _isUpdatingZoomInputs = false;
     private DispatcherTimer? _playbackTimer;
+
+    // Bézier Curve Editor State
+    private Point _bezierP1 = new Point(0.215, 0.61);
+    private Point _bezierP2 = new Point(0.355, 1.0);
+    private int _activeBezierHandle = 0; // 0 = none, 1 = P1, 2 = P2
+    private bool _isUpdatingBezierUI = false;
+
+    // Real-Time Zoom Preview State
+    private DispatcherTimer? _zoomPreviewTimer;
+    private readonly System.Diagnostics.Stopwatch _zoomPreviewStopwatch = new();
+    private CompositeTransform? _previewTargetTransform;
 
     private Windows.Media.Playback.MediaPlayer? _micPlayer;
     private Windows.Media.Playback.MediaPlayer? _sysPlayer;
@@ -69,14 +83,26 @@ public sealed partial class EditorPage : Page
     private static Geometry? _arrowGeometry;
     private static Geometry? _crosshairGeometry;
     private static Geometry? _ibeamGeometry;
+    private bool _isPageLoaded = false;
 
     public EditorPage()
     {
-        InitializeComponent();
-        ViewModel = App.Current.Services.GetRequiredService<EditorViewModel>();
-        _loc = App.Current.Services.GetRequiredService<LocalizationService>();
-        DataContext = ViewModel;
-        Loaded += OnPageLoaded;
+        AppLog.Info("[EditorPage] ctor başlatıldı.");
+        try
+        {
+            ViewModel = App.Current.Services.GetRequiredService<EditorViewModel>();
+            _loc = App.Current.Services.GetRequiredService<LocalizationService>();
+            DataContext = ViewModel;
+
+            InitializeComponent();
+            Loaded += OnPageLoaded;
+            AppLog.Success("[EditorPage] ctor ve InitializeComponent başarıyla tamamlandı.");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("[EditorPage] ctor içinde KRİTİK HATA!", ex);
+            throw;
+        }
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -84,6 +110,8 @@ public sealed partial class EditorPage : Page
         base.OnNavigatedTo(e);
 
         string? projectDir = e.Parameter as string;
+        AppLog.Event("NAV", $"[EditorPage] OnNavigatedTo çağrıldı. Parametre: '{projectDir}'");
+
         if (string.IsNullOrEmpty(projectDir))
         {
             var projectService = App.Current.Services.GetRequiredService<ProjectService>();
@@ -91,6 +119,7 @@ public sealed partial class EditorPage : Page
             if (recents.Count > 0)
             {
                 projectDir = recents[0].FolderPath;
+                AppLog.Info($"[EditorPage] Boş parametre yerine son proje seçildi: '{projectDir}'");
             }
         }
 
@@ -99,15 +128,25 @@ public sealed partial class EditorPage : Page
             _projectDir = projectDir;
             try
             {
+                AppLog.Info($"[EditorPage] ViewModel.LoadProject başlatılıyor: '{projectDir}'");
                 ViewModel.LoadProject(projectDir);
+                AppLog.Success($"[EditorPage] Proje başarıyla yüklendi: '{ViewModel.ProjectName}' (Süre: {ViewModel.TotalDurationSec:F1}s)");
+
                 UpdateFromViewModel();
                 RenderTimeline();
+
+                AppLog.Info($"[EditorPage] LoadVideoAsync başlatılıyor: '{ViewModel.VideoPath}'");
                 await LoadVideoAsync();
+                AppLog.Success("[EditorPage] LoadVideoAsync başarıyla tamamlandı.");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[EditorPage] Proje yükleme hatası: {ex}");
+                AppLog.Error($"[EditorPage] Proje veya video yükleme hatası!", ex);
             }
+        }
+        else
+        {
+            AppLog.Warn("[EditorPage] Yüklenecek geçerli bir proje dizini bulunamadı!");
         }
     }
 
@@ -117,6 +156,8 @@ public sealed partial class EditorPage : Page
         _loc.LanguageChanged -= ApplyLocalization;
         PausePlayback();
         _playbackTimer?.Stop();
+        _zoomPreviewTimer?.Stop();
+        _zoomPreviewStopwatch.Stop();
 
         try
         {
@@ -130,6 +171,26 @@ public sealed partial class EditorPage : Page
 
     private async void OnPageLoaded(object sender, RoutedEventArgs e)
     {
+        _isPageLoaded = true;
+        AppLog.Info("[EditorPage] OnPageLoaded tetiklendi. Bileşenler bağlanıyor...");
+
+        if (TimelineZoomSlider != null)
+        {
+            TimelineZoomSlider.ValueChanged += OnTimelineZoomChanged;
+        }
+        if (SliderZoomHoldDuration != null)
+        {
+            SliderZoomHoldDuration.ValueChanged += OnGlobalZoomDurationChanged;
+        }
+        if (SliderZoomMaxScale != null)
+        {
+            SliderZoomMaxScale.ValueChanged += OnGlobalZoomMaxScaleChanged;
+        }
+        if (SelectedZoomSlider != null)
+        {
+            SelectedZoomSlider.ValueChanged += OnSelectedZoomFactorChanged;
+        }
+
         _playbackTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(25)
@@ -145,11 +206,15 @@ public sealed partial class EditorPage : Page
         InitializeCursorOverlay();
         SyncCursorButtons();
         SyncMotionSettings();
+        InitializeZoomPreview();
+        UpdateBezierGraphVisuals();
 
         if (TimelineScrollViewer != null)
         {
             TimelineScrollViewer.PointerWheelChanged += OnTimelineWheelChanged;
         }
+
+        AppLog.Success("[EditorPage] OnPageLoaded tamamlandı, sayfa hazır.");
 
         ViewModel.PropertyChanged += (s, args) =>
         {
@@ -267,13 +332,6 @@ public sealed partial class EditorPage : Page
         // TAB 3: AUDIO
         if (TbTitleAudio != null) TbTitleAudio.Text = _loc["Editor_Audio_Title"];
         if (TbMuteMic != null) TbMuteMic.Text = _loc["Editor_Audio_MuteMic"];
-        if (TbVolEnhance != null) TbVolEnhance.Text = _loc["Editor_Audio_VolEnhance"];
-        if (BtnResetVolEnhance != null) BtnResetVolEnhance.Content = _loc["Reset"];
-        if (TbMicLevel != null) TbMicLevel.Text = _loc["Editor_Audio_MicLevel"];
-        if (TbNoiseReduction != null) TbNoiseReduction.Text = _loc["Editor_Audio_NoiseReduction"];
-        if (TbNoiseReductionSub != null) TbNoiseReductionSub.Text = _loc["Editor_Audio_NoiseReductionDesc"];
-        if (TbVocalEnhancement != null) TbVocalEnhancement.Text = _loc["Editor_Audio_VocalEnhance"];
-        if (TbVocalEnhancementSub != null) TbVocalEnhancementSub.Text = _loc["Editor_Audio_VocalEnhanceDesc"];
 
         // TAB 4: KEYS
         if (TbTitleKeys != null) TbTitleKeys.Text = _loc["Editor_Keys_Title"];
@@ -394,7 +452,7 @@ public sealed partial class EditorPage : Page
             }
 
             // Mikrofon ses çalarını başlat
-            if (!string.IsNullOrEmpty(ViewModel.MicAudioPath) && File.Exists(ViewModel.MicAudioPath))
+            if (ViewModel != null && !string.IsNullOrEmpty(ViewModel.MicAudioPath) && File.Exists(ViewModel.MicAudioPath))
             {
                 try
                 {
@@ -413,7 +471,7 @@ public sealed partial class EditorPage : Page
             }
 
             // Sistem sesi çalarını başlat
-            if (!string.IsNullOrEmpty(ViewModel.SystemAudioPath) && File.Exists(ViewModel.SystemAudioPath))
+            if (ViewModel != null && !string.IsNullOrEmpty(ViewModel.SystemAudioPath) && File.Exists(ViewModel.SystemAudioPath))
             {
                 try
                 {
@@ -494,15 +552,19 @@ public sealed partial class EditorPage : Page
 
     private void UpdateFromViewModel()
     {
+        if (ViewModel == null) return;
         _totalDurationSeconds = ViewModel.TotalDurationSec > 0 ? ViewModel.TotalDurationSec : 10;
-        TbProjectName.Text = string.IsNullOrEmpty(ViewModel.ProjectName)
-            ? "Untitled Recording.mp4"
-            : ViewModel.ProjectName;
+        if (TbProjectName != null)
+        {
+            TbProjectName.Text = string.IsNullOrEmpty(ViewModel.ProjectName)
+                ? "Untitled Recording.mp4"
+                : ViewModel.ProjectName;
+        }
 
-        TbTotalTime.Text = FormatTime(_totalDurationSeconds);
-        TbTimelineTotal.Text = FormatTime(_totalDurationSeconds);
-        TbCurrentTime.Text = FormatTime(0);
-        TbTimelineCurrent.Text = FormatTime(0);
+        if (TbTotalTime != null) TbTotalTime.Text = FormatTime(_totalDurationSeconds);
+        if (TbTimelineTotal != null) TbTimelineTotal.Text = FormatTime(_totalDurationSeconds);
+        if (TbCurrentTime != null) TbCurrentTime.Text = FormatTime(0);
+        if (TbTimelineCurrent != null) TbTimelineCurrent.Text = FormatTime(0);
 
         double clipWidth = _totalDurationSeconds * _timelineScale;
         if (VideoClipBlock != null)
@@ -590,6 +652,7 @@ public sealed partial class EditorPage : Page
 
     private void OnCursorSizeSliderChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_isPageLoaded) return;
         if (TbCursorSizeVal != null) TbCursorSizeVal.Text = $"{e.NewValue:F1}x";
         if (ViewModel != null)
         {
@@ -639,21 +702,25 @@ public sealed partial class EditorPage : Page
 
     private void OnPaddingValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_isPageLoaded) return;
         if (TbPaddingVal != null) TbPaddingVal.Text = $"{(int)e.NewValue}";
     }
 
     private void OnInsetValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_isPageLoaded) return;
         if (TbInsetVal != null) TbInsetVal.Text = $"{(int)e.NewValue}";
     }
 
     private void OnRoundnessValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_isPageLoaded) return;
         if (TbRoundnessVal != null) TbRoundnessVal.Text = $"{(int)e.NewValue}";
     }
 
     private void OnShadowValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_isPageLoaded) return;
         if (TbShadowVal != null) TbShadowVal.Text = $"{(int)e.NewValue}%";
     }
 
@@ -663,21 +730,6 @@ public sealed partial class EditorPage : Page
         ViewModel.CanvasPreset = tag;
 
         HighlightButtonChoice(new[] { BtnPresetDefault, BtnPresetSteady, BtnPresetGraceful, BtnPresetScenery }, btn);
-    }
-
-    // --- MIC AUDIO TAB HANDLERS ---
-
-    private void OnResetVolumeEnhanceClicked(object sender, RoutedEventArgs e)
-    {
-        if (SliderVolEnhance != null) SliderVolEnhance.Value = 1.0;
-        ViewModel.VolumeEnhancement = 1.0;
-        if (TbVolEnhanceVal != null) TbVolEnhanceVal.Text = "1.0x";
-    }
-
-    private void OnVolumeEnhanceChanged(object sender, RangeBaseValueChangedEventArgs e)
-    {
-        if (TbVolEnhanceVal != null) TbVolEnhanceVal.Text = $"{e.NewValue:F1}x";
-        if (ViewModel != null) ViewModel.VolumeEnhancement = e.NewValue;
     }
 
     // --- SHORTCUT KEYS HANDLERS ---
@@ -737,6 +789,7 @@ public sealed partial class EditorPage : Page
 
     private void RenderTimeline()
     {
+        if (!_isPageLoaded || ViewModel == null) return;
         if (TimeRuler == null || VideoTrack == null || AudioTrack == null || ZoomTrack == null) return;
 
         double totalWidth = Math.Max(_totalDurationSeconds * _timelineScale, 800);
@@ -1227,6 +1280,25 @@ public sealed partial class EditorPage : Page
                     }
                 }
 
+                // Sıkı çarpışma engelleme (Collision detection with stationary clips)
+                if (ViewModel != null)
+                {
+                    var trackClips = isAudioTrack ? ViewModel.MicTrack.Clips : ViewModel.VideoTrack.Clips;
+                    var nonMovingClips = trackClips.Where(c => !movingClips.Contains(c)).ToList();
+                    double minCandidateDt = -minOffset;
+                    double maxCandidateDt = double.MaxValue;
+                    foreach (var c in movingClips)
+                    {
+                        double dur = c.SourceEnd - c.SourceStart;
+                        double orig = movingClipOffsets[c];
+                        double cLeft = nonMovingClips.Where(o => o.TrackOffset + (o.SourceEnd - o.SourceStart) <= orig).Select(o => (double?)(o.TrackOffset + (o.SourceEnd - o.SourceStart))).Max() ?? 0.0;
+                        double cRight = nonMovingClips.Where(o => o.TrackOffset >= orig + dur).Select(o => (double?)o.TrackOffset).Min() ?? double.MaxValue;
+                        minCandidateDt = Math.Max(minCandidateDt, cLeft - orig);
+                        maxCandidateDt = Math.Min(maxCandidateDt, cRight - (orig + dur));
+                    }
+                    dt = Math.Clamp(dt, minCandidateDt, Math.Max(minCandidateDt, maxCandidateDt));
+                }
+
                 if (minOffset + dt < 0) dt = -minOffset;
 
                 foreach (var c in movingClips)
@@ -1249,10 +1321,17 @@ public sealed partial class EditorPage : Page
                 var (snapped, snapTime) = TimelineMathService.FindSnapTime(candidateOffset, snapPoints, _timelineScale, 15.0);
                 if (snapped) candidateOffset = snapTime;
 
-                double dt = candidateOffset - origOffset;
-                double maxRightTrim = origEnd - origStart - 0.2;
-                dt = Math.Clamp(dt, -origStart, maxRightTrim);
+                // Sol komşu klip ile çarpışma önleme
+                double leftLimit = 0.0;
+                if (ViewModel != null)
+                {
+                    var trackClips = isAudioTrack ? ViewModel.MicTrack.Clips : ViewModel.VideoTrack.Clips;
+                    leftLimit = trackClips.Where(o => o != clip && o.TrackOffset + (o.SourceEnd - o.SourceStart) <= origOffset).Select(o => (double?)(o.TrackOffset + (o.SourceEnd - o.SourceStart))).Max() ?? 0.0;
+                }
+                double clipDur = origEnd - origStart;
+                candidateOffset = Math.Clamp(candidateOffset, leftLimit, origOffset + clipDur - 0.2);
 
+                double dt = candidateOffset - origOffset;
                 clip.SourceStart = Math.Round(origStart + dt, 2);
                 clip.TrackOffset = Math.Round(origOffset + dt, 2);
 
@@ -1275,10 +1354,16 @@ public sealed partial class EditorPage : Page
                 var (snapped, snapTime) = TimelineMathService.FindSnapTime(candidateEndOffset, snapPoints, _timelineScale, 15.0);
                 if (snapped) candidateEndOffset = snapTime;
 
-                double dt = candidateEndOffset - (origOffset + origDur);
-                double maxExtend = Math.Max(1000, _totalDurationSeconds * 2) - origEnd;
-                dt = Math.Clamp(dt, -(origDur - 0.2), maxExtend);
+                // Sağ komşu klip ile çarpışma önleme
+                double rightLimit = double.MaxValue;
+                if (ViewModel != null)
+                {
+                    var trackClips = isAudioTrack ? ViewModel.MicTrack.Clips : ViewModel.VideoTrack.Clips;
+                    rightLimit = trackClips.Where(o => o != clip && o.TrackOffset >= origOffset + origDur).Select(o => (double?)o.TrackOffset).Min() ?? double.MaxValue;
+                }
+                candidateEndOffset = Math.Clamp(candidateEndOffset, origOffset + 0.2, rightLimit);
 
+                double dt = candidateEndOffset - (origOffset + origDur);
                 clip.SourceEnd = Math.Round(origEnd + dt, 2);
                 double newDur = Math.Max(0.2, clip.SourceEnd - clip.SourceStart);
                 clipBlock.Width = TimelineMathService.DurationToWidth(newDur, _timelineScale, 24);
@@ -1322,7 +1407,7 @@ public sealed partial class EditorPage : Page
 
     private void RenderZoomPills()
     {
-        if (ZoomTrack == null || ViewModel == null) return;
+        if (!_isPageLoaded || ZoomTrack == null || ViewModel == null) return;
         ZoomTrack.Children.Clear();
 
         foreach (var zoom in ViewModel.ZoomEffects)
@@ -1336,7 +1421,7 @@ public sealed partial class EditorPage : Page
         double x = TimelineMathService.TimeToPixel(zoom.StartTime, _timelineScale);
         double width = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 24);
 
-        bool isSelected = _selectedZoom == zoom;
+        bool isSelected = _selectedZoomIds.Contains(zoom.Id) || _selectedZoom == zoom;
 
         var pill = new Border
         {
@@ -1372,18 +1457,18 @@ public sealed partial class EditorPage : Page
         // 2. Sol Kenar Tutamacı (In-Point / Start Time Trimming)
         var leftHandle = new Border
         {
-            Width = 10,
+            Width = 12,
             HorizontalAlignment = HorizontalAlignment.Left,
             Background = isSelected
-                ? new SolidColorBrush(Color.FromArgb(80, 255, 255, 255))
-                : new SolidColorBrush(Colors.Transparent),
+                ? new SolidColorBrush(Color.FromArgb(90, 255, 255, 255))
+                : new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)),
             CornerRadius = new CornerRadius(17, 0, 0, 17),
             IsHitTestVisible = false,
             Child = new Border
             {
                 Width = 2,
                 Height = 14,
-                Background = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
+                Background = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 CornerRadius = new CornerRadius(1)
@@ -1393,28 +1478,26 @@ public sealed partial class EditorPage : Page
         // 3. Sağ Kenar Tutamacı (Out-Point / Duration Trimming)
         var rightHandle = new Border
         {
-            Width = 10,
+            Width = 12,
             HorizontalAlignment = HorizontalAlignment.Right,
             Background = isSelected
-                ? new SolidColorBrush(Color.FromArgb(80, 255, 255, 255))
-                : new SolidColorBrush(Colors.Transparent),
+                ? new SolidColorBrush(Color.FromArgb(90, 255, 255, 255))
+                : new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)),
             CornerRadius = new CornerRadius(0, 17, 17, 0),
             IsHitTestVisible = false,
             Child = new Border
             {
                 Width = 2,
                 Height = 14,
-                Background = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
+                Background = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 CornerRadius = new CornerRadius(1)
             }
         };
 
-        // DİKKAT: Üzerinde / içinde kesinlikle bir "X" (silme) butonu YOKTUR!
         contentGrid.Children.Add(leftHandle);
         contentGrid.Children.Add(rightHandle);
-
         pill.Child = contentGrid;
 
         bool isDragging = false;
@@ -1424,10 +1507,68 @@ public sealed partial class EditorPage : Page
         double origStart = 0;
         double origDur = 0;
 
+        pill.PointerEntered += (s, e) =>
+        {
+            if (!isDragging && !isTrimmingLeft && !isTrimmingRight)
+            {
+                pill.BorderBrush = new SolidColorBrush(Color.FromArgb(255, 220, 200, 255));
+            }
+        };
+
+        pill.PointerExited += (s, e) =>
+        {
+            if (!isDragging && !isTrimmingLeft && !isTrimmingRight)
+            {
+                pill.BorderBrush = isSelected
+                    ? new SolidColorBrush(Color.FromArgb(255, 208, 188, 255))
+                    : new SolidColorBrush(Color.FromArgb(130, 208, 188, 255));
+                this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Arrow);
+            }
+        };
+
         pill.PointerPressed += (s, e) =>
         {
             e.Handled = true;
-            SelectZoom(zoom);
+
+            var ctrlState = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+            bool isCtrl = (ctrlState & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+
+            if (isCtrl)
+            {
+                if (_selectedZoomIds.Contains(zoom.Id))
+                {
+                    _selectedZoomIds.Remove(zoom.Id);
+                    _selectedZooms.Remove(zoom);
+                    if (_selectedZoom == zoom)
+                    {
+                        _selectedZoom = _selectedZooms.LastOrDefault();
+                    }
+                }
+                else
+                {
+                    _selectedZoomIds.Add(zoom.Id);
+                    _selectedZooms.Add(zoom);
+                    _selectedZoom = zoom;
+                }
+
+                if (_selectedZoom != null)
+                {
+                    SelectZoom(_selectedZoom, clearOthers: false);
+                }
+                else
+                {
+                    RenderZoomPills();
+                }
+            }
+            else
+            {
+                _selectedZooms.Clear();
+                _selectedZoomIds.Clear();
+                _selectedZooms.Add(zoom);
+                _selectedZoomIds.Add(zoom.Id);
+                SelectZoom(zoom, clearOthers: false);
+            }
+
             ViewModel.SelectedClipId = null;
 
             var ptr = e.GetCurrentPoint(ZoomTrack);
@@ -1436,18 +1577,22 @@ public sealed partial class EditorPage : Page
             origDur = zoom.Duration;
 
             var localPt = e.GetCurrentPoint(pill).Position;
+            double edgeThreshold = Math.Clamp(pill.Width * 0.28, 10.0, 16.0);
 
-            if (localPt.X <= 12)
+            if (localPt.X <= edgeThreshold)
             {
                 isTrimmingLeft = true;
+                this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast);
             }
-            else if (localPt.X >= pill.Width - 12)
+            else if (localPt.X >= pill.Width - edgeThreshold)
             {
                 isTrimmingRight = true;
+                this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast);
             }
             else
             {
                 isDragging = true;
+                this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.SizeAll);
             }
 
             pill.CapturePointer(e.Pointer);
@@ -1455,11 +1600,31 @@ public sealed partial class EditorPage : Page
 
         pill.PointerMoved += (s, e) =>
         {
+            if (!isDragging && !isTrimmingLeft && !isTrimmingRight)
+            {
+                var localPt = e.GetCurrentPoint(pill).Position;
+                double edgeThreshold = Math.Clamp(pill.Width * 0.28, 10.0, 16.0);
+                if (localPt.X <= edgeThreshold || localPt.X >= pill.Width - edgeThreshold)
+                {
+                    this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast);
+                }
+                else
+                {
+                    this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
+                }
+                return;
+            }
+
             var ptr = e.GetCurrentPoint(ZoomTrack);
             double rawDx = ptr.Position.X - startPoint.X;
 
             if (isDragging)
             {
+                // Çarpışma / Üst üste binmeyi engelleme limitleri
+                var otherZooms = ViewModel.ZoomEffects.Where(z => z != zoom).ToList();
+                double leftLimit = otherZooms.Where(o => o.StartTime + o.Duration <= origStart).Select(o => (double?)(o.StartTime + o.Duration)).Max() ?? 0.0;
+                double rightLimit = otherZooms.Where(o => o.StartTime >= origStart + origDur).Select(o => (double?)o.StartTime).Min() ?? double.MaxValue;
+
                 double candidateStart = Math.Max(0, origStart + (rawDx / _timelineScale));
                 var snapPoints = GetTimelineSnapPoints(zoom);
 
@@ -1479,6 +1644,9 @@ public sealed partial class EditorPage : Page
                     }
                 }
 
+                // Sıkı kesişim / çarpışma sınırlandırması (Collision Clamp)
+                candidateStart = Math.Clamp(candidateStart, leftLimit, Math.Max(leftLimit, rightLimit - origDur));
+
                 zoom.StartTime = Math.Max(0, Math.Round(candidateStart, 2));
                 Canvas.SetLeft(pill, TimelineMathService.TimeToPixel(zoom.StartTime, _timelineScale));
                 _isUpdatingZoomInputs = true;
@@ -1492,13 +1660,16 @@ public sealed partial class EditorPage : Page
             }
             else if (isTrimmingLeft)
             {
+                var otherZooms = ViewModel.ZoomEffects.Where(z => z != zoom).ToList();
+                double leftLimit = otherZooms.Where(o => o.StartTime + o.Duration <= origStart).Select(o => (double?)(o.StartTime + o.Duration)).Max() ?? 0.0;
+
                 double candidateStart = origStart + (rawDx / _timelineScale);
                 var snapPoints = GetTimelineSnapPoints(zoom);
                 var (snapped, snapTime) = TimelineMathService.FindSnapTime(candidateStart, snapPoints, _timelineScale, 15.0);
                 if (snapped) candidateStart = snapTime;
 
                 double fixedEnd = origStart + origDur;
-                candidateStart = Math.Clamp(candidateStart, 0, fixedEnd - 0.2);
+                candidateStart = Math.Clamp(candidateStart, leftLimit, fixedEnd - 0.2);
 
                 zoom.StartTime = Math.Round(candidateStart, 2);
                 zoom.Duration = Math.Round(fixedEnd - zoom.StartTime, 2);
@@ -1516,12 +1687,15 @@ public sealed partial class EditorPage : Page
             }
             else if (isTrimmingRight)
             {
+                var otherZooms = ViewModel.ZoomEffects.Where(z => z != zoom).ToList();
+                double rightLimit = otherZooms.Where(o => o.StartTime >= origStart + origDur).Select(o => (double?)o.StartTime).Min() ?? double.MaxValue;
+
                 double candidateEnd = (origStart + origDur) + (rawDx / _timelineScale);
                 var snapPoints = GetTimelineSnapPoints(zoom);
                 var (snapped, snapTime) = TimelineMathService.FindSnapTime(candidateEnd, snapPoints, _timelineScale, 15.0);
                 if (snapped) candidateEnd = snapTime;
 
-                candidateEnd = Math.Max(zoom.StartTime + 0.2, candidateEnd);
+                candidateEnd = Math.Clamp(candidateEnd, zoom.StartTime + 0.2, rightLimit);
                 zoom.Duration = Math.Round(candidateEnd - zoom.StartTime, 2);
 
                 pill.Width = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 24);
@@ -1538,6 +1712,7 @@ public sealed partial class EditorPage : Page
         pill.PointerReleased += (s, e) =>
         {
             pill.ReleasePointerCapture(e.Pointer);
+            this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Arrow);
 
             if (isDragging || isTrimmingLeft || isTrimmingRight)
             {
@@ -1571,12 +1746,29 @@ public sealed partial class EditorPage : Page
         PlayheadLine.Height = 22 + 72 + 56 + 56;
     }
 
-    private void SelectZoom(ZoomEffect zoom)
+    private void SelectZoom(ZoomEffect zoom, bool clearOthers = true)
     {
+        if (clearOthers)
+        {
+            _selectedZooms.Clear();
+            _selectedZoomIds.Clear();
+            _selectedZooms.Add(zoom);
+            _selectedZoomIds.Add(zoom.Id);
+        }
+        else
+        {
+            if (!_selectedZoomIds.Contains(zoom.Id))
+            {
+                _selectedZooms.Add(zoom);
+                _selectedZoomIds.Add(zoom.Id);
+            }
+        }
+
         _selectedZoom = zoom;
+        zoom.Scale = Math.Clamp(zoom.Scale, 1.0, 2.2);
         SetSidebarTab("zoom");
-        TbSelectedZoomFactor.Text = $"{zoom.Scale:F1}x";
-        SelectedZoomSlider.Value = zoom.Scale;
+        if (TbSelectedZoomFactor != null) TbSelectedZoomFactor.Text = $"{zoom.Scale:F1}x";
+        if (SelectedZoomSlider != null) SelectedZoomSlider.Value = zoom.Scale;
 
         _isUpdatingZoomInputs = true;
         try
@@ -1589,7 +1781,44 @@ public sealed partial class EditorPage : Page
             _isUpdatingZoomInputs = false;
         }
 
-        ZoomLevelBadge.Text = $"{zoom.Scale:F1}x";
+        if (ZoomLevelBadge != null) ZoomLevelBadge.Text = $"{zoom.Scale:F1}x";
+
+        _isUpdatingBezierUI = true;
+        try
+        {
+            string easingStr = zoom.Easing ?? "Cubic-Out";
+            var (x1, y1, x2, y2) = ZoomEngineService.ParseCubicBezier(easingStr);
+            _bezierP1 = new Point(x1, y1);
+            _bezierP2 = new Point(x2, y2);
+
+            string norm = easingStr.Trim().ToLowerInvariant().Replace(" ", "-");
+            string comboItem = norm switch
+            {
+                "linear" => "Linear",
+                "quad-out" or "quadout" => "Quad-Out",
+                "cubic-out" or "cubicout" => "Cubic-Out",
+                "quartic-out" or "quarticout" => "Quartic-Out",
+                "ease-in-out" or "easeinout" => "Ease-In-Out",
+                _ => "Özel (Custom Eğri)"
+            };
+
+            if (CbSelectedZoomEasing != null)
+            {
+                CbSelectedZoomEasing.SelectedItem = comboItem;
+            }
+            if (TbBezierPresetName != null)
+            {
+                TbBezierPresetName.Text = comboItem;
+            }
+
+            UpdateBezierGraphVisuals();
+        }
+        catch { }
+        finally
+        {
+            _isUpdatingBezierUI = false;
+        }
+
         RenderZoomPills();
 
         if (_currentTimeSeconds < zoom.StartTime || _currentTimeSeconds > zoom.StartTime + zoom.Duration)
@@ -1602,15 +1831,60 @@ public sealed partial class EditorPage : Page
         }
     }
 
+    private void SelectAllZooms()
+    {
+        if (ViewModel?.ZoomEffects == null || ViewModel.ZoomEffects.Count == 0) return;
+        _selectedZooms.Clear();
+        _selectedZoomIds.Clear();
+        foreach (var z in ViewModel.ZoomEffects)
+        {
+            _selectedZooms.Add(z);
+            _selectedZoomIds.Add(z.Id);
+        }
+        _selectedZoom = _selectedZooms.LastOrDefault();
+        if (_selectedZoom != null)
+        {
+            SelectZoom(_selectedZoom, clearOthers: false);
+        }
+        RenderZoomPills();
+    }
+
+    private void DeleteSelectedZooms()
+    {
+        if (_selectedZooms.Count == 0 && _selectedZoom != null)
+        {
+            _selectedZooms.Add(_selectedZoom);
+        }
+        if (_selectedZooms.Count == 0) return;
+
+        ViewModel?.PushHistory();
+        foreach (var z in _selectedZooms.ToList())
+        {
+            ViewModel?.ZoomEffects.Remove(z);
+        }
+        _selectedZooms.Clear();
+        _selectedZoomIds.Clear();
+        _selectedZoom = null;
+        if (ZoomLevelBadge != null) ZoomLevelBadge.Text = "1.0x";
+        ViewModel?.SaveProject();
+        RenderZoomPills();
+        UpdateZoomSimulation();
+    }
+
     private void DeleteZoom(ZoomEffect zoom)
     {
         if (ViewModel?.ZoomEffects == null) return;
         ViewModel.PushHistory();
         ViewModel.ZoomEffects.Remove(zoom);
+        _selectedZooms.Remove(zoom);
+        _selectedZoomIds.Remove(zoom.Id);
         if (_selectedZoom == zoom)
         {
-            _selectedZoom = null;
-            ZoomLevelBadge.Text = "1.0x";
+            _selectedZoom = _selectedZooms.LastOrDefault();
+            if (_selectedZoom == null && ZoomLevelBadge != null)
+            {
+                ZoomLevelBadge.Text = "1.0x";
+            }
         }
         ViewModel.SaveProject();
         RenderZoomPills();
@@ -1678,15 +1952,22 @@ public sealed partial class EditorPage : Page
         var pos = e.GetPosition(ZoomTrack);
         double clickSec = Math.Max(0, (pos.X - 40) / _timelineScale);
 
+        var curPt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, clickSec);
+        double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
+        double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
+        double targetX = curPt.HasValue ? curPt.Value.X : (natW / 2.0);
+        double targetY = curPt.HasValue ? curPt.Value.Y : (natH / 2.0);
+
         var newZoom = new ZoomEffect
         {
             Id = Guid.NewGuid().ToString("N")[..8],
             Name = $"Zoom {ViewModel.ZoomEffects.Count + 1}",
             StartTime = clickSec,
             Duration = 3.0,
-            Scale = 1.5,
-            TargetX = 1920 / 2,
-            TargetY = 1080 / 2
+            Scale = ViewModel.DefaultZoomScale > 1.0 ? ViewModel.DefaultZoomScale : 1.5,
+            TargetX = Math.Round(targetX, 1),
+            TargetY = Math.Round(targetY, 1),
+            Easing = !string.IsNullOrEmpty(ViewModel.ZoomEasingFunction) ? ViewModel.ZoomEasingFunction : "Cubic-Out"
         };
 
         ViewModel.ZoomEffects.Add(newZoom);
@@ -1893,6 +2174,8 @@ public sealed partial class EditorPage : Page
 
     private void UpdateZoomSimulation()
     {
+        if (!_isPageLoaded || ZoomLevelBadge == null) return;
+
         // Mevcut fare konumunu telemetriden doğrudan kaynak video koordinatlarında al
         double cursorSrcX = -1, cursorSrcY = -1;
         if (ViewModel?.MouseMoves != null && ViewModel.MouseMoves.Count > 0)
@@ -1960,9 +2243,11 @@ public sealed partial class EditorPage : Page
             if (ReferenceEquals(e.OriginalSource, VideoTrack) || ReferenceEquals(e.OriginalSource, AudioTrack) ||
                 ReferenceEquals(e.OriginalSource, ZoomTrack) || ReferenceEquals(e.OriginalSource, TimeRuler))
             {
-                if (_selectedZoom != null || !string.IsNullOrEmpty(ViewModel?.SelectedClipId) || (ViewModel?.SelectedClipIds.Count > 0))
+                if (_selectedZoom != null || _selectedZooms.Count > 0 || !string.IsNullOrEmpty(ViewModel?.SelectedClipId) || (ViewModel?.SelectedClipIds.Count > 0))
                 {
                     _selectedZoom = null;
+                    _selectedZooms.Clear();
+                    _selectedZoomIds.Clear();
                     if (ViewModel != null)
                     {
                         ViewModel.ClearClipSelection();
@@ -2145,10 +2430,19 @@ public sealed partial class EditorPage : Page
                 OnRedoClicked(this, new RoutedEventArgs());
                 break;
 
+            case Windows.System.VirtualKey.A when isCtrl:
+                e.Handled = true;
+                SelectAllZooms();
+                break;
+
             case Windows.System.VirtualKey.Delete:
             case Windows.System.VirtualKey.Back:
                 e.Handled = true;
-                if (_selectedZoom != null)
+                if (_selectedZooms.Count > 0)
+                {
+                    DeleteSelectedZooms();
+                }
+                else if (_selectedZoom != null)
                 {
                     DeleteZoom(_selectedZoom);
                 }
@@ -2186,6 +2480,7 @@ public sealed partial class EditorPage : Page
         {
             ViewModel.TimelineZoom = e.NewValue;
         }
+        if (!_isPageLoaded || ViewModel == null) return;
         // Update derived UI elements (clip widths, ruler) before re‑rendering.
         UpdateFromViewModel();
         RenderTimeline();
@@ -2193,26 +2488,38 @@ public sealed partial class EditorPage : Page
 
     private void OnMotionBlurChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_isPageLoaded) return;
         if (TbZoomBlurVal != null) TbZoomBlurVal.Text = $"{(int)e.NewValue}%";
         if (ViewModel != null) ViewModel.MotionBlurAmount = e.NewValue;
     }
 
     private void OnOpacityChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_isPageLoaded) return;
         if (TbOpacity != null) TbOpacity.Text = $"{(int)e.NewValue}%";
         if (ViewModel != null) ViewModel.BackgroundOpacity = e.NewValue;
     }
 
+    // Yeniden giriş kilidi: ses slider'larının birbirini döngüsel tetiklemesini önler
+    private bool _isUpdatingVolume = false;
+
     private void OnMicVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        if (TbMicVolVal != null) TbMicVolVal.Text = $"{(int)e.NewValue}%";
-        if (TbMicVolVal2 != null) TbMicVolVal2.Text = $"{(int)e.NewValue}%";
-        if (TbFlyoutMicVolVal != null) TbFlyoutMicVolVal.Text = $"{(int)e.NewValue}%";
-        if (ViewModel != null) ViewModel.MicVolume = e.NewValue;
-        if (_micPlayer != null && ViewModel != null && !ViewModel.MicMuted) _micPlayer.Volume = e.NewValue / 100.0;
-        if (SliderAudioTrackVol != null && Math.Abs(SliderAudioTrackVol.Value - e.NewValue) > 0.5) SliderAudioTrackVol.Value = e.NewValue;
-        if (FlyoutAudioVolSlider != null && Math.Abs(FlyoutAudioVolSlider.Value - e.NewValue) > 0.5) FlyoutAudioVolSlider.Value = e.NewValue;
-        UpdateAudioIconState();
+        if (!_isPageLoaded || _isUpdatingVolume) return;
+        _isUpdatingVolume = true;
+        try
+        {
+            if (TbMicVolVal2 != null) TbMicVolVal2.Text = $"{(int)e.NewValue}%";
+            if (ViewModel != null) ViewModel.MicVolume = e.NewValue;
+            if (_micPlayer != null && ViewModel != null && !ViewModel.MicMuted) _micPlayer.Volume = e.NewValue / 100.0;
+            // SliderAudioTrackVol (timeline sol panel) sync
+            if (SliderAudioTrackVol != null && Math.Abs(SliderAudioTrackVol.Value - e.NewValue) > 0.5) SliderAudioTrackVol.Value = e.NewValue;
+            UpdateAudioIconState();
+        }
+        finally
+        {
+            _isUpdatingVolume = false;
+        }
     }
 
     private void OnAudioTrackVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -2220,23 +2527,102 @@ public sealed partial class EditorPage : Page
         OnMicVolumeChanged(sender, e);
     }
 
+    /// <summary>
+    /// Flyout açıldığında içindeki slider ve label'ı güncel ses seviyesiyle doldurur.
+    /// x:Bind/x:Name flyout içinde WinUI 3'te E_XAMLPARSEFAILED'a yol açar;
+    /// bu nedenle Opened event + Tag tabanlı traversal kullanılır.
+    /// </summary>
+    private void OnAudioFlyoutOpened(object sender, object e)
+    {
+        if (ViewModel == null) return;
+        try
+        {
+            double vol = ViewModel.MicVolume;
+            // Flyout içeriği: Flyout → Border → StackPanel → Slider[Tag=FlyoutVolSlider], TextBlock[Tag=FlyoutVolLabel]
+            if (sender is Flyout flyout && flyout.Content is Border border && border.Child is StackPanel sp)
+            {
+                foreach (var child in sp.Children)
+                {
+                    if (child is Slider sl && sl.Tag is string slTag && slTag == "FlyoutVolSlider")
+                    {
+                        _isUpdatingVolume = true;
+                        try { sl.Value = vol; } finally { _isUpdatingVolume = false; }
+                    }
+                    if (child is Grid grid)
+                    {
+                        foreach (var gc in grid.Children)
+                        {
+                            if (gc is TextBlock tb && tb.Tag is string tbTag && tbTag == "FlyoutVolLabel")
+                            {
+                                tb.Text = $"{(int)vol}%";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[EditorPage] OnAudioFlyoutOpened hatası: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Flyout içindeki ses slider'ı değiştiğinde çağrılır.
+    /// </summary>
+    private void OnFlyoutAudioVolSliderChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_isUpdatingVolume || ViewModel == null) return;
+        double newVol = e.NewValue;
+        _isUpdatingVolume = true;
+        try
+        {
+            ViewModel.MicVolume = newVol;
+            if (_micPlayer != null && !ViewModel.MicMuted) _micPlayer.Volume = newVol / 100.0;
+            if (SliderAudioTrackVol != null) SliderAudioTrackVol.Value = newVol;
+            if (TbMicVolVal2 != null) TbMicVolVal2.Text = $"{(int)newVol}%";
+            // Flyout label güncelle
+            if (sender is Slider sl && sl.Parent is StackPanel sp)
+            {
+                foreach (var child in sp.Children)
+                {
+                    if (child is Grid grid)
+                    {
+                        foreach (var gc in grid.Children)
+                        {
+                            if (gc is TextBlock tb && tb.Tag is string tbTag && tbTag == "FlyoutVolLabel")
+                                tb.Text = $"{(int)newVol}%";
+                        }
+                    }
+                }
+            }
+            UpdateAudioIconState();
+        }
+        finally
+        {
+            _isUpdatingVolume = false;
+        }
+    }
+
     private void OnAudioTrackBtnWheelChanged(object sender, PointerRoutedEventArgs e)
     {
+        if (BtnAudioMute == null) return;
         var delta = e.GetCurrentPoint(BtnAudioMute).Properties.MouseWheelDelta;
         if (ViewModel != null)
         {
             double step = delta > 0 ? 5 : -5;
             double newVol = Math.Clamp(ViewModel.MicVolume + step, 0, 100);
-            ViewModel.MicVolume = newVol;
-            if (SliderAudioTrackVol != null) SliderAudioTrackVol.Value = newVol;
-            if (MicVolumeSlider != null) MicVolumeSlider.Value = newVol;
-            if (FlyoutAudioVolSlider != null) FlyoutAudioVolSlider.Value = newVol;
-            if (TbMicVolVal != null) TbMicVolVal.Text = $"{(int)newVol}%";
-            if (TbMicVolVal2 != null) TbMicVolVal2.Text = $"{(int)newVol}%";
-            if (TbFlyoutMicVolVal != null) TbFlyoutMicVolVal.Text = $"{(int)newVol}%";
-            if (_micPlayer != null && !ViewModel.MicMuted)
+            _isUpdatingVolume = true;
+            try
             {
-                _micPlayer.Volume = newVol / 100.0;
+                ViewModel.MicVolume = newVol;
+                if (SliderAudioTrackVol != null) SliderAudioTrackVol.Value = newVol;
+                if (TbMicVolVal2 != null) TbMicVolVal2.Text = $"{(int)newVol}%";
+                if (_micPlayer != null && !ViewModel.MicMuted) _micPlayer.Volume = newVol / 100.0;
+            }
+            finally
+            {
+                _isUpdatingVolume = false;
             }
             UpdateAudioIconState();
             e.Handled = true;
@@ -2246,7 +2632,8 @@ public sealed partial class EditorPage : Page
     private void UpdateAudioIconState()
     {
         if (IconAudioMute == null || ViewModel == null) return;
-        bool isMuted = ViewModel.MicTrack.Muted || ViewModel.MicVolume <= 0;
+        // MicTrack null olabilir (proje henüz yüklenmemişse); null-safe erişim
+        bool isMuted = (ViewModel.MicTrack?.Muted ?? false) || ViewModel.MicVolume <= 0;
         if (isMuted)
         {
             IconAudioMute.Glyph = "\uE74F";
@@ -2265,26 +2652,76 @@ public sealed partial class EditorPage : Page
         }
     }
 
+    private void OnVideoTrackVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        OnSysVolumeChanged(sender, e);
+    }
+
     private void OnSysVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_isPageLoaded) return;
         if (TbSysVolVal != null) TbSysVolVal.Text = $"{(int)e.NewValue}%";
         if (ViewModel != null) ViewModel.SysVolume = e.NewValue;
         if (_sysPlayer != null) _sysPlayer.Volume = e.NewValue / 100.0;
+        if (VideoPlayer?.MediaPlayer != null) VideoPlayer.MediaPlayer.Volume = e.NewValue / 100.0;
+        if (SliderVideoTrackVol != null && Math.Abs(SliderVideoTrackVol.Value - e.NewValue) > 0.5)
+        {
+            SliderVideoTrackVol.Value = e.NewValue;
+        }
+        if (SysVolumeSlider != null && Math.Abs(SysVolumeSlider.Value - e.NewValue) > 0.5)
+        {
+            SysVolumeSlider.Value = e.NewValue;
+        }
     }
 
     private void OnSelectedZoomFactorChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        if (_selectedZoom == null) return;
-        _selectedZoom.Scale = e.NewValue;
-        TbSelectedZoomFactor.Text = $"{e.NewValue:F1}x";
-        ZoomLevelBadge.Text = $"{e.NewValue:F1}x";
+        if (!_isPageLoaded || _selectedZoom == null) return;
+        double clamped = Math.Clamp(e.NewValue, 1.0, 2.2);
+        _selectedZoom.Scale = clamped;
+
+        if (_selectedZooms.Count > 1)
+        {
+            foreach (var z in _selectedZooms)
+            {
+                z.Scale = clamped;
+            }
+        }
+
+        // Hedef koordinat varsayılan merkezde kalmışsa veya atanmamışsa gerçek fare tıklamasıyla eşle
+        if (ViewModel?.MouseClicks != null && ViewModel.MouseClicks.Count > 0)
+        {
+            var matchedClick = ViewModel.MouseClicks
+                .Where(c => c.Timestamp >= _selectedZoom.StartTime - 0.3 && c.Timestamp <= _selectedZoom.StartTime + _selectedZoom.Duration)
+                .OrderBy(c => Math.Abs(c.Timestamp - (_selectedZoom.StartTime + 0.15)))
+                .FirstOrDefault();
+            if (matchedClick != null && (_selectedZoom.TargetX <= 0 || (Math.Abs(_selectedZoom.TargetX - 960) < 1 && Math.Abs(_selectedZoom.TargetY - 540) < 1)))
+            {
+                _selectedZoom.TargetX = Math.Round((double)matchedClick.X, 1);
+                _selectedZoom.TargetY = Math.Round((double)matchedClick.Y, 1);
+            }
+        }
+        else if (ViewModel?.MouseMoves != null && ViewModel.MouseMoves.Count > 0)
+        {
+            var pt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, _selectedZoom.StartTime + 0.15)
+                     ?? ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, _selectedZoom.StartTime);
+            if (pt.HasValue && (_selectedZoom.TargetX <= 0 || (Math.Abs(_selectedZoom.TargetX - 960) < 1 && Math.Abs(_selectedZoom.TargetY - 540) < 1)))
+            {
+                _selectedZoom.TargetX = Math.Round(pt.Value.X, 1);
+                _selectedZoom.TargetY = Math.Round(pt.Value.Y, 1);
+            }
+        }
+
+        if (TbSelectedZoomFactor != null) TbSelectedZoomFactor.Text = $"{clamped:F1}x";
+        if (ZoomLevelBadge != null) ZoomLevelBadge.Text = $"{clamped:F1}x";
         RenderZoomPills();
         UpdateZoomSimulation();
+        UpdatePlaybackCursor(_currentTimeSeconds);
     }
 
     private void OnZoomStartChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
-        if (_isUpdatingZoomInputs || _selectedZoom == null || double.IsNaN(args.NewValue)) return;
+        if (!_isPageLoaded || _isUpdatingZoomInputs || _selectedZoom == null || double.IsNaN(args.NewValue)) return;
         double newStart = Math.Max(0, args.NewValue);
         double currentEnd = _selectedZoom.StartTime + _selectedZoom.Duration;
         if (newStart >= currentEnd - 0.1)
@@ -2296,12 +2733,13 @@ public sealed partial class EditorPage : Page
 
         RenderZoomPills();
         UpdateZoomSimulation();
+        UpdatePlaybackCursor(_currentTimeSeconds);
         ViewModel?.SaveProject();
     }
 
     private void OnZoomEndChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
-        if (_isUpdatingZoomInputs || _selectedZoom == null || double.IsNaN(args.NewValue)) return;
+        if (!_isPageLoaded || _isUpdatingZoomInputs || _selectedZoom == null || double.IsNaN(args.NewValue)) return;
         double newEnd = args.NewValue;
         if (newEnd <= _selectedZoom.StartTime + 0.1)
         {
@@ -2311,12 +2749,428 @@ public sealed partial class EditorPage : Page
 
         RenderZoomPills();
         UpdateZoomSimulation();
+        UpdatePlaybackCursor(_currentTimeSeconds);
         ViewModel?.SaveProject();
+    }
+
+    private void OnPreviewContainerSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is Border b && e.NewSize.Width > 0 && e.NewSize.Height > 0)
+        {
+            b.Clip = new RectangleGeometry { Rect = new Rect(0, 0, e.NewSize.Width, e.NewSize.Height) };
+        }
+    }
+
+    private void InitializeZoomPreview()
+    {
+        if (PreviewTargetBox != null)
+        {
+            _previewTargetTransform = new CompositeTransform
+            {
+                CenterX = 0,
+                CenterY = 0
+            };
+            PreviewTargetBox.RenderTransformOrigin = new Point(0.5, 0.5);
+            PreviewTargetBox.RenderTransform = _previewTargetTransform;
+        }
+
+        _zoomPreviewTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(16) // ~60fps
+        };
+        _zoomPreviewTimer.Tick += OnZoomPreviewTimerTick;
+        _zoomPreviewStopwatch.Restart();
+        _zoomPreviewTimer.Start();
+    }
+
+    private void OnZoomPreviewTimerTick(object? sender, object e)
+    {
+        if (_previewTargetTransform == null || PreviewTargetBox == null) return;
+
+        double totalMs = 2800.0;
+        double elapsed = _zoomPreviewStopwatch.ElapsedMilliseconds % (long)totalMs;
+        double t = elapsed / totalMs; // 0.0 - 1.0
+
+        double rawScale = _selectedZoom != null ? _selectedZoom.Scale : 1.5;
+        double targetScale = Math.Clamp(rawScale, 1.0, 2.2);
+        double curScale = 1.0;
+
+        if (t < 0.35)
+        {
+            // Zoom In
+            double p = t / 0.35;
+            double ease = ZoomEngineService.SolveCubicBezier(p, _bezierP1.X, _bezierP1.Y, _bezierP2.X, _bezierP2.Y);
+            curScale = 1.0 + (targetScale - 1.0) * ease;
+        }
+        else if (t <= 0.70)
+        {
+            // Hold
+            curScale = targetScale;
+        }
+        else
+        {
+            // Zoom Out
+            double p = (t - 0.70) / 0.30;
+            double ease = ZoomEngineService.SolveCubicBezier(p, _bezierP1.X, _bezierP1.Y, _bezierP2.X, _bezierP2.Y);
+            curScale = targetScale - (targetScale - 1.0) * ease;
+        }
+
+        _previewTargetTransform.ScaleX = curScale;
+        _previewTargetTransform.ScaleY = curScale;
+
+        if (TbPreviewScaleIndicator != null)
+        {
+            TbPreviewScaleIndicator.Text = $"{curScale:F2}x";
+        }
+    }
+
+    private const double BezierPadX = 14.0;
+    private const double BezierPadY = 14.0;
+
+    private (double w, double h) GetBezierGraphSize()
+    {
+        double totalW = CanvasBezierGraph != null && CanvasBezierGraph.ActualWidth > 40 ? CanvasBezierGraph.ActualWidth : 200.0;
+        double totalH = CanvasBezierGraph != null && CanvasBezierGraph.ActualHeight > 40 ? CanvasBezierGraph.ActualHeight : 128.0;
+        double w = totalW - (BezierPadX * 2);
+        double h = totalH - (BezierPadY * 2);
+        return (Math.Max(50, w), Math.Max(50, h));
+    }
+
+    private Point NormalizedToCanvasPoint(Point norm, double w, double h)
+    {
+        double x = BezierPadX + norm.X * w;
+        double y = BezierPadY + (1.0 - norm.Y) * h;
+        return new Point(x, y);
+    }
+
+    private Point CanvasToNormalizedPoint(Point pt, double w, double h)
+    {
+        double nx = Math.Clamp((pt.X - BezierPadX) / w, 0.0, 1.0);
+        double ny = Math.Clamp(1.0 - ((pt.Y - BezierPadY) / h), 0.0, 1.0);
+        return new Point(Math.Round(nx, 2), Math.Round(ny, 2));
+    }
+
+    private void UpdateBezierGraphVisuals()
+    {
+        if (CanvasBezierGraph == null || FigBezierCurve == null || SegBezierCurve == null) return;
+
+        var (gw, gh) = GetBezierGraphSize();
+        var p0 = NormalizedToCanvasPoint(new Point(0, 0), gw, gh);
+        var p3 = NormalizedToCanvasPoint(new Point(1, 1), gw, gh);
+        var cp1 = NormalizedToCanvasPoint(_bezierP1, gw, gh);
+        var cp2 = NormalizedToCanvasPoint(_bezierP2, gw, gh);
+
+        // Curve figure
+        FigBezierCurve.StartPoint = p0;
+        SegBezierCurve.Point1 = cp1;
+        SegBezierCurve.Point2 = cp2;
+        SegBezierCurve.Point3 = p3;
+
+        // Lines to handles
+        if (LineHandleP1 != null)
+        {
+            LineHandleP1.X1 = p0.X; LineHandleP1.Y1 = p0.Y;
+            LineHandleP1.X2 = cp1.X; LineHandleP1.Y2 = cp1.Y;
+        }
+        if (LineHandleP2 != null)
+        {
+            LineHandleP2.X1 = p3.X; LineHandleP2.Y1 = p3.Y;
+            LineHandleP2.X2 = cp2.X; LineHandleP2.Y2 = cp2.Y;
+        }
+
+        // Handle thumbs
+        if (ThumbP1 != null)
+        {
+            Canvas.SetLeft(ThumbP1, cp1.X - 7);
+            Canvas.SetTop(ThumbP1, cp1.Y - 7);
+        }
+        if (ThumbP2 != null)
+        {
+            Canvas.SetLeft(ThumbP2, cp2.X - 7);
+            Canvas.SetTop(ThumbP2, cp2.Y - 7);
+        }
+
+        // Grid lines
+        if (GridLineDiag != null)
+        {
+            GridLineDiag.X1 = p0.X; GridLineDiag.Y1 = p0.Y;
+            GridLineDiag.X2 = p3.X; GridLineDiag.Y2 = p3.Y;
+        }
+        if (GridLineH1 != null) { GridLineH1.X1 = BezierPadX; GridLineH1.X2 = BezierPadX + gw; GridLineH1.Y1 = GridLineH1.Y2 = BezierPadY + gh * 0.25; }
+        if (GridLineH2 != null) { GridLineH2.X1 = BezierPadX; GridLineH2.X2 = BezierPadX + gw; GridLineH2.Y1 = GridLineH2.Y2 = BezierPadY + gh * 0.50; }
+        if (GridLineH3 != null) { GridLineH3.X1 = BezierPadX; GridLineH3.X2 = BezierPadX + gw; GridLineH3.Y1 = GridLineH3.Y2 = BezierPadY + gh * 0.75; }
+
+        if (TbBezierCoords != null)
+        {
+            TbBezierCoords.Text = $"P1: {_bezierP1.X:F2}, {_bezierP1.Y:F2} | P2: {_bezierP2.X:F2}, {_bezierP2.Y:F2}";
+        }
+    }
+
+    private void OnBezierGraphPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (CanvasBezierGraph == null) return;
+        var (gw, gh) = GetBezierGraphSize();
+        var cp1 = NormalizedToCanvasPoint(_bezierP1, gw, gh);
+        var cp2 = NormalizedToCanvasPoint(_bezierP2, gw, gh);
+
+        var pt = e.GetCurrentPoint(CanvasBezierGraph).Position;
+        double dist1 = Math.Sqrt(Math.Pow(pt.X - cp1.X, 2) + Math.Pow(pt.Y - cp1.Y, 2));
+        double dist2 = Math.Sqrt(Math.Pow(pt.X - cp2.X, 2) + Math.Pow(pt.Y - cp2.Y, 2));
+
+        if (dist1 <= 22)
+        {
+            _activeBezierHandle = 1;
+            CanvasBezierGraph.CapturePointer(e.Pointer);
+            e.Handled = true;
+        }
+        else if (dist2 <= 22)
+        {
+            _activeBezierHandle = 2;
+            CanvasBezierGraph.CapturePointer(e.Pointer);
+            e.Handled = true;
+        }
+        else if (dist1 < dist2 && dist1 <= 36)
+        {
+            _activeBezierHandle = 1;
+            CanvasBezierGraph.CapturePointer(e.Pointer);
+            e.Handled = true;
+        }
+        else if (dist2 <= 36)
+        {
+            _activeBezierHandle = 2;
+            CanvasBezierGraph.CapturePointer(e.Pointer);
+            e.Handled = true;
+        }
+    }
+
+    private void OnBezierGraphPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (CanvasBezierGraph == null) return;
+        var (gw, gh) = GetBezierGraphSize();
+
+        if (_activeBezierHandle != 0)
+        {
+            var pt = e.GetCurrentPoint(CanvasBezierGraph).Position;
+            var normPt = CanvasToNormalizedPoint(pt, gw, gh);
+
+            if (_activeBezierHandle == 1)
+            {
+                _bezierP1 = normPt;
+            }
+            else if (_activeBezierHandle == 2)
+            {
+                _bezierP2 = normPt;
+            }
+
+            _isUpdatingBezierUI = true;
+            try
+            {
+                if (CbSelectedZoomEasing != null)
+                {
+                    CbSelectedZoomEasing.SelectedItem = "Özel (Custom Eğri)";
+                }
+                if (TbBezierPresetName != null)
+                {
+                    TbBezierPresetName.Text = "Özel";
+                }
+            }
+            finally
+            {
+                _isUpdatingBezierUI = false;
+            }
+
+            UpdateBezierGraphVisuals();
+
+            if (_selectedZoom != null)
+            {
+                _selectedZoom.Easing = $"cubic-bezier({_bezierP1.X:F2}, {_bezierP1.Y:F2}, {_bezierP2.X:F2}, {_bezierP2.Y:F2})";
+                UpdateZoomSimulation();
+            }
+            e.Handled = true;
+        }
+        else
+        {
+            var cp1 = NormalizedToCanvasPoint(_bezierP1, gw, gh);
+            var cp2 = NormalizedToCanvasPoint(_bezierP2, gw, gh);
+            var pt = e.GetCurrentPoint(CanvasBezierGraph).Position;
+            double dist1 = Math.Sqrt(Math.Pow(pt.X - cp1.X, 2) + Math.Pow(pt.Y - cp1.Y, 2));
+            double dist2 = Math.Sqrt(Math.Pow(pt.X - cp2.X, 2) + Math.Pow(pt.Y - cp2.Y, 2));
+            if (dist1 <= 20 || dist2 <= 20)
+            {
+                this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
+            }
+            else
+            {
+                this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Arrow);
+            }
+        }
+    }
+
+    private void OnBezierGraphPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (_activeBezierHandle != 0 && CanvasBezierGraph != null)
+        {
+            CanvasBezierGraph.ReleasePointerCapture(e.Pointer);
+            _activeBezierHandle = 0;
+            if (_selectedZoom != null)
+            {
+                _selectedZoom.Easing = $"cubic-bezier({_bezierP1.X:F2}, {_bezierP1.Y:F2}, {_bezierP2.X:F2}, {_bezierP2.Y:F2})";
+                ViewModel?.PushHistory();
+                ViewModel?.SaveProject();
+                UpdateZoomSimulation();
+            }
+            e.Handled = true;
+        }
+    }
+
+    private void OnBezierGraphPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (_activeBezierHandle == 0)
+        {
+            this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Arrow);
+        }
+    }
+
+    private void OnSelectedZoomEasingChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingBezierUI || CbSelectedZoomEasing == null) return;
+        string? selected = CbSelectedZoomEasing.SelectedItem as string;
+        if (string.IsNullOrEmpty(selected)) return;
+
+        if (TbBezierPresetName != null)
+        {
+            TbBezierPresetName.Text = selected;
+        }
+
+        switch (selected)
+        {
+            case "Linear":
+                _bezierP1 = new Point(0.0, 0.0);
+                _bezierP2 = new Point(1.0, 1.0);
+                break;
+            case "Quad-Out":
+                _bezierP1 = new Point(0.25, 0.46);
+                _bezierP2 = new Point(0.45, 0.94);
+                break;
+            case "Cubic-Out":
+                _bezierP1 = new Point(0.215, 0.61);
+                _bezierP2 = new Point(0.355, 1.0);
+                break;
+            case "Quartic-Out":
+                _bezierP1 = new Point(0.165, 0.84);
+                _bezierP2 = new Point(0.44, 1.0);
+                break;
+            case "Ease-In-Out":
+                _bezierP1 = new Point(0.42, 0.0);
+                _bezierP2 = new Point(0.58, 1.0);
+                break;
+            case "Özel (Custom Eğri)":
+                break;
+        }
+
+        UpdateBezierGraphVisuals();
+
+        if (_selectedZoom != null)
+        {
+            if (selected == "Özel (Custom Eğri)")
+            {
+                _selectedZoom.Easing = $"cubic-bezier({_bezierP1.X:F2}, {_bezierP1.Y:F2}, {_bezierP2.X:F2}, {_bezierP2.Y:F2})";
+            }
+            else
+            {
+                _selectedZoom.Easing = selected;
+            }
+            ViewModel?.PushHistory();
+            ViewModel?.SaveProject();
+            UpdateZoomSimulation();
+        }
+    }
+
+    private void OnApplyToSelectedZoomsClicked(object sender, RoutedEventArgs e)
+    {
+        var targets = _selectedZooms.Count > 0 
+            ? _selectedZooms.ToList() 
+            : (_selectedZoom != null ? new List<ZoomEffect> { _selectedZoom } : new List<ZoomEffect>());
+
+        if (targets.Count == 0 || ViewModel == null) return;
+
+        string targetEasing = _selectedZoom?.Easing ??
+            (CbSelectedZoomEasing?.SelectedItem as string ?? $"cubic-bezier({_bezierP1.X:F2}, {_bezierP1.Y:F2}, {_bezierP2.X:F2}, {_bezierP2.Y:F2})");
+        double targetScale = SelectedZoomSlider != null 
+            ? Math.Clamp(SelectedZoomSlider.Value, 1.0, 2.2) 
+            : (_selectedZoom != null ? Math.Clamp(_selectedZoom.Scale, 1.0, 2.2) : 1.5);
+
+        ViewModel.PushHistory();
+
+        foreach (var z in targets)
+        {
+            z.Easing = targetEasing;
+            z.Scale = targetScale;
+        }
+
+        ViewModel.SaveProject();
+        RenderZoomPills();
+        UpdateZoomSimulation();
+
+        if (sender is Button btn)
+        {
+            if (btn.Content is StackPanel sp && sp.Children.OfType<TextBlock>().FirstOrDefault() is TextBlock tb)
+            {
+                string origText = tb.Text;
+                tb.Text = $"Uygulandı! ({targets.Count} Seçili)";
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+                timer.Tick += (s, ev) =>
+                {
+                    tb.Text = origText;
+                    timer.Stop();
+                };
+                timer.Start();
+            }
+        }
+    }
+
+    private void OnApplyZoomToAllClicked(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel?.ZoomEffects == null || ViewModel.ZoomEffects.Count == 0) return;
+
+        string targetEasing = _selectedZoom?.Easing ??
+            (CbSelectedZoomEasing?.SelectedItem as string ?? $"cubic-bezier({_bezierP1.X:F2}, {_bezierP1.Y:F2}, {_bezierP2.X:F2}, {_bezierP2.Y:F2})");
+        double targetScale = SelectedZoomSlider != null 
+            ? Math.Clamp(SelectedZoomSlider.Value, 1.0, 2.2) 
+            : (_selectedZoom != null ? Math.Clamp(_selectedZoom.Scale, 1.0, 2.2) : 1.5);
+
+        ViewModel.PushHistory();
+
+        foreach (var z in ViewModel.ZoomEffects)
+        {
+            z.Easing = targetEasing;
+            z.Scale = targetScale;
+        }
+
+        ViewModel.SaveProject();
+        RenderZoomPills();
+        UpdateZoomSimulation();
+
+        if (sender is Button btn)
+        {
+            if (btn.Content is StackPanel sp && sp.Children.OfType<TextBlock>().FirstOrDefault() is TextBlock tb)
+            {
+                string origText = tb.Text;
+                tb.Text = "Uygulandı! (Tümüne Aktarıldı)";
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+                timer.Tick += (s, ev) =>
+                {
+                    tb.Text = origText;
+                    timer.Stop();
+                };
+                timer.Start();
+            }
+        }
     }
 
     private void OnGlobalZoomMaxScaleChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        if (ViewModel == null) return;
+        if (!_isPageLoaded || ViewModel == null) return;
         ViewModel.ZoomMaxScale = e.NewValue;
         ViewModel.DefaultZoomScale = e.NewValue;
 
@@ -2328,18 +3182,19 @@ public sealed partial class EditorPage : Page
             }
             if (_selectedZoom != null)
             {
-                TbSelectedZoomFactor.Text = $"{_selectedZoom.Scale:F1}x";
-                SelectedZoomSlider.Value = _selectedZoom.Scale;
+                if (TbSelectedZoomFactor != null) TbSelectedZoomFactor.Text = $"{_selectedZoom.Scale:F1}x";
+                if (SelectedZoomSlider != null) SelectedZoomSlider.Value = _selectedZoom.Scale;
             }
             RenderZoomPills();
             UpdateZoomSimulation();
+            UpdatePlaybackCursor(_currentTimeSeconds);
             ViewModel.SaveProject();
         }
     }
 
     private void OnGlobalZoomDurationChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        if (ViewModel == null) return;
+        if (!_isPageLoaded || ViewModel == null) return;
         ViewModel.ZoomHoldDurationSec = e.NewValue;
         RenderZoomPills();
         UpdateZoomSimulation();
@@ -2458,28 +3313,52 @@ public sealed partial class EditorPage : Page
         double targetX = curPt.HasValue ? curPt.Value.X : (natW / 2.0);
         double targetY = curPt.HasValue ? curPt.Value.Y : (natH / 2.0);
 
+        double defaultScale = ViewModel.DefaultZoomScale > 0 ? ViewModel.DefaultZoomScale : 1.5;
+        double startCandidate = Math.Round(_currentTimeSeconds, 2);
+        double durationCandidate = 2.5;
+
+        // Çakışma önleme: Yeni zoom var olan bir zoom'un üzerine çakışmasın
+        if (ViewModel.ZoomEffects != null && ViewModel.ZoomEffects.Count > 0)
+        {
+            var sorted = ViewModel.ZoomEffects.OrderBy(z => z.StartTime).ToList();
+            var inside = sorted.FirstOrDefault(z => startCandidate >= z.StartTime && startCandidate < z.StartTime + z.Duration);
+            if (inside != null)
+            {
+                startCandidate = Math.Round(inside.StartTime + inside.Duration + 0.05, 2);
+            }
+            var next = sorted.FirstOrDefault(z => z.StartTime > startCandidate);
+            if (next != null && startCandidate + durationCandidate > next.StartTime)
+            {
+                durationCandidate = Math.Max(0.5, Math.Round(next.StartTime - startCandidate - 0.05, 2));
+            }
+        }
+
         var newZoom = new ZoomEffect
         {
             Id = Guid.NewGuid().ToString("N")[..8],
-            Name = $"Zoom {ViewModel.ZoomEffects.Count + 1}",
-            StartTime = Math.Round(_currentTimeSeconds, 2),
-            Duration = 2.5,
-            Scale = ViewModel.DefaultZoomScale > 0 ? ViewModel.DefaultZoomScale : 1.5,
+            Name = $"Zoom {(ViewModel?.ZoomEffects?.Count ?? 0) + 1}",
+            StartTime = startCandidate,
+            Duration = durationCandidate,
+            Scale = Math.Clamp(defaultScale, 1.0, 2.2),
             TargetX = Math.Round(targetX, 1),
             TargetY = Math.Round(targetY, 1),
-            Easing = "ease-in-out"
+            Easing = !string.IsNullOrEmpty(ViewModel?.ZoomEasingFunction) ? ViewModel.ZoomEasingFunction : "Cubic-Out"
         };
-        ViewModel.ZoomEffects.Add(newZoom);
+        ViewModel?.ZoomEffects?.Add(newZoom);
         SelectZoom(newZoom);
     }
 
     private void OnDeleteZoomClicked(object sender, RoutedEventArgs e)
     {
-        if (_selectedZoom != null)
+        if (_selectedZooms.Count > 0)
+        {
+            DeleteSelectedZooms();
+        }
+        else if (_selectedZoom != null)
         {
             DeleteZoom(_selectedZoom);
         }
-        else if (!string.IsNullOrEmpty(ViewModel.SelectedClipId))
+        else if (!string.IsNullOrEmpty(ViewModel?.SelectedClipId))
         {
             ViewModel.DeleteSelected();
             RenderTimeline();
@@ -2552,6 +3431,7 @@ public sealed partial class EditorPage : Page
 
     private void OnMasterVolumeSliderChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        if (!_isPageLoaded) return;
         double vol = e.NewValue;
         if (TbVolumePercent != null) TbVolumePercent.Text = $"{(int)vol}%";
 

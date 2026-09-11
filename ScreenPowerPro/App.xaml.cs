@@ -15,6 +15,33 @@ public partial class App : Application
 
     public App()
     {
+        ScreenPowerPro.Helpers.AppLog.InitializeConsole();
+        ScreenPowerPro.Helpers.AppLog.Info("Uygulama başlatılıyor (App ctor)...");
+
+        UnhandledException += (s, e) =>
+        {
+            ScreenPowerPro.Helpers.AppLog.Error($"[App.UnhandledException] {e.Message}", e.Exception);
+            try { System.IO.File.AppendAllText(@"C:\Users\burak\ScreenPowerPro\global_crash.log", $"[App.UnhandledException] {e.Message}\n{e.Exception}\n"); } catch { }
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        {
+            if (e.ExceptionObject is Exception ex)
+            {
+                ScreenPowerPro.Helpers.AppLog.Error("[AppDomain.UnhandledException] Yakalanmamış sistem hatası", ex);
+            }
+            else
+            {
+                ScreenPowerPro.Helpers.AppLog.Error($"[AppDomain.UnhandledException] {e.ExceptionObject}");
+            }
+        };
+
+        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) =>
+        {
+            ScreenPowerPro.Helpers.AppLog.Error("[TaskScheduler.UnobservedTaskException]", e.Exception);
+            e.SetObserved();
+        };
+
         InitializeComponent();
 
         var services = new ServiceCollection();

@@ -2,6 +2,7 @@ using System;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using ScreenPowerPro.Helpers;
 using ScreenPowerPro.Views;
 using Windows.Graphics;
 
@@ -39,6 +40,7 @@ public sealed partial class MainWindow : Window
         ResizeForDashboard();
 
         // İlk sayfa olarak Dashboard'a yönlendir
+        AppLog.Event("NAV", "İlk açılış: Dashboard'a yönlendiriliyor.");
         RootFrame.Navigate(typeof(DashboardPage));
     }
 
@@ -88,28 +90,41 @@ public sealed partial class MainWindow : Window
 
     public void NavigateToDashboard()
     {
+        AppLog.Event("NAV", "DashboardPage sayfasına geçiliyor.");
         ResizeForDashboard();
         RootFrame.Navigate(typeof(DashboardPage));
     }
 
     public void NavigateToLibrary()
     {
+        AppLog.Event("NAV", "LibraryPage sayfasına geçiliyor.");
         RootFrame.Navigate(typeof(LibraryPage));
     }
 
     public void NavigateToEditor(string projectDir)
     {
-        ResizeForEditor();
-        RootFrame.Navigate(typeof(EditorPage), projectDir);
+        AppLog.Event("NAV", $"NavigateToEditor çağrıldı. Hedef proje: '{projectDir}'");
+        try
+        {
+            ResizeForEditor();
+            bool result = RootFrame.Navigate(typeof(EditorPage), projectDir);
+            AppLog.Success($"EditorPage navigasyonu tamamlandı (Result: {result}).");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"[MainWindow] EditorPage sayfasına navigasyon sırasında KRİTİK HATA!", ex);
+        }
     }
 
     public void NavigateToExport(string projectDir)
     {
+        AppLog.Event("NAV", $"ExportPage sayfasına geçiliyor (Proje: '{projectDir}').");
         RootFrame.Navigate(typeof(ExportPage), projectDir);
     }
 
     public void NavigateToExport(ScreenPowerPro.Models.ExportOptions options)
     {
+        AppLog.Event("NAV", "ExportPage sayfasına geçiliyor (ExportOptions).");
         RootFrame.Navigate(typeof(ExportPage), options);
     }
 }

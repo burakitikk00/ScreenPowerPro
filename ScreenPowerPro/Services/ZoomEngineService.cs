@@ -219,17 +219,15 @@ public class ZoomEngineService
 
             if (ev.IsClick)
             {
-                double tx = Math.Clamp(x, halfW, vW - halfW);
-                double ty = Math.Clamp(y, halfH, vH - halfH);
                 lastActivityTime = time;
 
                 if (!isZoomed)
                 {
-                    // Yeni bir zoom oturumu başlat
+                    // Yeni bir zoom oturumu başlat - Tıklamanın yapıldığı orijinal koordinatları sakla
                     isZoomed = true;
                     currentZoomStartTime = Math.Max(0, time - (autoZoomMode == "instant" ? 0.08 : ZoomPreviewLeadSec));
-                    currentTargetX = tx;
-                    currentTargetY = ty;
+                    currentTargetX = x;
+                    currentTargetY = y;
 
                     currentEffect = new ZoomEffect
                     {
@@ -237,8 +235,8 @@ public class ZoomEngineService
                         Name = $"Zoom {zoomIndex++}",
                         StartTime = Math.Round(currentZoomStartTime, 3),
                         Scale = actualScale,
-                        TargetX = Math.Round(currentTargetX, 1),
-                        TargetY = Math.Round(currentTargetY, 1),
+                        TargetX = Math.Round(x, 1),
+                        TargetY = Math.Round(y, 1),
                         Easing = autoZoomMode == "instant" ? "instant" : SettingsManager.Instance.ZoomEasingFunction.ToLowerInvariant()
                     };
                 }
@@ -251,8 +249,8 @@ public class ZoomEngineService
                     FinalizeCurrentZoom(transitionStart);
                     
                     isZoomed = true;
-                    currentTargetX = tx;
-                    currentTargetY = ty;
+                    currentTargetX = x;
+                    currentTargetY = y;
                     
                     currentEffect = new ZoomEffect
                     {
@@ -260,8 +258,8 @@ public class ZoomEngineService
                         Name = $"Zoom {zoomIndex++}",
                         StartTime = Math.Round(transitionStart, 3),
                         Scale = actualScale,
-                        TargetX = Math.Round(currentTargetX, 1),
-                        TargetY = Math.Round(currentTargetY, 1),
+                        TargetX = Math.Round(x, 1),
+                        TargetY = Math.Round(y, 1),
                         Easing = autoZoomMode == "instant" ? "instant" : SettingsManager.Instance.ZoomEasingFunction.ToLowerInvariant()
                     };
                 }
@@ -425,16 +423,130 @@ public class ZoomEngineService
         return 1.0 - (f * f * f * f);
     }
 
-    public static double ApplyEasing(double p, string easing)
+    public static (double x1, double y1, double x2, double y2) ParseCubicBezier(string? easing)
     {
-        return easing switch
+        if (string.IsNullOrWhiteSpace(easing))
+            return (0.215, 0.61, 0.355, 1.0); // default cubic-out
+
+        string clean = easing.Trim().ToLowerInvariant().Replace(" ", "");
+        if (clean.StartsWith("cubic-bezier(") && clean.EndsWith(")"))
+        {
+            var parts = clean.Substring(13, clean.Length - 14).Split(',');
+            if (parts.Length == 4 &&
+                double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double x1) &&
+                double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double y1) &&
+                double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double x2) &&
+                double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double y2))
+            {
+                return (Math.Clamp(x1, 0.0, 1.0), y1, Math.Clamp(x2, 0.0, 1.0), y2);
+            }
+        }
+        else if (clean == "linear") return (0.0, 0.0, 1.0, 1.0);
+        else if (clean == "quad-out" || clean == "quadout") return (0.25, 0.46, 0.45, 0.94);
+        else if (clean == "cubic-out" || clean == "cubicout") return (0.215, 0.61, 0.355, 1.0);
+        else if (clean == "quartic-out" || clean == "quarticout") return (0.165, 0.84, 0.44, 1.0);
+        else if (clean == "ease-in-out" || clean == "easeinout") return (0.42, 0.0, 0.58, 1.0);
+
+        return (0.215, 0.61, 0.355, 1.0);
+    }
+
+    public static double SolveCubicBezier(double p, double x1, double y1, double x2, double y2)
+    {
+        p = Math.Clamp(p, 0.0, 1.0);
+        if (p <= 0.0) return 0.0;
+        if (p >= 1.0) return 1.0;
+
+        double cx = 3.0 * x1;
+        double bx = 3.0 * (x2 - x1) - cx;
+        double ax = 1.0 - cx - bx;
+
+        double cy = 3.0 * y1;
+        double by = 3.0 * (y2 - y1) - cy;
+        double ay = 1.0 - cy - by;
+
+        double SampleCurveX(double t) => ((ax * t + bx) * t + cx) * t;
+        double SampleCurveY(double t) => ((ay * t + by) * t + cy) * t;
+        double SampleCurveDerivativeX(double t) => (3.0 * ax * t + 2.0 * bx) * t + cx;
+
+        double t2 = p;
+        for (int i = 0; i < 8; i++)
+        {
+            double x2Val = SampleCurveX(t2) - p;
+            if (Math.Abs(x2Val) < 1e-6)
+                return SampleCurveY(t2);
+
+            double d2 = SampleCurveDerivativeX(t2);
+            if (Math.Abs(d2) < 1e-6)
+                break;
+
+            t2 -= x2Val / d2;
+            t2 = Math.Clamp(t2, 0.0, 1.0);
+        }
+
+        double t0 = 0.0, t1 = 1.0;
+        t2 = p;
+        while (t0 < t1)
+        {
+            double x2Val = SampleCurveX(t2);
+            if (Math.Abs(x2Val - p) < 1e-5)
+                return SampleCurveY(t2);
+            if (p > x2Val)
+                t0 = t2;
+            else
+                t1 = t2;
+            t2 = (t1 + t0) * 0.5;
+            if (Math.Abs(t1 - t0) < 1e-5) break;
+        }
+
+        return SampleCurveY(t2);
+    }
+
+    public static double ApplyEasing(double p, string? easing)
+    {
+        if (string.IsNullOrWhiteSpace(easing))
+            return EaseOutCubic(p);
+
+        string key = easing.Trim().ToLowerInvariant().Replace(" ", "-");
+        if (key.StartsWith("cubic-bezier"))
+        {
+            var (x1, y1, x2, y2) = ParseCubicBezier(easing);
+            return SolveCubicBezier(p, x1, y1, x2, y2);
+        }
+
+        return key switch
         {
             "linear" => p,
-            "quad-out" => EaseOutQuad(p),
-            "cubic-out" => EaseOutCubic(p),
-            "quartic-out" => EaseOutQuart(p),
-            "ease-in-out" => EaseInOutCubic(p),
+            "quad-out" or "quadout" or "ease-out-quad" => EaseOutQuad(p),
+            "cubic-out" or "cubicout" or "ease-out-cubic" => EaseOutCubic(p),
+            "quartic-out" or "quarticout" or "ease-out-quart" => EaseOutQuart(p),
+            "ease-in-out" or "easeinout" or "ease-in-out-cubic" => EaseInOutCubic(p),
+            "sine-out" or "ease-out-sine" => EaseOutSine(p),
             _ => EaseOutCubic(p)
+        };
+    }
+
+    public static string GetFfmpegEaseExpression(string pVar, string? easing, bool isEaseIn = true)
+    {
+        if (string.IsNullOrWhiteSpace(easing))
+            return isEaseIn ? $"(1-pow(1-{pVar},3))" : $"({pVar}*(2-{pVar}))";
+
+        string key = easing.Trim().ToLowerInvariant().Replace(" ", "-");
+        if (key.StartsWith("cubic-bezier"))
+        {
+            var (x1, y1, x2, y2) = ParseCubicBezier(easing);
+            string sy1 = y1.ToString("F3", CultureInfo.InvariantCulture);
+            string sy2 = y2.ToString("F3", CultureInfo.InvariantCulture);
+            return $"(3*pow(1-{pVar},2)*{pVar}*{sy1}+3*(1-{pVar})*pow({pVar},2)*{sy2}+pow({pVar},3))";
+        }
+
+        return key switch
+        {
+            "linear" => pVar,
+            "quad-out" or "quadout" => $"({pVar}*(2-{pVar}))",
+            "cubic-out" or "cubicout" => $"(1-pow(1-{pVar},3))",
+            "quartic-out" or "quarticout" => $"(1-pow(1-{pVar},4))",
+            "ease-in-out" or "easeinout" => $"({pVar}*{pVar}*(3-2*{pVar}))",
+            _ => isEaseIn ? $"(1-pow(1-{pVar},3))" : $"({pVar}*(2-{pVar}))"
         };
     }
 
@@ -543,6 +655,8 @@ public class ZoomEngineService
                 {
                     tx = e.TargetX2 > 0 ? e.TargetX2 : e.TargetX;
                     ty = e.TargetY2 > 0 ? e.TargetY2 : e.TargetY;
+                    tx = Math.Clamp(tx, halfW, vW - halfW);
+                    ty = Math.Clamp(ty, halfH, vH - halfH);
                 }
 
                 // 1. ZOOM-IN EVRESİ: Doğrusal olmayan Cubic-Ease-Out animasyonu
@@ -702,14 +816,7 @@ public class ZoomEngineService
             }
 
             string pIn = $"((in_time-{sStart})/{sTransIn})";
-            string easeIn = e.Easing switch
-            {
-                "linear" => pIn,
-                "quad-out" => $"({pIn}*(2-{pIn}))",
-                "cubic-out" => $"(1-pow(1-{pIn},3))",
-                "quartic-out" => $"(1-pow(1-{pIn},4))",
-                _ => $"(1-pow(1-{pIn},3))"
-            };
+            string easeIn = GetFfmpegEaseExpression(pIn, e.Easing, true);
             string zIn = $"1+{sScaleDelta}*{easeIn}";
 
             string zOut;
@@ -725,14 +832,7 @@ public class ZoomEngineService
                 string clampNextY = $"max(0,min(({sNextY}-(ih/zoom/2)),ih-(ih/zoom)))";
 
                 string pOut = $"((in_time-{sOutStart})/{sTransOut})";
-                string easeOut = e.Easing switch
-                {
-                    "linear" => pOut,
-                    "quad-out" => $"({pOut}*(2-{pOut}))",
-                    "cubic-out" => $"(1-pow(1-{pOut},3))",
-                    "quartic-out" => $"(1-pow(1-{pOut},4))",
-                    _ => $"({pOut}*{pOut}*(3-2*{pOut}))"
-                };
+                string easeOut = GetFfmpegEaseExpression(pOut, e.Easing, false);
 
                 zOut = sScale; 
                 curX = $"if(between(in_time,{sStart},{sInEnd}),(iw/2-(iw/zoom/2))+({holdX}-(iw/2-(iw/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{holdX},if(between(in_time,{sOutStart},{sEnd}),{holdX}+({clampNextX}-{holdX})*{easeOut},{xExpr})))";
@@ -741,14 +841,7 @@ public class ZoomEngineService
             else
             {
                 string pOut = $"(({sEnd}-in_time)/{sTransOut})";
-                string easeOut = e.Easing switch
-                {
-                    "linear" => pOut,
-                    "quad-out" => $"({pOut}*(2-{pOut}))",
-                    "cubic-out" => $"(1-pow(1-{pOut},3))",
-                    "quartic-out" => $"(1-pow(1-{pOut},4))",
-                    _ => $"({pOut}*(2-{pOut}))"
-                };
+                string easeOut = GetFfmpegEaseExpression(pOut, e.Easing, false);
                 zOut = $"1+{sScaleDelta}*{easeOut}";
 
                 curX = $"if(between(in_time,{sStart},{sInEnd}),(iw/2-(iw/zoom/2))+({holdX}-(iw/2-(iw/zoom/2)))*{easeIn},if(between(in_time,{sInEnd},{sOutStart}),{holdX},if(between(in_time,{sOutStart},{sEnd}),(iw/2-(iw/zoom/2))+({holdX}-(iw/2-(iw/zoom/2)))*{easeOut},{xExpr})))";

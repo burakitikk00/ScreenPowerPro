@@ -134,7 +134,10 @@ public partial class RecordingBarViewModel : ObservableObject
         {
             manifest.Timeline.ZoomEffects = _inputTracker.GenerateAutoZoomEffects(
                 maxVideoDurationSec: duration,
-                autoZoomMode: _settingsService.Current.AutoZoomMode);
+                autoZoomMode: _settingsService.Current.AutoZoomMode,
+                defaultScale: _settingsService.Current.MaxZoomRatio > 1.0 ? _settingsService.Current.MaxZoomRatio : 1.5,
+                videoWidth: _recordingWidth > 0 ? _recordingWidth : 1920,
+                videoHeight: _recordingHeight > 0 ? _recordingHeight : 1080);
         }
 
         // 6. İlk tam boy klip segmentlerini oluştur

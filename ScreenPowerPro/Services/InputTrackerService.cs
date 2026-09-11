@@ -261,7 +261,9 @@ public class InputTrackerService : IDisposable
     public List<ZoomEffect> GenerateAutoZoomEffects(
         double maxVideoDurationSec = 0,
         string autoZoomMode = "smooth",
-        double defaultScale = 1.5)
+        double defaultScale = 1.5,
+        double videoWidth = 1920,
+        double videoHeight = 1080)
     {
         var zoomEngine = new ZoomEngineService();
         return zoomEngine.GenerateZoomEffectsFromClicks(
@@ -269,7 +271,9 @@ public class InputTrackerService : IDisposable
             moves: Moves,
             autoZoomMode: autoZoomMode,
             defaultScale: defaultScale,
-            maxVideoDurationSec: maxVideoDurationSec);
+            maxVideoDurationSec: maxVideoDurationSec,
+            defaultCenterX: (videoWidth > 0 ? videoWidth : 1920) / 2.0,
+            defaultCenterY: (videoHeight > 0 ? videoHeight : 1080) / 2.0);
     }
 
     public void Dispose()

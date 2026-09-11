@@ -273,7 +273,7 @@ public partial class EditorViewModel : ObservableObject
     public double DefaultZoomScale
     {
         get => Settings.DefaultZoomScale;
-        set { if (Math.Abs(Settings.DefaultZoomScale - value) > 0.01) { Settings.DefaultZoomScale = value; OnPropertyChanged(); } }
+        set { double clamped = Math.Clamp(value, 1.0, 2.2); if (Math.Abs(Settings.DefaultZoomScale - clamped) > 0.01) { Settings.DefaultZoomScale = clamped; OnPropertyChanged(); } }
     }
 
     public double VideoSpeed
@@ -523,7 +523,7 @@ public partial class EditorViewModel : ObservableObject
     public double ZoomMaxScale
     {
         get => SettingsManager.Instance.MaxZoomRatio;
-        set { if (Math.Abs(SettingsManager.Instance.MaxZoomRatio - value) > 0.01) { SettingsManager.Instance.MaxZoomRatio = value; OnPropertyChanged(); } }
+        set { double clamped = Math.Clamp(value, 1.0, 2.2); if (Math.Abs(SettingsManager.Instance.MaxZoomRatio - clamped) > 0.01) { SettingsManager.Instance.MaxZoomRatio = clamped; OnPropertyChanged(); } }
     }
 
     public int PreClickAnticipationMs
@@ -678,6 +678,38 @@ public partial class EditorViewModel : ObservableObject
         MouseClicks = _projectService.LoadMouseClicks(projectDir);
         MouseMoves = _projectService.LoadMouseMoves(projectDir);
         Keystrokes = _projectService.LoadKeystrokes(projectDir);
+
+        // Telemetri verilerine göre Zoom hedeflerini kesinleştir
+        if (ZoomEffects.Count > 0)
+        {
+            foreach (var z in ZoomEffects)
+            {
+                MouseClickEvent? matchedClick = null;
+                if (MouseClicks != null && MouseClicks.Count > 0)
+                {
+                    matchedClick = MouseClicks
+                        .Where(c => c.Timestamp >= z.StartTime - 0.3 && c.Timestamp <= z.StartTime + z.Duration)
+                        .OrderBy(c => Math.Abs(c.Timestamp - (z.StartTime + 0.15)))
+                        .FirstOrDefault();
+                }
+
+                if (matchedClick != null)
+                {
+                    z.TargetX = Math.Round((double)matchedClick.X, 1);
+                    z.TargetY = Math.Round((double)matchedClick.Y, 1);
+                }
+                else if (MouseMoves != null && MouseMoves.Count > 0)
+                {
+                    var pt = ZoomEngineService.GetInterpolatedCursorPosition(MouseMoves, z.StartTime + 0.15) 
+                             ?? ZoomEngineService.GetInterpolatedCursorPosition(MouseMoves, z.StartTime);
+                    if (pt.HasValue && (z.TargetX <= 0 || (Math.Abs(z.TargetX - 960) < 1 && Math.Abs(z.TargetY - 540) < 1)))
+                    {
+                        z.TargetX = Math.Round(pt.Value.X, 1);
+                        z.TargetY = Math.Round(pt.Value.Y, 1);
+                    }
+                }
+            }
+        }
 
         LoadWaveformData();
         NotifyAllProperties();
@@ -886,29 +918,36 @@ public partial class EditorViewModel : ObservableObject
             double end = z.StartTime + z.Duration;
             if (time > z.StartTime && time < end)
             {
-                // İlk yarı
+                double part1Dur = Math.Round(time - z.StartTime, 2);
+                if (part1Dur < 0.1 || (z.Duration - part1Dur) < 0.1)
+                {
+                    newZooms.Add(z);
+                    continue;
+                }
+
+                // İlk yarı: startTime: eski_start, duration: T - eski_start
                 newZooms.Add(new ZoomEffect
                 {
                     Id = z.Id,
                     Name = z.Name,
                     StartTime = z.StartTime,
-                    Duration = Math.Round(time - z.StartTime, 2),
+                    Duration = part1Dur,
                     TargetX = z.TargetX,
                     TargetY = z.TargetY,
-                    Scale = z.Scale,
+                    Scale = Math.Clamp(z.Scale, 1.0, 2.2),
                     Easing = z.Easing
                 });
 
-                // İkinci yarı
+                // İkinci yarı: startTime: T, duration: eski_duration - (T - eski_start)
                 newZooms.Add(new ZoomEffect
                 {
                     Id = $"{z.Id}-split",
                     Name = $"{z.Name} (Bölünmüş)",
-                    StartTime = Math.Round(time, 2),
-                    Duration = Math.Round(end - time, 2),
+                    StartTime = Math.Round(z.StartTime + part1Dur, 2),
+                    Duration = Math.Round(z.Duration - part1Dur, 2),
                     TargetX = z.TargetX,
                     TargetY = z.TargetY,
-                    Scale = z.Scale,
+                    Scale = Math.Clamp(z.Scale, 1.0, 2.2),
                     Easing = z.Easing
                 });
             }
@@ -937,7 +976,17 @@ public partial class EditorViewModel : ObservableObject
 
             if (time > clip.TrackOffset && time < clipEnd)
             {
-                double splitPoint = clip.SourceStart + (time - clip.TrackOffset);
+                double part1Duration = Math.Round(time - clip.TrackOffset, 2);
+                if (part1Duration < 0.05 || (clipDuration - part1Duration) < 0.05)
+                {
+                    result.Add(clip);
+                    continue;
+                }
+
+                double splitPoint = Math.Round(clip.SourceStart + part1Duration, 2);
+                double part2Offset = Math.Round(clip.TrackOffset + part1Duration, 2);
+
+                // Parça 1: startTime: eski_start, duration: T - eski_start
                 result.Add(new ClipSegment
                 {
                     Id = clip.Id,
@@ -945,12 +994,13 @@ public partial class EditorViewModel : ObservableObject
                     SourceEnd = splitPoint,
                     TrackOffset = clip.TrackOffset
                 });
+                // Parça 2: startTime: T, duration: eski_duration - (T - eski_start)
                 result.Add(new ClipSegment
                 {
                     Id = $"clip-{Guid.NewGuid():N}",
                     SourceStart = splitPoint,
                     SourceEnd = clip.SourceEnd,
-                    TrackOffset = time
+                    TrackOffset = part2Offset
                 });
             }
             else
@@ -1061,15 +1111,21 @@ public partial class EditorViewModel : ObservableObject
     {
         PushHistory();
 
+        var curPt = ZoomEngineService.GetInterpolatedCursorPosition(MouseMoves, CurrentTimeSec);
+        double natW = VideoWidth > 0 ? VideoWidth : 1920.0;
+        double natH = VideoHeight > 0 ? VideoHeight : 1080.0;
+        double targetX = curPt.HasValue ? curPt.Value.X : (natW / 2.0);
+        double targetY = curPt.HasValue ? curPt.Value.Y : (natH / 2.0);
+
         var newZoom = new ZoomEffect
         {
             Id = Guid.NewGuid().ToString("N")[..8],
             Name = $"Zoom {ZoomEffects.Count + 1}",
             StartTime = Math.Round(CurrentTimeSec, 2),
             Duration = 2.0,
-            TargetX = 1920 / 2.0,
-            TargetY = 1080 / 2.0,
-            Scale = DefaultZoomScale,
+            TargetX = Math.Round(targetX, 1),
+            TargetY = Math.Round(targetY, 1),
+            Scale = Math.Clamp(DefaultZoomScale > 1.0 ? DefaultZoomScale : 1.5, 1.0, 2.2),
             Easing = "ease-in-out"
         };
 
@@ -1162,15 +1218,22 @@ public partial class EditorViewModel : ObservableObject
         if (MouseClicks == null || MouseClicks.Count == 0) return;
 
         PushHistory();
+        double defW = VideoWidth > 0 ? VideoWidth : 1920.0;
+        double defH = VideoHeight > 0 ? VideoHeight : 1080.0;
+
         var generated = _zoomEngineService.GenerateZoomEffectsFromClicks(
             MouseClicks,
+            moves: MouseMoves,
             autoZoomMode: "smooth",
-            defaultScale: DefaultZoomScale > 1.0 ? DefaultZoomScale : 1.5,
-            maxVideoDurationSec: TotalDurationSec);
+            defaultScale: Math.Clamp(DefaultZoomScale > 1.0 ? DefaultZoomScale : 1.5, 1.0, 2.2),
+            maxVideoDurationSec: TotalDurationSec,
+            defaultCenterX: defW / 2.0,
+            defaultCenterY: defH / 2.0);
 
         ZoomEffects.Clear();
         foreach (var z in generated)
         {
+            z.Scale = Math.Clamp(z.Scale, 1.0, 2.2);
             ZoomEffects.Add(z);
         }
 

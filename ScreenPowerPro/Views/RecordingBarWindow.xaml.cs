@@ -199,13 +199,16 @@ public sealed partial class RecordingBarWindow : Window
         StatusTextBlock.Text = "KAYDEDİLİYOR...";
         PulseStoryboard.Pause();
         UpdateBarSize();
+        AppLog.Event("RECORDING", "Kullanıcı kaydı durdur butonuna bastı. StopRecordingAsync çağrılıyor...");
 
         try
         {
             await _viewModel.StopRecordingAsync();
+            AppLog.Success("StopRecordingAsync çağrısı başarıyla tamamlandı.");
         }
-        catch
+        catch (Exception ex)
         {
+            AppLog.Error("StopRecordingAsync sırasında hata meydana geldi!", ex);
             // Olası hata durumunda kilitlenmeyi önle
             BtnStop.IsHitTestVisible = true;
             StopLoadingStoryboard.Stop();
@@ -223,6 +226,7 @@ public sealed partial class RecordingBarWindow : Window
         StatusTextBlock.Text = "İPTAL EDİLİYOR...";
         PulseStoryboard.Pause();
         UpdateBarSize();
+        AppLog.Event("RECORDING", "Kayıt iptal edildi.");
 
         // Kaydı durdur ve pencereyi kapat, düzenleyiciye yönlendirme yapma
         await _viewModel.StopRecordingAsync();
@@ -255,11 +259,13 @@ public sealed partial class RecordingBarWindow : Window
 
     private void OnRecordingFinished(string projectDir)
     {
+        AppLog.Event("RECORDING", $"Kayıt tamamlandı bildirimi alındı. Proje dizini: '{projectDir}'");
         if (MainWindow.CurrentInstance != null)
         {
             var mainWin = MainWindow.CurrentInstance;
             mainWin.DispatcherQueue.TryEnqueue(() =>
             {
+                AppLog.Info("Ana pencere DispatcherQueue ile geri getiriliyor ve Editor'e geçiliyor...");
                 var appWin = mainWin.AppWindow;
                 if (appWin.Presenter is OverlappedPresenter presenter)
                 {
@@ -273,14 +279,17 @@ public sealed partial class RecordingBarWindow : Window
                 Win32Helper.SetForegroundWindow(hwnd);
 
                 mainWin.Activate();
+                AppLog.Info($"Ana pencere aktif. mainWin.NavigateToEditor('{projectDir}') çağrılıyor...");
                 mainWin.NavigateToEditor(projectDir);
 
                 // Ana pencere başarıyla geri yüklenip düzenleyiciye geçtikten sonra çubuğu kapat
+                AppLog.Info("RecordingBarWindow kapatılıyor.");
                 Close();
             });
         }
         else
         {
+            AppLog.Warn("MainWindow.CurrentInstance NULL, doğrudan kapatılıyor.");
             Close();
         }
     }

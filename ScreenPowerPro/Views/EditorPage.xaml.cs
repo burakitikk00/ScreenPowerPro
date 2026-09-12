@@ -1696,9 +1696,9 @@ public sealed partial class EditorPage : Page
         };
         contentGrid.Children.Add(label);
 
-        // 2. Sol Kenar Tutamacı (In-Point / Start Time Trimming)
         var leftHandle = new Border
         {
+            Name = "LeftZoomHandle",
             Width = 8,
             HorizontalAlignment = HorizontalAlignment.Left,
             Background = isSelected
@@ -1720,9 +1720,9 @@ public sealed partial class EditorPage : Page
             }
         };
 
-        // 3. Sağ Kenar Tutamacı (Out-Point / Duration Trimming)
         var rightHandle = new Border
         {
+            Name = "RightZoomHandle",
             Width = 8,
             HorizontalAlignment = HorizontalAlignment.Right,
             Background = isSelected
@@ -1750,6 +1750,7 @@ public sealed partial class EditorPage : Page
 
         bool isTrimmingLeft = false;
         bool isTrimmingRight = false;
+        bool isMovingZoom = false;
         bool hasActuallyMoved = false;
         Point startPoint = default;
         double origStart = 0;
@@ -1810,11 +1811,18 @@ public sealed partial class EditorPage : Page
             }
             else
             {
-                _selectedZooms.Clear();
-                _selectedZoomIds.Clear();
-                _selectedZooms.Add(zoom);
-                _selectedZoomIds.Add(zoom.Id);
-                SelectZoom(zoom, clearOthers: false);
+                if (!_selectedZoomIds.Contains(zoom.Id))
+                {
+                    _selectedZooms.Clear();
+                    _selectedZoomIds.Clear();
+                    _selectedZooms.Add(zoom);
+                    _selectedZoomIds.Add(zoom.Id);
+                    SelectZoom(zoom, clearOthers: false);
+                }
+                else
+                {
+                    SelectZoom(zoom, clearOthers: false);
+                }
             }
 
             ViewModel.SelectedClipId = null;
@@ -1827,25 +1835,22 @@ public sealed partial class EditorPage : Page
             hasActuallyMoved = false;
 
             var localPt = e.GetCurrentPoint(pill).Position;
-            double edgeThreshold = Math.Clamp(pill.Width * 0.28, 12.0, 18.0);
+            double edgeThreshold = Math.Min(14.0, pill.Width * 0.33);
+            
+            bool isLeftHit = localPt.X <= edgeThreshold;
+            bool isRightHit = localPt.X >= pill.Width - edgeThreshold;
 
-            if (localPt.X <= edgeThreshold)
+            if (isLeftHit)
             {
                 isTrimmingLeft = true;
-                this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast);
             }
-            else if (localPt.X >= pill.Width - edgeThreshold)
+            else if (isRightHit)
             {
                 isTrimmingRight = true;
-                this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast);
             }
             else
             {
-                _isDraggingPlayhead = true;
-                _isPanningTimeline = false;
-                
-                double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
-                SeekToTime(clickSec);
+                isMovingZoom = true;
             }
 
             pill.CapturePointer(e.Pointer);
@@ -1853,10 +1858,11 @@ public sealed partial class EditorPage : Page
 
         pill.PointerMoved += (s, e) =>
         {
-            if (!_isDraggingPlayhead && !isTrimmingLeft && !isTrimmingRight)
+            if (!_isDraggingPlayhead && !isTrimmingLeft && !isTrimmingRight && !isMovingZoom)
             {
                 var localPt = e.GetCurrentPoint(pill).Position;
-                double edgeThreshold = Math.Clamp(pill.Width * 0.28, 12.0, 18.0);
+                double edgeThreshold = Math.Min(14.0, pill.Width * 0.33);
+                
                 if (localPt.X <= edgeThreshold || localPt.X >= pill.Width - edgeThreshold)
                 {
                     this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.SizeWestEast);
@@ -1943,6 +1949,31 @@ public sealed partial class EditorPage : Page
                 finally { _isUpdatingZoomInputs = false; }
                 UpdateZoomSimulation();
             }
+            else if (isMovingZoom)
+            {
+                var otherZooms = ViewModel.ZoomEffects.Where(z => z != zoom).ToList();
+                double leftLimit = otherZooms.Where(o => o.StartTime + o.Duration <= origStart).Select(o => (double?)(o.StartTime + o.Duration)).Max() ?? 0.0;
+                double rightLimit = otherZooms.Where(o => o.StartTime >= origStart + origDur).Select(o => (double?)o.StartTime).Min() ?? _totalDurationSeconds;
+                
+                double candidateStart = origStart + (rawDx / _timelineScale);
+                var snapPoints = GetTimelineSnapPoints(zoom);
+                var (snapped, snapTime) = TimelineMathService.FindSnapTime(candidateStart, snapPoints, _timelineScale, 15.0);
+                if (snapped) candidateStart = snapTime;
+
+                candidateStart = Math.Clamp(candidateStart, leftLimit, rightLimit - origDur);
+                zoom.StartTime = Math.Round(candidateStart, 2);
+                
+                Canvas.SetLeft(pill, TimelineMathService.TimeToPixel(zoom.StartTime, _timelineScale));
+                
+                _isUpdatingZoomInputs = true;
+                try
+                {
+                    if (NbZoomStart != null) NbZoomStart.Value = zoom.StartTime;
+                    if (NbZoomEnd != null) NbZoomEnd.Value = zoom.StartTime + zoom.Duration;
+                }
+                finally { _isUpdatingZoomInputs = false; }
+                UpdateZoomSimulation();
+            }
         };
 
         pill.PointerReleased += (s, e) =>
@@ -1966,6 +1997,7 @@ public sealed partial class EditorPage : Page
 
             isTrimmingLeft = false;
             isTrimmingRight = false;
+            isMovingZoom = false;
             hasActuallyMoved = false;
         };
 
@@ -2183,7 +2215,7 @@ public sealed partial class EditorPage : Page
             _isUpdatingBezierUI = false;
         }
 
-        RenderZoomPills();
+        UpdateZoomSelectionVisuals();
 
         if (_currentTimeSeconds < zoom.StartTime || _currentTimeSeconds > zoom.StartTime + zoom.Duration)
         {
@@ -5594,6 +5626,41 @@ public sealed partial class EditorPage : Page
             };
 
             sb.Begin();
+        }
+    }
+
+    private void UpdateZoomSelectionVisuals()
+    {
+        if (ZoomTrack == null) return;
+        foreach (var pill in ZoomTrack.Children.OfType<Border>())
+        {
+            if (pill.Tag is ZoomEffect zoom)
+            {
+                bool isSelected = _selectedZoomIds.Contains(zoom.Id) || _selectedZoom == zoom;
+                pill.Background = isSelected
+                    ? new SolidColorBrush(Color.FromArgb(120, 208, 188, 255))
+                    : new SolidColorBrush(Color.FromArgb(55, 160, 120, 255));
+                pill.BorderBrush = isSelected
+                    ? new SolidColorBrush(Color.FromArgb(255, 208, 188, 255))
+                    : new SolidColorBrush(Color.FromArgb(130, 208, 188, 255));
+                pill.BorderThickness = isSelected ? new Thickness(2.5) : new Thickness(1);
+                
+                if (pill.Child is Grid g)
+                {
+                    if (g.Children.Count >= 2 && g.Children[1] is Border leftH)
+                    {
+                        leftH.Background = isSelected
+                            ? new SolidColorBrush(Color.FromArgb(90, 255, 255, 255))
+                            : new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+                    }
+                    if (g.Children.Count >= 3 && g.Children[2] is Border rightH)
+                    {
+                        rightH.Background = isSelected
+                            ? new SolidColorBrush(Color.FromArgb(90, 255, 255, 255))
+                            : new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+                    }
+                }
+            }
         }
     }
 }

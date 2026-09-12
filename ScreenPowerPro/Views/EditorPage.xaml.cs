@@ -737,10 +737,11 @@ public sealed partial class EditorPage : Page
 
     private void OnMediaPlayerEnded(Windows.Media.Playback.MediaPlayer sender, object args)
     {
+        // Yalnızca oynatıcıyı durdur, tüm timeline'ı başa sarma! 
+        // Timeline döngüsü _totalDurationSeconds üzerinden OnPlaybackTimerTick'te yönetilir.
         DispatcherQueue.TryEnqueue(() =>
         {
-            PausePlayback();
-            SeekToTime(0);
+            try { sender.Pause(); } catch { }
         });
     }
 
@@ -831,7 +832,7 @@ public sealed partial class EditorPage : Page
         if (w == 0)
         {
             // Eğer arayüz tam yüklenmediyse bekle
-            Microsoft.UI.Xaml.SizeChangedEventHandler sizeChangedHandler = null;
+            Microsoft.UI.Xaml.SizeChangedEventHandler? sizeChangedHandler = null;
             sizeChangedHandler = (s, e) =>
             {
                 TimelineScrollViewer.SizeChanged -= sizeChangedHandler;

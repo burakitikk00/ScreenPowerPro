@@ -114,6 +114,38 @@ public sealed partial class EditorPage : Page
         }
     }
 
+    private Storyboard? GetLoadingAnimation()
+    {
+        if (Resources.TryGetValue("LoadingAnimation", out object anim) && anim is Storyboard sb)
+        {
+            return sb;
+        }
+        return null;
+    }
+
+    private void OnLoadingOverlayLoaded(object sender, RoutedEventArgs e)
+    {
+        GetLoadingAnimation()?.Begin();
+
+        // Safety timeout to prevent infinite loading screen
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+        timer.Tick += (s, ev) =>
+        {
+            timer.Stop();
+            HideLoadingOverlay();
+        };
+        timer.Start();
+    }
+
+    private void HideLoadingOverlay()
+    {
+        if (LoadingOverlay != null && LoadingOverlay.Visibility == Visibility.Visible)
+        {
+            GetLoadingAnimation()?.Stop();
+            LoadingOverlay.Visibility = Visibility.Collapsed;
+        }
+    }
+
     protected override async void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
@@ -151,11 +183,13 @@ public sealed partial class EditorPage : Page
             catch (Exception ex)
             {
                 AppLog.Error($"[EditorPage] Proje veya video yükleme hatası!", ex);
+                HideLoadingOverlay();
             }
         }
         else
         {
             AppLog.Warn("[EditorPage] Yüklenecek geçerli bir proje dizini bulunamadı!");
+            HideLoadingOverlay();
         }
     }
 
@@ -454,7 +488,11 @@ public sealed partial class EditorPage : Page
         try
         {
             await Task.Yield();
-            if (string.IsNullOrEmpty(ViewModel.VideoPath)) return;
+            if (string.IsNullOrEmpty(ViewModel.VideoPath))
+            {
+                HideLoadingOverlay();
+                return;
+            }
 
             string videoPath = ViewModel.VideoPath;
 
@@ -465,6 +503,7 @@ public sealed partial class EditorPage : Page
                     NoVideoMessage.Visibility = Visibility.Visible;
                     TbMissingVideoPath.Text = videoPath;
                 }
+                HideLoadingOverlay();
                 return;
             }
 
@@ -476,6 +515,7 @@ public sealed partial class EditorPage : Page
             if (_pendingVideoSource == null)
             {
                 AppLog.Error($"[EditorPage] MediaSource oluşturulamadı: {videoPath}");
+                HideLoadingOverlay();
                 return;
             }
 
@@ -684,6 +724,13 @@ public sealed partial class EditorPage : Page
 
                 // İlk frame'i göster (AutoPlay=false ile kara ekran olmaması için)
                 try { sender.PlaybackSession.Position = TimeSpan.Zero; } catch { }
+
+                // Hide loading overlay once media is opened and first frame is queued
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(150); // slight delay to allow D3D surface to update
+                    DispatcherQueue.TryEnqueue(() => HideLoadingOverlay());
+                });
             }
         });
     }

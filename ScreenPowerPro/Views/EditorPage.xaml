@@ -66,6 +66,32 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
         </Style>
+
+        <Storyboard x:Name="LoadingAnimation" RepeatBehavior="Forever">
+            <!-- Dot 1 -->
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="TransDot1" Storyboard.TargetProperty="Y">
+                <LinearDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.3" Value="-10" KeySpline="0.25,0.1 0.25,1.0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.6" Value="0" KeySpline="0.25,0.1 0.25,1.0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.0" Value="0"/>
+            </DoubleAnimationUsingKeyFrames>
+            <!-- Pill -->
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="TransPill" Storyboard.TargetProperty="Y">
+                <LinearDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:0.1" Value="0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.4" Value="-10" KeySpline="0.25,0.1 0.25,1.0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.7" Value="0" KeySpline="0.25,0.1 0.25,1.0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.0" Value="0"/>
+            </DoubleAnimationUsingKeyFrames>
+            <!-- Dot 2 -->
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="TransDot2" Storyboard.TargetProperty="Y">
+                <LinearDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:0.2" Value="0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.5" Value="-10" KeySpline="0.25,0.1 0.25,1.0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.8" Value="0" KeySpline="0.25,0.1 0.25,1.0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.0" Value="0"/>
+            </DoubleAnimationUsingKeyFrames>
+        </Storyboard>
     </Page.Resources>
 
     <Grid>
@@ -2263,6 +2289,30 @@
                     </Grid>
                 </StackPanel>
             </Border>
+        </Grid>
+
+        <!-- Loading Overlay -->
+        <Grid x:Name="LoadingOverlay" Grid.RowSpan="3" Background="#15171E" Canvas.ZIndex="9999" Visibility="Visible" Loaded="OnLoadingOverlayLoaded">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                    <Ellipse Width="12" Height="12" Fill="#A078FF">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="TransDot1"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Border Width="36" Height="12" CornerRadius="6" Background="#00E5FF">
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="TransPill"/>
+                        </Border.RenderTransform>
+                    </Border>
+                    <Ellipse Width="12" Height="12" Fill="#FACC15">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="TransDot2"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </StackPanel>
+                <TextBlock Text="Loading..." Foreground="#E2E8F0" FontSize="16" FontFamily="Segoe UI" HorizontalAlignment="Center"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </Page>

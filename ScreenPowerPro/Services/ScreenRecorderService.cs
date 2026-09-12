@@ -389,110 +389,121 @@ public class ScreenRecorderService : IDisposable
         _durationTimer?.Dispose();
         _recordStopwatch?.Stop();
 
-        // Stop Audio
-        try
+        // Tüm ağır durdurma, flushing ve FFmpeg kapanış işlemlerini arka plana alarak UI thread'i dondurmasını önlüyoruz
+        await Task.Run(async () =>
         {
-            if (_micRecorder != null)
-            {
-                _micRecorder.StopRecording();
-                _micRecorder.Dispose();
-                _micRecorder = null;
-            }
-            if (_legacyMicCapture != null)
-            {
-                _legacyMicCapture.StopRecording();
-                _legacyMicCapture.Dispose();
-                _legacyMicCapture = null;
-            }
-            if (_micWriter != null)
-            {
-                _micWriter.Dispose();
-                _micWriter = null;
-            }
-        }
-        catch { }
-
-        try
-        {
-            if (_loopbackRecorder != null)
-            {
-                _loopbackRecorder.StopRecording();
-                _loopbackRecorder.Dispose();
-                _loopbackRecorder = null;
-            }
-            if (_legacyLoopbackCapture != null)
-            {
-                _legacyLoopbackCapture.StopRecording();
-                _legacyLoopbackCapture.Dispose();
-                _legacyLoopbackCapture = null;
-            }
-            if (_loopbackWriter != null)
-            {
-                _loopbackWriter.Dispose();
-                _loopbackWriter = null;
-            }
-        }
-        catch { }
-
-        // Boş veya sadece başlık içeren (<= 200 bayt) ses dosyalarını temizle
-        try
-        {
-            if (!string.IsNullOrEmpty(_currentSystemAudioPath) && File.Exists(_currentSystemAudioPath))
-            {
-                var fi = new FileInfo(_currentSystemAudioPath);
-                if (fi.Length <= 200)
-                {
-                    File.Delete(_currentSystemAudioPath);
-                    _currentSystemAudioPath = null;
-                }
-            }
-        }
-        catch { }
-
-        try
-        {
-            if (!string.IsNullOrEmpty(_currentMicPath) && File.Exists(_currentMicPath))
-            {
-                var fi = new FileInfo(_currentMicPath);
-                if (fi.Length <= 200)
-                {
-                    File.Delete(_currentMicPath);
-                    _currentMicPath = null;
-                }
-            }
-        }
-        catch { }
-
-        // Gracefully Stop FFmpeg by writing 'q' and closing stdin
-        if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
-        {
+            // 1. Mikrofon Kaydını Durdur
             try
             {
-                _ffmpegProcess.StandardInput.WriteLine("q");
-                _ffmpegProcess.StandardInput.Flush();
-                _ffmpegProcess.StandardInput.Close();
-                await Task.Run(() => _ffmpegProcess.WaitForExit(5000));
-                if (!_ffmpegProcess.HasExited)
+                if (_micRecorder != null)
                 {
-                    _ffmpegProcess.Kill();
+                    _micRecorder.StopRecording();
+                    _micRecorder.Dispose();
+                    _micRecorder = null;
+                }
+                if (_legacyMicCapture != null)
+                {
+                    _legacyMicCapture.StopRecording();
+                    _legacyMicCapture.Dispose();
+                    _legacyMicCapture = null;
+                }
+                if (_micWriter != null)
+                {
+                    _micWriter.Dispose();
+                    _micWriter = null;
                 }
             }
             catch { }
-            finally
+
+            // 2. Sistem Ses Kaydını Durdur
+            try
             {
-                _ffmpegProcess.Dispose();
-                _ffmpegProcess = null;
+                if (_loopbackRecorder != null)
+                {
+                    _loopbackRecorder.StopRecording();
+                    _loopbackRecorder.Dispose();
+                    _loopbackRecorder = null;
+                }
+                if (_legacyLoopbackCapture != null)
+                {
+                    _legacyLoopbackCapture.StopRecording();
+                    _legacyLoopbackCapture.Dispose();
+                    _legacyLoopbackCapture = null;
+                }
+                if (_loopbackWriter != null)
+                {
+                    _loopbackWriter.Dispose();
+                    _loopbackWriter = null;
+                }
             }
-        }
+            catch { }
 
-        // Ses kanalları ve temizlik yapıldı. FFmpeg gracefully kapatıldı, moov atom otomatik MP4 sonuna yazıldı.
+            // 3. Boş veya sadece başlık içeren (<= 200 bayt) ses dosyalarını temizle
+            try
+            {
+                if (!string.IsNullOrEmpty(_currentSystemAudioPath) && File.Exists(_currentSystemAudioPath))
+                {
+                    var fi = new FileInfo(_currentSystemAudioPath);
+                    if (fi.Length <= 200)
+                    {
+                        File.Delete(_currentSystemAudioPath);
+                        _currentSystemAudioPath = null;
+                    }
+                }
+            }
+            catch { }
 
-        if (_windowCaptureService != null)
-        {
-            _windowCaptureService.StopCapture();
-            _windowCaptureService.Dispose();
-            _windowCaptureService = null;
-        }
+            try
+            {
+                if (!string.IsNullOrEmpty(_currentMicPath) && File.Exists(_currentMicPath))
+                {
+                    var fi = new FileInfo(_currentMicPath);
+                    if (fi.Length <= 200)
+                    {
+                        File.Delete(_currentMicPath);
+                        _currentMicPath = null;
+                    }
+                }
+            }
+            catch { }
+
+            // 4. FFmpeg'i Graceful olarak sonlandır ('q' gönder ve asenkron bekle)
+            if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
+            {
+                try
+                {
+                    await _ffmpegProcess.StandardInput.WriteLineAsync("q");
+                    await _ffmpegProcess.StandardInput.FlushAsync();
+                    _ffmpegProcess.StandardInput.Close();
+
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    try
+                    {
+                        await _ffmpegProcess.WaitForExitAsync(cts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        if (!_ffmpegProcess.HasExited)
+                        {
+                            _ffmpegProcess.Kill();
+                        }
+                    }
+                }
+                catch { }
+                finally
+                {
+                    _ffmpegProcess?.Dispose();
+                    _ffmpegProcess = null;
+                }
+            }
+
+            if (_windowCaptureService != null)
+            {
+                _windowCaptureService.StopCapture();
+                _windowCaptureService.Dispose();
+                _windowCaptureService = null;
+            }
+        });
 
         if (!string.IsNullOrEmpty(_currentProjectDir))
         {

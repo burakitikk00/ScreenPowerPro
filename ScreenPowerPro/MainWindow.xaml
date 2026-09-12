@@ -16,5 +16,34 @@
     <Grid Background="{StaticResource AppBgBrush}">
         <!-- Main Content Frame occupying full window canvas -->
         <Frame x:Name="RootFrame" />
+
+        <!-- Indeterminate Processing Overlay (shown during Stop Recording → Editor transition) -->
+        <Grid x:Name="LoadingOverlay"
+              Background="#B2000000"
+              Visibility="Collapsed"
+              HorizontalAlignment="Stretch"
+              VerticalAlignment="Stretch"
+              Canvas.ZIndex="999">
+
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="20">
+
+                <!-- Spinning ProgressRing -->
+                <ProgressRing x:Name="ProcessingRing"
+                              IsActive="False"
+                              Width="64"
+                              Height="64"
+                              Foreground="#7C6FF7" />
+
+                <!-- Status text -->
+                <TextBlock Text="Lütfen bekleyin..."
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="#CCFFFFFF"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

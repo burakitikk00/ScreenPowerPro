@@ -91,6 +91,7 @@ public sealed partial class MainWindow : Window
     public void NavigateToDashboard()
     {
         AppLog.Event("NAV", "DashboardPage sayfasına geçiliyor.");
+        HideProcessingOverlay();
         ResizeForDashboard();
         RootFrame.Navigate(typeof(DashboardPage), null, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
     }
@@ -113,6 +114,7 @@ public sealed partial class MainWindow : Window
         AppLog.Event("NAV", $"EditorPage sayfasına geçiliyor. Proje: {projectDir}");
         try
         {
+            HideProcessingOverlay();
             ResizeForEditor();
             bool result = RootFrame.Navigate(typeof(EditorPage), projectDir, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
             AppLog.Success($"EditorPage navigasyonu tamamlandı (Result: {result}).");
@@ -121,6 +123,32 @@ public sealed partial class MainWindow : Window
         {
             AppLog.Error($"[MainWindow] EditorPage sayfasına navigasyon sırasında KRİTİK HATA!", ex);
         }
+    }
+
+    /// <summary>
+    /// Kayıt işlemi tamamlanırken gösterilen tam ekran yükleme overlay'ini gösterir.
+    /// Herhangi bir thread'den güvenle çağrılabilir.
+    /// </summary>
+    public void ShowProcessingOverlay()
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            ProcessingRing.IsActive = true;
+            LoadingOverlay.Visibility = Visibility.Visible;
+        });
+    }
+
+    /// <summary>
+    /// Tam ekran yükleme overlay'ini gizler.
+    /// Herhangi bir thread'den güvenle çağrılabilir.
+    /// </summary>
+    public void HideProcessingOverlay()
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            ProcessingRing.IsActive = false;
+            LoadingOverlay.Visibility = Visibility.Collapsed;
+        });
     }
 
     public void NavigateToExport(string projectDir)

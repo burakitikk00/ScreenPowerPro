@@ -205,6 +205,31 @@ public sealed partial class RecordingBarWindow : Window
         UpdateBarSize();
         AppLog.Event("RECORDING", "Kullanıcı kaydı durdur butonuna bastı. StopRecordingAsync çağrılıyor...");
 
+        // 2. Ana pencereyi görünür yap (minimize durumundan çıkar), en öne getir ve yükleme overlay'ini göster!
+        //    (RecordingBarWindow ile MainWindow farklı UI pencereleridir; multi-thread UI modelinde DispatcherQueue kullanılır)
+        if (MainWindow.CurrentInstance != null)
+        {
+            var mainWin = MainWindow.CurrentInstance;
+            mainWin.DispatcherQueue.TryEnqueue(() =>
+            {
+                var appWin = mainWin.AppWindow;
+                if (appWin.Presenter is OverlappedPresenter presenter)
+                {
+                    presenter.Restore();
+                }
+
+                var hwnd = mainWin.GetWindowHandle();
+                Win32Helper.ShowWindow(hwnd, Win32Helper.SW_RESTORE);
+                Win32Helper.SetForegroundWindow(hwnd);
+
+                mainWin.Activate();
+                mainWin.ShowProcessingOverlay();
+            });
+        }
+
+        // 3. UI Thread'e arayüzü ve dönen animasyonu ekrana fiziksel olarak çizmesi için zorunlu nefes molası (Render Yielding)
+        await Task.Delay(100);
+
         try
         {
             await _viewModel.StopRecordingAsync();
@@ -213,7 +238,14 @@ public sealed partial class RecordingBarWindow : Window
         catch (Exception ex)
         {
             AppLog.Error("StopRecordingAsync sırasında hata meydana geldi!", ex);
-            // Olası hata durumunda kilitlenmeyi önle
+            // Hata durumunda overlay'i gizle ve UI'ı sıfırla
+            if (MainWindow.CurrentInstance != null)
+            {
+                MainWindow.CurrentInstance.DispatcherQueue.TryEnqueue(() =>
+                {
+                    MainWindow.CurrentInstance.HideProcessingOverlay();
+                });
+            }
             BtnStop.IsHitTestVisible = true;
             StopLoadingStoryboard.Stop();
             StopLoadingPanel.Visibility = Visibility.Collapsed;

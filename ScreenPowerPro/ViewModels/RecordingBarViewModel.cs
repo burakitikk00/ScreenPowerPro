@@ -82,6 +82,8 @@ public partial class RecordingBarViewModel : ObservableObject
     /// <summary>
     /// Kaydı sonlandırır, fare/klavye olaylarını kaydeder, otomatik zoom efektlerini
     /// hesaplar ve göreceli dosya yollarıyla proje manifestosunu kaydeder.
+    /// Tüm ağır I/O ve hesaplama işlemleri Task.Run ile arka plan thread'ine offload edilir
+    /// böylece UI thread (ve ProgressRing animasyonu) bloklanmaz.
     /// </summary>
     [RelayCommand]
     public async Task StopRecordingAsync()
@@ -90,92 +92,126 @@ public partial class RecordingBarViewModel : ObservableObject
 
         IsRecording = false;
 
-        // 1. Video kaydını ve FFmpeg sürecini durdur
-        await _recorderService.StopRecordingAsync();
+        // Capture snapshot of all state needed on the background thread
+        // (avoids cross-thread access to service internals after tracking stops)
+        string projectDir = _activeProjectDir;
 
-        // 2. Win32 Low-Level Hook giriş takibini durdur
+        // ── STEP 1: Stop the Win32 low-level input hook (fast, signal-only) ──
         _inputTracker.StopTracking();
 
-        // 3. Ham giriş verilerini proje klasörüne JSON olarak kaydet
-        _projectService.SaveMouseClicks(_activeProjectDir, _inputTracker.Clicks);
-        _projectService.SaveMouseMoves(_activeProjectDir, _inputTracker.Moves);
-        _projectService.SaveKeystrokes(_activeProjectDir, _inputTracker.Keystrokes);
+        // Snapshot all input data BEFORE entering Task.Run to avoid concurrent access
+        var clicks     = _inputTracker.Clicks;
+        var moves      = _inputTracker.Moves;
+        var keystrokes = _inputTracker.Keystrokes;
+        bool autoZoom   = _settingsService.Current.AutoZoom;
+        string autoZoomMode = _settingsService.Current.AutoZoomMode;
+        double maxZoomRatio = _settingsService.Current.MaxZoomRatio;
+        int fps             = _settingsService.Current.Fps;
+        int recWidth        = _recordingWidth  > 0 ? _recordingWidth  : 1920;
+        int recHeight       = _recordingHeight > 0 ? _recordingHeight : 1080;
+        int origX           = _originX;
+        int origY           = _originY;
 
-        double duration = _recorderService.ElapsedSeconds;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        string recFolder = Path.Combine(_activeProjectDir, "recording");
-        string micFullPath = Path.Combine(recFolder, "microphone-0.wav");
-        string sysFullPath = Path.Combine(recFolder, "system_audio-0.wav");
-        bool hasMicFile = File.Exists(micFullPath) && new FileInfo(micFullPath).Length > 200;
-        bool hasSysFile = File.Exists(sysFullPath) && new FileInfo(sysFullPath).Length > 200;
-
-        // 4. Proje manifestosunu göreceli yollarla oluştur (Taşınabilirlik için kritik)
-        var manifest = new ProjectManifest
+        // ── STEP 2: Offload ALL disk I/O, FFmpeg finalization + heavy computation to a ThreadPool thread ──
+        //    This keeps the UI thread free so the ProgressRing keeps spinning continuously.
+        await Task.Run(async () =>
         {
-            ProjectName = Path.GetFileName(_activeProjectDir),
-            VideoPath = "./recording/display-0.mp4",
-            MicAudioPath = hasMicFile ? "./recording/microphone-0.wav" : null,
-            SystemAudioPath = hasSysFile ? "./recording/system_audio-0.wav" : null,
-            Metadata = new RecordingMetadata
-            {
-                Width = _recordingWidth,
-                Height = _recordingHeight,
-                OriginX = _originX,
-                OriginY = _originY,
-                DurationSeconds = duration,
-                Fps = _settingsService.Current.Fps,
-                HasMicAudio = hasMicFile,
-                HasSystemAudio = hasSysFile
-            }
-        };
+            // 2a. Stop FFmpeg and audio capture (completely backgrounded)
+            await _recorderService.StopRecordingAsync();
 
-        // 5. Otomatik zoom efektlerini ZoomEngineService ve kümeleme ile hesapla
-        if (_settingsService.Current.AutoZoom)
-        {
-            manifest.Timeline.ZoomEffects = _inputTracker.GenerateAutoZoomEffects(
-                maxVideoDurationSec: duration,
-                autoZoomMode: _settingsService.Current.AutoZoomMode,
-                defaultScale: _settingsService.Current.MaxZoomRatio > 1.0 ? _settingsService.Current.MaxZoomRatio : 1.5,
-                videoWidth: _recordingWidth > 0 ? _recordingWidth : 1920,
-                videoHeight: _recordingHeight > 0 ? _recordingHeight : 1080);
-        }
+            double duration = _recorderService.ElapsedSeconds;
 
-        // 6. İlk tam boy klip segmentlerini oluştur
-        if (duration > 0)
-        {
-            manifest.Timeline.VideoTrack.Clips.Add(new ClipSegment
-            {
-                Id = $"clip-video-{Guid.NewGuid():N}",
-                SourceStart = 0,
-                SourceEnd = duration,
-                TrackOffset = 0
-            });
+            // 3a. Save raw input event logs as JSON
+            _projectService.SaveMouseClicks(projectDir, clicks);
+            _projectService.SaveMouseMoves(projectDir, moves);
+            _projectService.SaveKeystrokes(projectDir, keystrokes);
 
-            if (hasMicFile)
+            string recFolder  = Path.Combine(projectDir, "recording");
+            string micFullPath = Path.Combine(recFolder, "microphone-0.wav");
+            string sysFullPath = Path.Combine(recFolder, "system_audio-0.wav");
+            bool hasMicFile = File.Exists(micFullPath) && new FileInfo(micFullPath).Length > 200;
+            bool hasSysFile = File.Exists(sysFullPath) && new FileInfo(sysFullPath).Length > 200;
+
+            // 3b. Build project manifest with relative paths (portable)
+            var manifest = new ProjectManifest
             {
-                manifest.Timeline.MicTrack.Clips.Add(new ClipSegment
+                ProjectName    = Path.GetFileName(projectDir),
+                VideoPath      = "./recording/display-0.mp4",
+                MicAudioPath   = hasMicFile ? "./recording/microphone-0.wav" : null,
+                SystemAudioPath = hasSysFile ? "./recording/system_audio-0.wav" : null,
+                Metadata = new RecordingMetadata
                 {
-                    Id = $"clip-mic-{Guid.NewGuid():N}",
+                    Width           = recWidth,
+                    Height          = recHeight,
+                    OriginX         = origX,
+                    OriginY         = origY,
+                    DurationSeconds = duration,
+                    Fps             = fps,
+                    HasMicAudio     = hasMicFile,
+                    HasSystemAudio  = hasSysFile
+                }
+            };
+
+            // 3c. Generate auto-zoom effects (CPU-intensive clustering)
+            if (autoZoom)
+            {
+                manifest.Timeline.ZoomEffects = _inputTracker.GenerateAutoZoomEffects(
+                    maxVideoDurationSec: duration,
+                    autoZoomMode:        autoZoomMode,
+                    defaultScale:        maxZoomRatio > 1.0 ? maxZoomRatio : 1.5,
+                    videoWidth:          recWidth,
+                    videoHeight:         recHeight);
+            }
+
+            // 3d. Build initial full-length clip segments for every track
+            if (duration > 0)
+            {
+                manifest.Timeline.VideoTrack.Clips.Add(new ClipSegment
+                {
+                    Id          = $"clip-video-{Guid.NewGuid():N}",
                     SourceStart = 0,
-                    SourceEnd = duration,
+                    SourceEnd   = duration,
                     TrackOffset = 0
                 });
+
+                if (hasMicFile)
+                {
+                    manifest.Timeline.MicTrack.Clips.Add(new ClipSegment
+                    {
+                        Id          = $"clip-mic-{Guid.NewGuid():N}",
+                        SourceStart = 0,
+                        SourceEnd   = duration,
+                        TrackOffset = 0
+                    });
+                }
+
+                if (hasSysFile)
+                {
+                    manifest.Timeline.SysTrack.Clips.Add(new ClipSegment
+                    {
+                        Id          = $"clip-sys-{Guid.NewGuid():N}",
+                        SourceStart = 0,
+                        SourceEnd   = duration,
+                        TrackOffset = 0
+                    });
+                }
             }
 
-            if (hasSysFile)
-            {
-                manifest.Timeline.SysTrack.Clips.Add(new ClipSegment
-                {
-                    Id = $"clip-sys-{Guid.NewGuid():N}",
-                    SourceStart = 0,
-                    SourceEnd = duration,
-                    TrackOffset = 0
-                });
-            }
+            // 3e. Flush manifest JSON to disk
+            _projectService.SaveProject(projectDir, manifest);
+        });
+
+        // Olayların çok hızlı gerçekleşmesi (race condition) durumunda animasyonun ekranda
+        // aniden kaybolmasını (flicker) önlemek için minimum akıcı geçiş süresi garantisi
+        int elapsed = (int)sw.ElapsedMilliseconds;
+        if (elapsed < 350)
+        {
+            await Task.Delay(350 - elapsed);
         }
 
-        _projectService.SaveProject(_activeProjectDir, manifest);
-
-        RecordingFinished?.Invoke(_activeProjectDir);
+        // ── Back on the UI thread: fire the event to trigger navigation ──
+        RecordingFinished?.Invoke(projectDir);
     }
 }

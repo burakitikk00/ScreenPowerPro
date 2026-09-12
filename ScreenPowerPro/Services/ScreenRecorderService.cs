@@ -342,6 +342,11 @@ public class ScreenRecorderService : IDisposable
     /// </summary>
     private static string BuildVideoEncodeArgs(string ffmpegExe, int crf)
     {
+        // Yüksek kaliteli ekran kaydı için bitrate (CRF üzerinden haritalanır)
+        // Ekran kayıtlarında zamanla pikselleşmeyi önlemek için yüksek bitrate ve keyframe (GOP) interval kullanıyoruz.
+        int bitrate = crf switch { <= 15 => 15000, <= 18 => 10000, <= 23 => 5000, _ => 3000 };
+        string gop = "-g 120"; // Her 120 karede bir tam kare (keyframe) at, 60fps'de 2 saniyeye denk gelir
+
         try
         {
             var psi = new ProcessStartInfo
@@ -361,23 +366,22 @@ public class ScreenRecorderService : IDisposable
             {
                 // Windows Media Foundation hardware encode — guaranteed WMF decode
                 // Same encoder as the WinUI3 MediaPlayer decoder path.
-                System.Diagnostics.Debug.WriteLine("[Recorder] Encoder: h264_mf");
-                return "-c:v h264_mf -pix_fmt yuv420p";
+                System.Diagnostics.Debug.WriteLine($"[Recorder] Encoder: h264_mf ({bitrate}k)");
+                return $"-c:v h264_mf -rate_control pc_vbr -b:v {bitrate}k {gop} -pix_fmt yuv420p";
             }
 
             if (output.Contains("h264_nvenc"))
             {
                 // NVIDIA hardware encode — WMF compatible output
-                int bitrate = crf switch { <= 15 => 8000, <= 18 => 5000, <= 23 => 3000, _ => 2000 };
                 System.Diagnostics.Debug.WriteLine($"[Recorder] Encoder: h264_nvenc ({bitrate}k)");
-                return $"-c:v h264_nvenc -preset p1 -b:v {bitrate}k -pix_fmt yuv420p";
+                return $"-c:v h264_nvenc -preset p1 -b:v {bitrate}k -maxrate {bitrate + 5000}k {gop} -bufsize {bitrate * 2}k -pix_fmt yuv420p";
             }
         }
         catch { }
 
         // Fallback: libx264 software encode
         System.Diagnostics.Debug.WriteLine($"[Recorder] Encoder: libx264 (crf={crf})");
-        return $"-c:v libx264 -preset ultrafast -profile:v baseline -level 3.1 -crf {crf} -pix_fmt yuv420p";
+        return $"-c:v libx264 -preset ultrafast -profile:v baseline -level 3.1 -crf {crf} {gop} -pix_fmt yuv420p";
     }
 
     public async Task StopRecordingAsync()

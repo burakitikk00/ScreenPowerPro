@@ -1399,8 +1399,7 @@
                     <!-- 16:9 Video container -->
                     <Border x:Name="VideoContainer"
                             CornerRadius="10"
-                            HorizontalAlignment="Center" VerticalAlignment="Center"
-                            Margin="16">
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Grid>
                             <!-- Layer 0: Dynamic Background -->
                             <Border x:Name="PreviewBackgroundLayer"
@@ -1852,12 +1851,6 @@
                                             Foreground="{StaticResource TextPrimaryBrush}"
                                             VerticalAlignment="Center"/>
                                     </StackPanel>
-                                    <Button x:Name="BtnAddZoomTrack" Grid.Column="1" Style="{StaticResource IconButtonStyle}"
-                                        Width="24" Height="24" Click="OnAddZoomClicked"
-                                        ToolTipService.ToolTip="Zoom Efekti Ekle">
-                                        <FontIcon Glyph="&#xE710;" FontSize="12"
-                                            Foreground="{StaticResource TertiaryBrush}"/>
-                                    </Button>
                                 </Grid>
                             </Border>
 
@@ -1937,7 +1930,13 @@
                         x:Name="TimelineScrollViewer"
                         HorizontalScrollBarVisibility="Auto"
                         VerticalScrollBarVisibility="Disabled">
-                        <Grid x:Name="TimelineContentGrid" MinWidth="800">
+                        <Grid x:Name="TimelineContentGrid" MinWidth="800"
+                              Background="Transparent"
+                              Margin="8,0,0,0"
+                              PointerPressed="OnHoverScrubPointerPressed"
+                              PointerMoved="OnHoverScrubPointerMoved"
+                              PointerReleased="OnHoverScrubPointerReleased"
+                              PointerExited="OnHoverScrubPointerExited">
                             <Grid.RowDefinitions>
                                 <!-- Time ruler -->
                                 <RowDefinition Height="22"/>
@@ -1948,20 +1947,12 @@
                                 <!-- Zoom track -->
                                 <RowDefinition Height="56"/>
                                 <!-- Click sound track -->
-                                <RowDefinition Height="48"/>
+                                <RowDefinition Height="0"/>
                             </Grid.RowDefinitions>
-
-                            <!-- HOVER SCRUB OVERLAY -->
-                            <Canvas Grid.Row="0" Grid.RowSpan="4"
-                                x:Name="HoverScrubOverlay"
-                                Background="Transparent"
-                                PointerPressed="OnHoverScrubPointerPressed"
-                                PointerMoved="OnHoverScrubPointerMoved"
-                                PointerReleased="OnHoverScrubPointerReleased"
-                                PointerExited="OnHoverScrubPointerExited" />
 
                             <!-- TIME RULER (Row 0) -->
                             <Canvas Grid.Row="0"
+                                HorizontalAlignment="Left"
                                 x:Name="TimeRuler"
                                 Background="{StaticResource SurfaceContainerLowestBrush}"
                                 Height="22">
@@ -1970,6 +1961,7 @@
 
                             <!-- VIDEO TRACK (Row 1) -->
                             <Canvas Grid.Row="1"
+                                HorizontalAlignment="Left"
                                 x:Name="VideoTrack"
                                 Background="#080D0E15"
                                 PointerEntered="OnVideoTrackPointerEntered">
@@ -1981,16 +1973,17 @@
                                     BorderBrush="{StaticResource VideoTrackBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="6"
-                                    Canvas.Left="40"
+                                    Canvas.Left="0"
                                     Canvas.Top="8">
                                     <TextBlock Text="recording.mp4" FontSize="11" FontWeight="SemiBold"
                                         Foreground="{StaticResource PrimaryAccentBrush}"
-                                        Margin="8,4,0,0" VerticalAlignment="Top"/>
+                                        Margin="4,4,0,0" VerticalAlignment="Top"/>
                                 </Border>
                             </Canvas>
 
                             <!-- AUDIO TRACK (Row 2: Waveform Canvas) -->
                             <Canvas Grid.Row="2"
+                                HorizontalAlignment="Left"
                                 x:Name="AudioTrack"
                                 Background="#0500FF88"
                                 PointerEntered="OnAudioTrackPointerEntered">
@@ -1999,16 +1992,32 @@
 
                             <!-- ZOOM EFFECTS TRACK (Row 3) -->
                             <Canvas Grid.Row="3"
+                                HorizontalAlignment="Left"
                                 x:Name="ZoomTrack"
                                 Background="#030D0E15"
                                 PointerEntered="OnZoomTrackPointerEntered"
+                                PointerExited="OnZoomTrackPointerExited"
+                                PointerMoved="OnZoomTrackPointerMoved"
                                 PointerPressed="OnZoomTrackPointerPressed"
                                 DoubleTapped="OnZoomTrackDoubleTapped">
                                 <!-- Zoom pills are added dynamically in code-behind -->
+                                <Border x:Name="ZoomHoverAddBadge"
+                                        Canvas.Left="0" Canvas.Top="14"
+                                        Background="#33C0C1FF"
+                                        BorderBrush="#80C0C1FF" BorderThickness="1"
+                                        CornerRadius="8" Padding="8,4"
+                                        Visibility="Collapsed"
+                                        IsHitTestVisible="False">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon Glyph="&#xE710;" FontSize="11" Foreground="#C0C1FF"/>
+                                        <TextBlock Text="Zoom Ekle" FontSize="10" Foreground="#C0C1FF"/>
+                                    </StackPanel>
+                                </Border>
                             </Canvas>
 
                             <!-- CLICK SOUND TRACK (Row 4) -->
                             <Canvas Grid.Row="4"
+                                HorizontalAlignment="Left"
                                 x:Name="ClickTrack"
                                 Background="#0400D2FF"
                                 PointerEntered="OnClickTrackPointerEntered"
@@ -2019,6 +2028,7 @@
 
                             <!-- PLAYHEAD (spans all 4 rows, rendered on top) -->
                             <Canvas Grid.Row="0" Grid.RowSpan="4"
+                                HorizontalAlignment="Left"
                                 IsHitTestVisible="False" ZIndex="100">
                                 <Rectangle
                                     x:Name="PlayheadLine"

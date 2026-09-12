@@ -442,7 +442,6 @@ public sealed partial class EditorPage : Page
         if (TbTrackAudioSub != null) TbTrackAudioSub.Text = _loc["Editor_Timeline_TrackAudioSub"];
         if (BtnAudioMute != null) ToolTipService.SetToolTip(BtnAudioMute, _loc["Editor_Timeline_MuteAudioTrack"]);
         if (TbTrackZoom != null) TbTrackZoom.Text = _loc["Editor_Timeline_TrackZoom"];
-        if (BtnAddZoomTrack != null) ToolTipService.SetToolTip(BtnAddZoomTrack, _loc["Editor_Timeline_AddZoom"]);
     }
 
     private bool _isLoadingVideo = false;
@@ -1028,7 +1027,7 @@ public sealed partial class EditorPage : Page
         for (int i = 0; i <= tickCount; i++)
         {
             double sec = i * step;
-            double x = 40 + sec * _timelineScale;
+            double x = sec * _timelineScale;
 
             var line = new Rectangle
             {
@@ -1049,7 +1048,7 @@ public sealed partial class EditorPage : Page
                     Foreground = new SolidColorBrush(Color.FromArgb(130, 199, 196, 215)),
                     FontFamily = new FontFamily("Consolas")
                 };
-                Canvas.SetLeft(label, x + 2);
+                Canvas.SetLeft(label, x);
                 Canvas.SetTop(label, 4);
                 TimeRuler.Children.Add(label);
             }
@@ -1066,7 +1065,7 @@ public sealed partial class EditorPage : Page
         int tickCount = (int)((_totalDurationSeconds + step) / step);
         for (int i = 0; i <= tickCount; i++)
         {
-            double x = 40 + i * step * _timelineScale;
+            double x = i * step * _timelineScale;
             var gridLine = new Rectangle
             {
                 Width = 1,
@@ -1103,7 +1102,7 @@ public sealed partial class EditorPage : Page
         int tickCount = (int)((_totalDurationSeconds + step) / step);
         for (int i = 0; i <= tickCount; i++)
         {
-            double x = 40 + i * step * _timelineScale;
+            double x = i * step * _timelineScale;
             var gridLine = new Rectangle
             {
                 Width = 1,
@@ -1279,7 +1278,7 @@ public sealed partial class EditorPage : Page
             Foreground = isAudioTrack
                 ? new SolidColorBrush(Color.FromArgb(255, 230, 255, 235))
                 : new SolidColorBrush(Color.FromArgb(255, 220, 222, 255)),
-            Margin = new Thickness(14, 4, 14, 0),
+            Margin = new Thickness(4, 4, 14, 0),
             VerticalAlignment = VerticalAlignment.Top,
             IsHitTestVisible = false
         };
@@ -2002,7 +2001,7 @@ public sealed partial class EditorPage : Page
         var validClicks = clicks.Where(c => c.Type == "left_down" || c.Type == "right_down").ToList();
         foreach (var c in validClicks)
         {
-            double x = 40 + (c.Timestamp * _timelineScale);
+            double x = (c.Timestamp * _timelineScale);
             bool isRight = c.Type == "right_down";
             bool isSelected = _selectedClickTimestamps.Contains(c.Timestamp);
 
@@ -2097,13 +2096,13 @@ public sealed partial class EditorPage : Page
     private void UpdatePlayhead()
     {
         if (PlayheadLine == null) return;
-        double x = 40 + _currentTimeSeconds * _timelineScale;
+        double x = _currentTimeSeconds * _timelineScale;
         Canvas.SetLeft(PlayheadLine, x - 1);
         if (PlayheadTriangle != null)
         {
             Canvas.SetLeft(PlayheadTriangle, x);
         }
-        PlayheadLine.Height = 22 + 72 + 56 + 56 + 48;
+        PlayheadLine.Height = 22 + 72 + 56 + 56;
     }
 
     private void SelectZoom(ZoomEffect zoom, bool clearOthers = true)
@@ -2450,15 +2449,45 @@ public sealed partial class EditorPage : Page
         if (ViewModel == null) return;
 
         var pos = e.GetPosition(ZoomTrack);
-        double clickSec = Math.Max(0, (pos.X - 40) / _timelineScale);
+        double clickSec = Math.Max(0, pos.X / _timelineScale);
 
-        // Boş alana çift tıklama yeni zoom eklemesin.
         // Eğer tıklanan konumda mevcut bir zoom efekti varsa onu seçip özellikler panelini aç.
         var existingZoom = ViewModel.ZoomEffects.FirstOrDefault(z => clickSec >= z.StartTime && clickSec <= z.StartTime + z.Duration);
         if (existingZoom != null)
         {
             SelectZoom(existingZoom);
         }
+        else
+        {
+            // Boş alana çift tıklanırsa yeni zoom ekle.
+            AddZoomEffectAt(clickSec);
+        }
+    }
+
+    private void OnZoomTrackPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        var pt = e.GetCurrentPoint(ZoomTrack).Position;
+        bool overPill = ZoomTrack.Children
+            .OfType<Border>()
+            .Any(b => b != ZoomHoverAddBadge &&
+                      new Windows.Foundation.Rect(Canvas.GetLeft(b), Canvas.GetTop(b),
+                               b.ActualWidth, b.ActualHeight).Contains(pt));
+                               
+        if (!overPill && ZoomHoverAddBadge != null)
+        {
+            ZoomHoverAddBadge.Visibility = Visibility.Visible;
+            Canvas.SetLeft(ZoomHoverAddBadge, Math.Max(4, pt.X));
+        }
+        else if (overPill && ZoomHoverAddBadge != null)
+        {
+            ZoomHoverAddBadge.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnZoomTrackPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (ZoomHoverAddBadge != null)
+            ZoomHoverAddBadge.Visibility = Visibility.Collapsed;
     }
 
     // =========================================================================
@@ -2600,8 +2629,8 @@ public sealed partial class EditorPage : Page
         double hostW = VideoCanvasHost?.ActualWidth > 0 ? VideoCanvasHost.ActualWidth : 920;
         double hostH = VideoCanvasHost?.ActualHeight > 0 ? VideoCanvasHost.ActualHeight : 540;
 
-        double availW = Math.Max(200, hostW - 16);
-        double availH = Math.Max(150, hostH - 16);
+        double availW = Math.Max(200, hostW - 32);
+        double availH = Math.Max(150, hostH - 32);
 
         double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel?.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
         double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel?.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
@@ -2805,7 +2834,7 @@ public sealed partial class EditorPage : Page
     // TIMELINE POINTER EVENTS (PANNING + PLAYHEAD SEEK + CTRL ZOOM)
     // =========================================================================
 
-    private double CalculateTimeFromPointerX(double pointerX, double timelineScale, double rulerOffset = 40.0)
+    private double CalculateTimeFromPointerX(double pointerX, double timelineScale, double rulerOffset = 0.0)
     {
         double rawTime = (pointerX - rulerOffset) / timelineScale;
         return Math.Clamp(rawTime, 0.0, _totalDurationSeconds);
@@ -3024,7 +3053,7 @@ public sealed partial class EditorPage : Page
             double currentOffset = TimelineScrollViewer.HorizontalOffset;
             double mouseViewportX = ptr.Position.X;
             double mouseCanvasX = currentOffset + mouseViewportX;
-            double mouseSec = Math.Max(0, (mouseCanvasX - 40) / oldScale);
+            double mouseSec = Math.Max(0, mouseCanvasX / oldScale);
 
             _timelineScale = newScale;
 
@@ -3045,7 +3074,7 @@ public sealed partial class EditorPage : Page
             RenderTimeline();
 
             // Yeni ofseti uygula (Pivot konumu koru)
-            double newMouseCanvasX = 40 + (mouseSec * newScale);
+            double newMouseCanvasX = (mouseSec * newScale);
             double targetOffset = Math.Max(0, newMouseCanvasX - mouseViewportX);
             TimelineScrollViewer.ChangeView(targetOffset, null, null, true);
         }
@@ -4378,12 +4407,12 @@ public sealed partial class EditorPage : Page
         return Windows.UI.Color.FromArgb(a, r, g, b);
     }
 
-    private void OnAddZoomClicked(object sender, RoutedEventArgs e)
+    private void AddZoomEffectAt(double timeSec)
     {
         if (ViewModel == null) return;
         ViewModel.PushHistory();
 
-        var curPt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, _currentTimeSeconds);
+        var curPt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, timeSec);
         double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
         double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
 
@@ -4391,7 +4420,7 @@ public sealed partial class EditorPage : Page
         double targetY = curPt.HasValue ? curPt.Value.Y : (natH / 2.0);
 
         double defaultScale = ViewModel.DefaultZoomScale > 0 ? ViewModel.DefaultZoomScale : 1.5;
-        double startCandidate = Math.Round(_currentTimeSeconds, 2);
+        double startCandidate = Math.Round(timeSec, 2);
         double durationCandidate = 2.5;
 
         // Çakışma önleme: Yeni zoom var olan bir zoom'un üzerine çakışmasın

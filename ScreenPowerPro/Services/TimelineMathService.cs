@@ -9,7 +9,7 @@ namespace ScreenPowerPro.Services;
 /// </summary>
 public class TimelineMathService
 {
-    public const double DefaultLeftOffset = 40.0;
+    public const double DefaultLeftOffset = 0.0;
     public const double DefaultSnapThresholdPixels = 15.0;
 
     /// <summary>

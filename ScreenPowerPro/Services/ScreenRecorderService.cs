@@ -471,27 +471,35 @@ public class ScreenRecorderService : IDisposable
             }
             catch { }
 
-            // 4. FFmpeg'i Graceful olarak sonlandır ('q' gönder ve asenkron bekle)
+            // 4. Stop capture services feeding FFmpeg FIRST to prevent corrupting the input pipe
+            if (_windowCaptureService != null)
+            {
+                _windowCaptureService.StopCapture();
+                _windowCaptureService.Dispose();
+                _windowCaptureService = null;
+            }
+
+            // 5. FFmpeg'i Graceful olarak sonlandır ('q' gönder, stdin kapat ve asenkron bekle)
             if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
             {
                 try
                 {
-                    await _ffmpegProcess.StandardInput.WriteLineAsync("q");
-                    await _ffmpegProcess.StandardInput.FlushAsync();
-                    _ffmpegProcess.StandardInput.Close();
-
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                     try
                     {
-                        await _ffmpegProcess.WaitForExitAsync(cts.Token);
+                        await _ffmpegProcess.StandardInput.WriteLineAsync("q");
+                        await _ffmpegProcess.StandardInput.FlushAsync();
                     }
-                    catch (OperationCanceledException)
+                    catch { }
+
+                    try
                     {
-                        if (!_ffmpegProcess.HasExited)
-                        {
-                            _ffmpegProcess.Kill();
-                        }
+                        _ffmpegProcess.StandardInput.Close();
                     }
+                    catch { }
+
+                    // FFmpeg'in arabellekteki kareleri işlemesi ve mp4 dosyasını tamamlaması (moov atom) için
+                    // tamamen bitmesini bekliyoruz. Timeout uygulanmıyor ki uzun kayıtlarda video eksik kalmasın.
+                    await _ffmpegProcess.WaitForExitAsync();
                 }
                 catch { }
                 finally
@@ -499,13 +507,6 @@ public class ScreenRecorderService : IDisposable
                     _ffmpegProcess?.Dispose();
                     _ffmpegProcess = null;
                 }
-            }
-
-            if (_windowCaptureService != null)
-            {
-                _windowCaptureService.StopCapture();
-                _windowCaptureService.Dispose();
-                _windowCaptureService = null;
             }
         });
 

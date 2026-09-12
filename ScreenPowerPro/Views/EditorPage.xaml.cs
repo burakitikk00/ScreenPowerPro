@@ -2606,12 +2606,15 @@ public sealed partial class EditorPage : Page
         double targetPx = contentRect.X + (normX * contentRect.Width);
         double targetPy = contentRect.Y + (normY * contentRect.Height);
 
-        // Odak noktasını ekranın merkezine (W/2, H/2) hizalamak için gereken Translate
-        double tx = (W * 0.5) - (targetPx * scale);
-        double ty = (H * 0.5) - (targetPy * scale);
+        // Odak noktasını ekranın merkezine hizalamak için gereken Translate
+        // RenderTransformOrigin="0.5,0.5" olduğu için merkez etrafında scale ediliyor.
+        // Bu yüzden formül tx = (W/2 - targetPx) * scale olmalıdır.
+        double tx = (W * 0.5 - targetPx) * scale;
+        double ty = (H * 0.5 - targetPy) * scale;
 
-        tx = Math.Clamp(tx, W * (1.0 - scale), 0);
-        ty = Math.Clamp(ty, H * (1.0 - scale), 0);
+        // Ekranın dışına çıkmaması (siyah boşluk göstermemesi) için sınırla
+        tx = Math.Clamp(tx, W * (1.0 - scale) * 0.5, W * (scale - 1.0) * 0.5);
+        ty = Math.Clamp(ty, H * (1.0 - scale) * 0.5, H * (scale - 1.0) * 0.5);
 
         VideoTransform.ScaleX     = scale;
         VideoTransform.ScaleY     = scale;
@@ -5579,10 +5582,31 @@ public sealed partial class EditorPage : Page
 
         if (dt > 0.0001 && currentSec >= m1.Timestamp && currentSec <= m2.Timestamp)
         {
-            double t = (currentSec - m1.Timestamp) / dt;
-            double x = m1.X + (m2.X - m1.X) * t;
-            double y = m1.Y + (m2.Y - m1.Y) * t;
-            return new Point(x, y);
+            if (dt > 0.15)
+            {
+                // Eğer iki hareket arasında çok fazla zaman farkı varsa (örn. fare sabit durduysa),
+                // farenin tüm süre boyunca yavaşça sürükleniyormuş gibi (hava boşluğunda kayma) görünmesini engelle.
+                // Sadece son 50ms kala hareketi başlat.
+                double delayStart = m2.Timestamp - 0.05;
+                if (currentSec < delayStart)
+                {
+                    return new Point(m1.X, m1.Y);
+                }
+                else
+                {
+                    double t = (currentSec - delayStart) / 0.05;
+                    double x = m1.X + (m2.X - m1.X) * t;
+                    double y = m1.Y + (m2.Y - m1.Y) * t;
+                    return new Point(x, y);
+                }
+            }
+            else
+            {
+                double t = (currentSec - m1.Timestamp) / dt;
+                double x = m1.X + (m2.X - m1.X) * t;
+                double y = m1.Y + (m2.Y - m1.Y) * t;
+                return new Point(x, y);
+            }
         }
 
         return new Point(m1.X, m1.Y);
@@ -5592,17 +5616,13 @@ public sealed partial class EditorPage : Page
     {
         if (CursorOverlayCanvas == null || ViewModel == null) return;
 
-        // VideoTransform ile CursorCanvasTransform senkronizasyonu
-        if (CursorCanvasTransform != null && VideoTransform != null)
+        if (VideoTransform != null)
         {
-            CursorCanvasTransform.ScaleX = VideoTransform.ScaleX;
-            CursorCanvasTransform.ScaleY = VideoTransform.ScaleY;
-            CursorCanvasTransform.TranslateX = VideoTransform.TranslateX;
-            CursorCanvasTransform.TranslateY = VideoTransform.TranslateY;
-
             if (_cursorTransform != null)
             {
                 double baseScale = ViewModel.CursorSize > 0 ? ViewModel.CursorSize / 100.0 : 1.0;
+                // CursorOverlayCanvas ebeveyn Grid'den scale'i miras alır, bu yüzden ters (inverse) scale uyguluyoruz ki
+                // imleç görsel olarak orjinal boyutunda kalsın.
                 double invScale = VideoTransform.ScaleX > 0 ? (1.0 / VideoTransform.ScaleX) : 1.0;
                 _cursorTransform.ScaleX = baseScale * invScale;
                 _cursorTransform.ScaleY = baseScale * invScale;

@@ -243,25 +243,35 @@ public class ZoomEngineService
                 else
                 {
                     // Zaten zoom durumundayız. BÜYÜTME (Scale artmaz). Sadece Panning yap.
-                    // Mevcut zoom'u burada sonlandırıp ardışık yeni bir ZoomEffect başlatarak
-                    // Render katmanının smooth pan yapmasını sağlıyoruz.
-                    double transitionStart = time;
-                    FinalizeCurrentZoom(transitionStart);
-                    
-                    isZoomed = true;
-                    currentTargetX = x;
-                    currentTargetY = y;
-                    
-                    currentEffect = new ZoomEffect
+                    double dist = Math.Sqrt(Math.Pow(x - currentTargetX, 2) + Math.Pow(y - currentTargetY, 2));
+
+                    if (dist < 400.0)
                     {
-                        Id = Guid.NewGuid().ToString("N")[..8],
-                        Name = $"Zoom {zoomIndex++}",
-                        StartTime = Math.Round(transitionStart, 3),
-                        Scale = actualScale,
-                        TargetX = Math.Round(x, 1),
-                        TargetY = Math.Round(y, 1),
-                        Easing = autoZoomMode == "instant" ? "instant" : SettingsManager.Instance.ZoomEasingFunction.ToLowerInvariant()
-                    };
+                        // Hedef yeterince yakınsa (örneğin aynı bölgede ardışık tıklamalar),
+                        // yeni bir ZoomEffect üretip kamerayı sarsma.
+                        // lastActivityTime güncellendiği için zoom süresi zaten uzayacaktır.
+                    }
+                    else
+                    {
+                        // Farklı bir alana tıklandı, smooth pan yapması için yeni zoom başlat.
+                        double transitionStart = time;
+                        FinalizeCurrentZoom(transitionStart);
+                        
+                        isZoomed = true;
+                        currentTargetX = x;
+                        currentTargetY = y;
+                        
+                        currentEffect = new ZoomEffect
+                        {
+                            Id = Guid.NewGuid().ToString("N")[..8],
+                            Name = $"Zoom {zoomIndex++}",
+                            StartTime = Math.Round(transitionStart, 3),
+                            Scale = actualScale,
+                            TargetX = Math.Round(x, 1),
+                            TargetY = Math.Round(y, 1),
+                            Easing = autoZoomMode == "instant" ? "instant" : SettingsManager.Instance.ZoomEasingFunction.ToLowerInvariant()
+                        };
+                    }
                 }
             }
             else

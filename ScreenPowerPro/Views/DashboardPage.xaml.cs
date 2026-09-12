@@ -61,6 +61,7 @@ public sealed partial class DashboardPage : Page
 
     private void OnPageUnloaded(object sender, RoutedEventArgs e)
     {
+        ViewModel.RequestStartRecording -= OnRecordingStarted;
         _loc.LanguageChanged -= ApplyLocalization;
         if (XamlRoot != null)
         {

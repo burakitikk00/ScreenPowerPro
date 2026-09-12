@@ -1641,7 +1641,15 @@ public sealed partial class EditorPage : Page
     private void RenderZoomPills()
     {
         if (!_isPageLoaded || ZoomTrack == null || ViewModel == null) return;
-        ZoomTrack.Children.Clear();
+        
+        double totalWidth = Math.Max(_totalDurationSeconds * _timelineScale, 800);
+        ZoomTrack.Width = totalWidth + 120;
+
+        var toRemove = ZoomTrack.Children.Where(c => c != ZoomHoverAddBadge).ToList();
+        foreach (var c in toRemove)
+        {
+            ZoomTrack.Children.Remove(c);
+        }
 
         foreach (var zoom in ViewModel.ZoomEffects)
         {
@@ -2463,17 +2471,35 @@ public sealed partial class EditorPage : Page
 
     private void OnZoomTrackPointerMoved(object sender, PointerRoutedEventArgs e)
     {
+        if (_isDraggingPlayhead)
+        {
+            if (ZoomHoverAddBadge != null) ZoomHoverAddBadge.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         var pt = e.GetCurrentPoint(ZoomTrack).Position;
+        double badgeWidth = 90;
+        
+        // Videonun bitişinden sonra butonun çıkmasını engelle. (Merkezin 80px pillin sığacağı alan kadar öncesinde olmalı)
+        double pillDurationSec = 80.0 / Math.Max(0.1, _timelineScale);
+        double pointerSec = CalculateTimeFromPointerX(pt.X, _timelineScale);
+        
+        if (pointerSec + (pillDurationSec / 2.0) > _totalDurationSeconds)
+        {
+            if (ZoomHoverAddBadge != null) ZoomHoverAddBadge.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         bool overPill = ZoomTrack.Children
             .OfType<Border>()
-            .Any(b => b != ZoomHoverAddBadge &&
+            .Any(b => b.Visibility == Visibility.Visible &&
                       new Windows.Foundation.Rect(Canvas.GetLeft(b), Canvas.GetTop(b),
                                b.ActualWidth, b.ActualHeight).Contains(pt));
                                
         if (!overPill && ZoomHoverAddBadge != null)
         {
             ZoomHoverAddBadge.Visibility = Visibility.Visible;
-            Canvas.SetLeft(ZoomHoverAddBadge, Math.Max(4, pt.X));
+            Canvas.SetLeft(ZoomHoverAddBadge, Math.Max(0, pt.X - (badgeWidth / 2)));
         }
         else if (overPill && ZoomHoverAddBadge != null)
         {
@@ -2484,7 +2510,34 @@ public sealed partial class EditorPage : Page
     private void OnZoomTrackPointerExited(object sender, PointerRoutedEventArgs e)
     {
         if (ZoomHoverAddBadge != null)
-            ZoomHoverAddBadge.Visibility = Visibility.Collapsed;
+        {
+            var pt = e.GetCurrentPoint(ZoomTrack).Position;
+            if (pt.Y <= 0 || pt.Y >= ZoomTrack.ActualHeight)
+            {
+                ZoomHoverAddBadge.Visibility = Visibility.Collapsed;
+            }
+        }
+    }
+
+    private void OnZoomHoverAddBadgeExited(object sender, PointerRoutedEventArgs e)
+    {
+        // Flicker önlemi
+    }
+
+    private void OnZoomAddBadgeClicked(object sender, RoutedEventArgs e)
+    {
+        if (ZoomHoverAddBadge == null) return;
+        double badgeLeft = Canvas.GetLeft(ZoomHoverAddBadge);
+        double badgeWidth = 90;
+        double badgeCenter = badgeLeft + (badgeWidth / 2);
+        
+        // Eklenecek zoom bloğunun genişliği sabit 80px olacak.
+        // Buton merkezini 80px'lik bloğun merkezi olarak hizalayalım:
+        double pillLeftPixel = badgeCenter - 40;
+        double clickSec = CalculateTimeFromPointerX(pillLeftPixel, _timelineScale);
+        
+        AddZoomEffectAt(clickSec);
+        ZoomHoverAddBadge.Visibility = Visibility.Collapsed;
     }
 
     // =========================================================================
@@ -4504,22 +4557,37 @@ public sealed partial class EditorPage : Page
 
         double defaultScale = ViewModel.DefaultZoomScale > 0 ? ViewModel.DefaultZoomScale : 1.5;
         double startCandidate = Math.Round(timeSec, 2);
-        double durationCandidate = 2.5;
+        
+        // Genişliği tam 80 piksel (butonun genişliğinden 10 piksel küçük) olacak süreyi hesapla
+        double durationCandidate = Math.Round(80.0 / Math.Max(0.1, _timelineScale), 2);
 
-        // Çakışma önleme: Yeni zoom var olan bir zoom'un üzerine çakışmasın
+        // Videonun sonunu geçmemesi için süre sınırını ayarla
+        if (startCandidate + durationCandidate > _totalDurationSeconds)
+        {
+            durationCandidate = Math.Round(_totalDurationSeconds - startCandidate, 2);
+            if (durationCandidate <= 0.1) return; // Çok kısaysa ekleme
+        }
+
+        // Çakışma önleme: Yeni zoom var olan bir zoom'un üzerine çakışmasın (Magnet etkisi)
         if (ViewModel.ZoomEffects != null && ViewModel.ZoomEffects.Count > 0)
         {
             var sorted = ViewModel.ZoomEffects.OrderBy(z => z.StartTime).ToList();
+            
+            // Eğer başlangıç noktası başka bir zoom'un içine düşüyorsa, hemen sonrasına yapıştır
             var inside = sorted.FirstOrDefault(z => startCandidate >= z.StartTime && startCandidate < z.StartTime + z.Duration);
             if (inside != null)
             {
-                startCandidate = Math.Round(inside.StartTime + inside.Duration + 0.05, 2);
+                startCandidate = Math.Round(inside.StartTime + inside.Duration, 2);
             }
+            
+            // Eğer bitiş noktası bir sonraki zoom'a taşıyorsa, tam sınırında bitecek şekilde süreyi ayarla
             var next = sorted.FirstOrDefault(z => z.StartTime > startCandidate);
             if (next != null && startCandidate + durationCandidate > next.StartTime)
             {
-                durationCandidate = Math.Max(0.5, Math.Round(next.StartTime - startCandidate - 0.05, 2));
+                durationCandidate = Math.Round(next.StartTime - startCandidate, 2);
             }
+
+            if (durationCandidate < 0.1) return; // Eklenecek yeterli boşluk kalmamışsa iptal et
         }
 
         var newZoom = new ZoomEffect

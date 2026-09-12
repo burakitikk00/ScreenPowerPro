@@ -2027,19 +2027,22 @@
                                 PointerMoved="OnZoomTrackPointerMoved"
                                 PointerPressed="OnZoomTrackPointerPressed"
                                 DoubleTapped="OnZoomTrackDoubleTapped">
-                                <!-- Zoom pills are added dynamically in code-behind -->
-                                <Border x:Name="ZoomHoverAddBadge"
-                                        Canvas.Left="0" Canvas.Top="14"
-                                        Background="#33C0C1FF"
-                                        BorderBrush="#80C0C1FF" BorderThickness="1"
-                                        CornerRadius="8" Padding="8,4"
+                                <Button x:Name="ZoomHoverAddBadge"
+                                        Canvas.Left="0" Canvas.Top="10"
+                                        Padding="12,6" CornerRadius="12"
+                                        Width="90"
+                                        BorderThickness="1" BorderBrush="#33FFFFFF"
                                         Visibility="Collapsed"
-                                        IsHitTestVisible="False">
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <FontIcon Glyph="&#xE710;" FontSize="11" Foreground="#C0C1FF"/>
-                                        <TextBlock Text="Zoom Ekle" FontSize="10" Foreground="#C0C1FF"/>
+                                        Click="OnZoomAddBadgeClicked"
+                                        PointerExited="OnZoomHoverAddBadgeExited">
+                                    <Button.Background>
+                                        <SolidColorBrush Color="#26C0C1FF"/>
+                                    </Button.Background>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE710;" FontSize="12" Foreground="#C0C1FF"/>
+                                        <TextBlock Text="Zoom Ekle" FontSize="11" FontWeight="SemiBold" Foreground="#C0C1FF"/>
                                     </StackPanel>
-                                </Border>
+                                </Button>
                             </Canvas>
 
                             <!-- CLICK SOUND TRACK (Row 4) -->

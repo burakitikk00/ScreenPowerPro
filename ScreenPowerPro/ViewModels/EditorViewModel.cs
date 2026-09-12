@@ -489,6 +489,12 @@ public partial class EditorViewModel : ObservableObject
         set { if (Settings.Padding != value) { Settings.Padding = value; OnPropertyChanged(); } }
     }
 
+    public bool IsVideoFrameEnabled
+    {
+        get => Settings.IsVideoFrameEnabled;
+        set { if (Settings.IsVideoFrameEnabled != value) { Settings.IsVideoFrameEnabled = value; OnPropertyChanged(); } }
+    }
+
     public int Inset
     {
         get => Settings.Inset;

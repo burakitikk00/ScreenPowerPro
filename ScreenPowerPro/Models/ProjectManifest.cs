@@ -241,6 +241,9 @@ public class TimelineSettings
     [JsonPropertyName("backgroundStyle")]
     public string BackgroundStyle { get; set; } = "gradient-1"; // gradient-1, gradient-2, dark, blur
 
+    [JsonPropertyName("isVideoFrameEnabled")]
+    public bool IsVideoFrameEnabled { get; set; } = true;
+
     // --- Filigran (Watermark) & Kısayol Tuşları ---
     [JsonPropertyName("watermark")]
     public bool Watermark { get; set; } = false;

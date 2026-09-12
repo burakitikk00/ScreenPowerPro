@@ -74,7 +74,7 @@
             <!-- Main workspace: FocuSee Left Sidebar + Video Preview -->
             <RowDefinition Height="*" />
             <!-- Timeline -->
-            <RowDefinition Height="315" />
+            <RowDefinition Height="250" />
         </Grid.RowDefinitions>
 
         <!-- ====================================================
@@ -197,8 +197,8 @@
                 <Grid.ColumnDefinitions>
                     <!-- 0: Icon Bar (48px) -->
                     <ColumnDefinition Width="48" />
-                    <!-- 1: Tab Detail Flyout (280px) -->
-                    <ColumnDefinition Width="280" />
+                    <!-- 1: Tab Detail Flyout (320px) -->
+                    <ColumnDefinition Width="320" />
                     <!-- 2: Video Canvas (*) -->
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
@@ -596,45 +596,19 @@
                             <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="12"
                                 BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                                 <StackPanel Spacing="12">
+                                    <!-- Video Çerçevesi Toggle -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="TbFixedZoom" Text="Fixed Zoom Part" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                        <ToggleSwitch x:Name="TsFixedZoom" Grid.Column="1"
-                                            IsOn="{x:Bind ViewModel.FixedZoomPart, Mode=TwoWay}"
+                                        <TextBlock Text="Video Çerçevesi" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <ToggleSwitch Grid.Column="1"
+                                            IsOn="{x:Bind ViewModel.IsVideoFrameEnabled, Mode=TwoWay}"
+                                            Toggled="OnVideoFrameToggled"
                                             OnContent="" OffContent="" Margin="0"/>
                                     </Grid>
                                     <Rectangle Height="1" Fill="{StaticResource GlassBorderBrush}"/>
-
-                                    <!-- Padding -->
-                                    <StackPanel Spacing="4">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="TbPaddingLabel" Text="Padding" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <TextBlock x:Name="TbPaddingVal" Grid.Column="1" Text="5" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
-                                        </Grid>
-                                        <Slider x:Name="SliderPadding" Minimum="0" Maximum="20" Value="{x:Bind ViewModel.Padding, Mode=TwoWay}"
-                                            ValueChanged="OnPaddingValueChanged"/>
-                                    </StackPanel>
-
-                                    <!-- Inset -->
-                                    <StackPanel Spacing="4">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="TbInsetLabel" Text="Inset" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <TextBlock x:Name="TbInsetVal" Grid.Column="1" Text="0" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
-                                        </Grid>
-                                        <Slider x:Name="SliderInset" Minimum="0" Maximum="10" Value="{x:Bind ViewModel.Inset, Mode=TwoWay}"
-                                            ValueChanged="OnInsetValueChanged"/>
-                                    </StackPanel>
 
                                     <!-- Roundness -->
                                     <StackPanel Spacing="4">
@@ -671,24 +645,7 @@
                                 BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                                 <StackPanel Spacing="10">
                                     <TextBlock x:Name="TbBgPresetLabel" Text="Background Preset" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                    <!-- Preset tabs -->
-                                    <Grid ColumnSpacing="4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Button x:Name="BtnPresetDefault" Grid.Column="0" Style="{StaticResource PresetTabButtonStyle}"
-                                            Content="Default" Click="OnCanvasPresetSelected" Tag="Default"
-                                            Background="#26C0C1FF" Foreground="{StaticResource PrimaryAccentBrush}" HorizontalAlignment="Stretch"/>
-                                        <Button x:Name="BtnPresetSteady" Grid.Column="1" Style="{StaticResource PresetTabButtonStyle}"
-                                            Content="Steady" Click="OnCanvasPresetSelected" Tag="Steady" HorizontalAlignment="Stretch"/>
-                                        <Button x:Name="BtnPresetGraceful" Grid.Column="2" Style="{StaticResource PresetTabButtonStyle}"
-                                            Content="Grace" Click="OnCanvasPresetSelected" Tag="Graceful" HorizontalAlignment="Stretch"/>
-                                        <Button x:Name="BtnPresetScenery" Grid.Column="3" Style="{StaticResource PresetTabButtonStyle}"
-                                            Content="Scene" Click="OnCanvasPresetSelected" Tag="Scenery" HorizontalAlignment="Stretch"/>
-                                    </Grid>
+
 
                                     <!-- Color Swatches Grid -->
                                     <Grid ColumnSpacing="8" RowSpacing="8" Margin="0,4,0,0">
@@ -780,19 +737,7 @@
                                         </Border>
                                     </Grid>
 
-                                    <!-- Opacity -->
-                                    <StackPanel Spacing="4" Margin="0,4,0,0">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="TbOpacityLabel" Text="Opacity" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <TextBlock x:Name="TbOpacity" Text="100%" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
-                                        </Grid>
-                                        <Slider x:Name="OpacitySlider" Minimum="0" Maximum="100" Value="100"
-                                            ValueChanged="OnOpacityChanged"/>
-                                    </StackPanel>
+
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -1453,9 +1398,9 @@
 
                     <!-- 16:9 Video container -->
                     <Border x:Name="VideoContainer"
-                            MaxWidth="920" CornerRadius="10"
+                            CornerRadius="10"
                             HorizontalAlignment="Center" VerticalAlignment="Center"
-                            Margin="24">
+                            Margin="16">
                         <Grid>
                             <!-- Layer 0: Dynamic Background -->
                             <Border x:Name="PreviewBackgroundLayer"
@@ -1478,9 +1423,11 @@
                                         TranslateX="0" TranslateY="0"/>
                                 </Grid.RenderTransform>
 
-                                <!-- Layer 1: Scaled Video Window — NO Shadow -->
-                                <Border x:Name="VideoWindowLayer"
-                                        Margin="48" CornerRadius="8">
+                                <!-- Layer 1: Scaled Video Window -->
+                                <Border x:Name="VideoWindowLayer" Translation="0,0,32">
+                                    <Border.Shadow>
+                                        <ThemeShadow />
+                                    </Border.Shadow>
                                     <MediaPlayerElement x:Name="VideoPlayer"
                                         AutoPlay="False" AreTransportControlsEnabled="False"
                                         Stretch="Uniform" MinHeight="200"/>
@@ -1488,7 +1435,7 @@
 
                                 <!-- Layer 2: Black Gap Overlay -->
                                 <Border x:Name="BlackGapOverlay"
-                                        Background="#000000" Margin="48" CornerRadius="8"
+                                        Background="#000000"
                                         Visibility="Collapsed" IsHitTestVisible="False"/>
 
                                 <!-- Layer 3: Cursor Overlay -->

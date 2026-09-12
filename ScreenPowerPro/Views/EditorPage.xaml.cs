@@ -368,17 +368,9 @@ public sealed partial class EditorPage : Page
         if (TbTitleCanvas != null) TbTitleCanvas.Text = _loc["Editor_Canvas_Title"];
         if (TbAspectRatio != null) TbAspectRatio.Text = _loc["Editor_Canvas_AspectRatio"];
         if (BtnRatioOrig != null) BtnRatioOrig.Content = _loc["Editor_Canvas_Auto"];
-        if (TbFixedZoom != null) TbFixedZoom.Text = _loc["Editor_Canvas_FixedZoom"];
-        if (TbPaddingLabel != null) TbPaddingLabel.Text = _loc["Editor_Canvas_Padding"];
-        if (TbInsetLabel != null) TbInsetLabel.Text = _loc["Editor_Canvas_Inset"];
         if (TbRoundnessLabel != null) TbRoundnessLabel.Text = _loc["Editor_Canvas_Roundness"];
         if (TbShadowLabel != null) TbShadowLabel.Text = _loc["Editor_Canvas_Shadow"];
         if (TbBgPresetLabel != null) TbBgPresetLabel.Text = _loc["Editor_Canvas_BgPreset"];
-        if (BtnPresetDefault != null) BtnPresetDefault.Content = _loc["Editor_Canvas_PresetDefault"];
-        if (BtnPresetSteady != null) BtnPresetSteady.Content = _loc["Editor_Canvas_PresetSteady"];
-        if (BtnPresetGraceful != null) BtnPresetGraceful.Content = _loc["Editor_Canvas_PresetGraceful"];
-        if (BtnPresetScenery != null) BtnPresetScenery.Content = _loc["Editor_Canvas_PresetScenery"];
-        if (TbOpacityLabel != null) TbOpacityLabel.Text = _loc["Editor_Canvas_Opacity"];
 
         // TAB 3: AUDIO
         if (TbTitleAudio != null) TbTitleAudio.Text = _loc["Editor_Audio_Title"];
@@ -937,24 +929,13 @@ public sealed partial class EditorPage : Page
         UpdateVideoContainerBounds();
     }
 
-    private void OnPaddingValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-    {
-        if (!_isPageLoaded) return;
-        if (TbPaddingVal != null) TbPaddingVal.Text = $"{(int)e.NewValue}";
-        UpdateVideoWindowPadding();
-    }
 
-    private void OnInsetValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-    {
-        if (!_isPageLoaded) return;
-        if (TbInsetVal != null) TbInsetVal.Text = $"{(int)e.NewValue}";
-    }
 
     private void OnRoundnessValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
         if (!_isPageLoaded) return;
         if (TbRoundnessVal != null) TbRoundnessVal.Text = $"{(int)e.NewValue}";
-        UpdateVideoWindowPadding();
+        UpdateVideoWindowRoundness();
     }
 
     private void OnShadowValueChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -963,13 +944,7 @@ public sealed partial class EditorPage : Page
         if (TbShadowVal != null) TbShadowVal.Text = $"{(int)e.NewValue}%";
     }
 
-    private void OnCanvasPresetSelected(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button btn || btn.Tag is not string tag) return;
-        ViewModel.CanvasPreset = tag;
 
-        HighlightButtonChoice(new[] { BtnPresetDefault, BtnPresetSteady, BtnPresetGraceful, BtnPresetScenery }, btn);
-    }
 
     // --- SHORTCUT KEYS HANDLERS ---
 
@@ -2349,7 +2324,7 @@ public sealed partial class EditorPage : Page
     private double _cameraCurrentX = 0.5, _cameraCurrentY = 0.5;
     private double _cameraTargetX  = 0.5, _cameraTargetY  = 0.5;
     private double _cameraCurrentScale = 1.0, _cameraTargetScale = 1.0;
-    private const double CameraLerpSpeed = 0.08;
+    private const double CameraLerpSpeed = 0.025;
 
     private static double CubicEaseOut(double t)
         => 1.0 - Math.Pow(1.0 - Math.Clamp(t, 0.0, 1.0), 3.0);
@@ -2394,8 +2369,16 @@ public sealed partial class EditorPage : Page
 
         scale = Math.Clamp(scale, 1.0, 2.2);
 
-        double tx = (W * 0.5) - (normX * W * scale);
-        double ty = (H * 0.5) - (normY * H * scale);
+        // Gerçek video içeriğinin ekrandaki sınırlarını al (Letterbox hesabı)
+        Windows.Foundation.Rect contentRect = GetVideoContentRect();
+
+        // Odak noktasının konteyner üzerindeki gerçek piksel koordinatı
+        double targetPx = contentRect.X + (normX * contentRect.Width);
+        double targetPy = contentRect.Y + (normY * contentRect.Height);
+
+        // Odak noktasını ekranın merkezine (W/2, H/2) hizalamak için gereken Translate
+        double tx = (W * 0.5) - (targetPx * scale);
+        double ty = (H * 0.5) - (targetPy * scale);
 
         tx = Math.Clamp(tx, W * (1.0 - scale), 0);
         ty = Math.Clamp(ty, H * (1.0 - scale), 0);
@@ -2404,6 +2387,14 @@ public sealed partial class EditorPage : Page
         VideoTransform.ScaleY     = scale;
         VideoTransform.TranslateX = tx;
         VideoTransform.TranslateY = ty;
+        
+        if (BlackGapOverlay != null && BlackGapOverlay.RenderTransform is Microsoft.UI.Xaml.Media.CompositeTransform bgT)
+        {
+            bgT.ScaleX = scale;
+            bgT.ScaleY = scale;
+            bgT.TranslateX = tx;
+            bgT.TranslateY = ty;
+        }
     }
 
     private void UpdateGapBlackScreen()
@@ -2604,53 +2595,114 @@ public sealed partial class EditorPage : Page
     {
         if (VideoContainer == null) return;
 
-        UpdateVideoWindowPadding();
+        UpdateVideoWindowRoundness();
 
         double hostW = VideoCanvasHost?.ActualWidth > 0 ? VideoCanvasHost.ActualWidth : 920;
         double hostH = VideoCanvasHost?.ActualHeight > 0 ? VideoCanvasHost.ActualHeight : 540;
 
-        double availW = Math.Max(200, hostW - 48);
-        double availH = Math.Max(150, hostH - 48);
+        double availW = Math.Max(200, hostW - 16);
+        double availH = Math.Max(150, hostH - 16);
 
         double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel?.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
         double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel?.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
         
-        double aspect = natW / natH;
+        double canvasAspect = natW / natH;
         if (ViewModel != null && !string.IsNullOrEmpty(ViewModel.AspectRatio))
         {
             switch (ViewModel.AspectRatio)
             {
-                case "16:9": aspect = 16.0 / 9.0; break;
-                case "4:3": aspect = 4.0 / 3.0; break;
-                case "1:1": aspect = 1.0; break;
-                case "9:16": aspect = 9.0 / 16.0; break;
+                case "16:9": canvasAspect = 16.0 / 9.0; break;
+                case "4:3": canvasAspect = 4.0 / 3.0; break;
+                case "1:1": canvasAspect = 1.0; break;
+                case "9:16": canvasAspect = 9.0 / 16.0; break;
             }
         }
 
-        double targetW = Math.Min(availW, 960);
-        double targetH = targetW / aspect;
+        // Arkaplan (Tuval) boyutunu hesapla - MAX SINIRI KALDIRILDI
+        double targetW = availW;
+        double targetH = targetW / canvasAspect;
 
         if (targetH > availH)
         {
             targetH = availH;
-            targetW = targetH * aspect;
+            targetW = targetH * canvasAspect;
         }
 
         VideoContainer.Width = Math.Round(targetW);
         VideoContainer.Height = Math.Round(targetH);
 
+        // Videonun, tuval içindeki gerçek kaplayacağı alanı (kendi en-boy oranına göre) hesapla
+        double videoAspect = natW / natH;
+        double innerW = targetW;
+        double innerH = innerW / videoAspect;
+        if (innerH > targetH)
+        {
+            innerH = targetH;
+            innerW = innerH * videoAspect;
+        }
+
+        // VideoWindowLayer'in boyutunu doğrudan videonun gerçek boyutuna eşitle ki sınırlarına (gölge, radius) tam otursun
+        if (VideoWindowLayer != null)
+        {
+            VideoWindowLayer.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
+            VideoWindowLayer.VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Center;
+            VideoWindowLayer.Width = Math.Round(innerW);
+            VideoWindowLayer.Height = Math.Round(innerH);
+        }
+
+        if (BlackGapOverlay != null)
+        {
+            BlackGapOverlay.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
+            BlackGapOverlay.VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Center;
+            BlackGapOverlay.Width = Math.Round(innerW);
+            BlackGapOverlay.Height = Math.Round(innerH);
+        }
+
         UpdatePlaybackCursor(_currentTimeSeconds);
     }
 
-    private void UpdateVideoWindowPadding()
+    private void UpdateVideoWindowRoundness()
     {
         if (VideoWindowLayer == null || ViewModel == null) return;
-        double padding = ViewModel.Padding;
-        double margin = 8 + padding * 3.6; // 8px to 80px
-        var t = new Thickness(margin);
-        VideoWindowLayer.Margin = t;
-        VideoWindowLayer.CornerRadius = new CornerRadius(ViewModel.Roundness);
-        if (BlackGapOverlay != null) BlackGapOverlay.Margin = t;
+        
+        VideoWindowLayer.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+        if (BlackGapOverlay != null) BlackGapOverlay.RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5);
+
+        if (ViewModel.IsVideoFrameEnabled)
+        {
+            // Margin yerine Scale kullanarak en-boy oranını (Aspect Ratio) koruyoruz.
+            // Böylece yanlarda siyah boşluk (letterbox) oluşmaz.
+            var scale = new Microsoft.UI.Xaml.Media.ScaleTransform { ScaleX = 0.92, ScaleY = 0.92 };
+            
+            VideoWindowLayer.Margin = new Thickness(0);
+            VideoWindowLayer.RenderTransform = scale;
+            VideoWindowLayer.CornerRadius = new CornerRadius(ViewModel.Roundness > 0 ? ViewModel.Roundness : 12);
+            
+            if (BlackGapOverlay != null) 
+            {
+                BlackGapOverlay.Margin = new Thickness(0);
+                BlackGapOverlay.RenderTransform = scale;
+                BlackGapOverlay.CornerRadius = new CornerRadius(ViewModel.Roundness > 0 ? ViewModel.Roundness : 12);
+            }
+        }
+        else
+        {
+            VideoWindowLayer.Margin = new Thickness(0);
+            VideoWindowLayer.RenderTransform = null;
+            VideoWindowLayer.CornerRadius = new CornerRadius(0);
+            
+            if (BlackGapOverlay != null)
+            {
+                BlackGapOverlay.Margin = new Thickness(0);
+                BlackGapOverlay.RenderTransform = null;
+                BlackGapOverlay.CornerRadius = new CornerRadius(0);
+            }
+        }
+    }
+
+    private void OnVideoFrameToggled(object sender, RoutedEventArgs e)
+    {
+        UpdateVideoWindowRoundness();
     }
 
     private Rect GetVideoContentRect()
@@ -2933,6 +2985,15 @@ public sealed partial class EditorPage : Page
         }
         catch { }
 
+        try
+        {
+            if (VideoPlayer?.MediaPlayer?.PlaybackSession != null && ts <= VideoPlayer.MediaPlayer.PlaybackSession.NaturalDuration)
+            {
+                VideoPlayer.MediaPlayer.Position = ts;
+            }
+        }
+        catch { }
+
         ViewModel.CurrentTimeSec = _currentTimeSeconds;
         TbCurrentTime.Text = FormatTime(_currentTimeSeconds);
         TbTimelineCurrent.Text = FormatTime(_currentTimeSeconds);
@@ -3107,12 +3168,7 @@ public sealed partial class EditorPage : Page
         if (ViewModel != null) ViewModel.MotionBlurAmount = e.NewValue;
     }
 
-    private void OnOpacityChanged(object sender, RangeBaseValueChangedEventArgs e)
-    {
-        if (!_isPageLoaded) return;
-        if (TbOpacity != null) TbOpacity.Text = $"{(int)e.NewValue}%";
-        if (ViewModel != null) ViewModel.BackgroundOpacity = e.NewValue;
-    }
+
 
     // Yeniden giriş kilidi: ses slider'larının birbirini döngüsel tetiklemesini önler
     private bool _isUpdatingVolume = false;
@@ -4236,46 +4292,90 @@ public sealed partial class EditorPage : Page
             {
                 case "Black":
                     ViewModel.CanvasBackground = "#0D0E15";
-                    ViewModel.BackgroundStyle = "dark";
+                    ApplyBackgroundGradient("#0D0E15", "#05050A");
                     break;
                 case "DarkGray":
                     ViewModel.CanvasBackground = "#1E1F27";
-                    ViewModel.BackgroundStyle = "gradient-1";
+                    ApplyBackgroundGradient("#1E1F27", "#101015");
                     break;
                 case "Purple":
                     ViewModel.CanvasBackground = "#1E1B4B";
-                    ViewModel.BackgroundStyle = "gradient-2";
+                    ApplyBackgroundGradient("#1E1B4B", "#0F0D25");
                     break;
                 case "Navy":
                     ViewModel.CanvasBackground = "#0C4A6E";
+                    ApplyBackgroundGradient("#0C4A6E", "#062537");
                     break;
                 case "Emerald":
                     ViewModel.CanvasBackground = "#064E3B";
+                    ApplyBackgroundGradient("#064E3B", "#03271D");
                     break;
                 case "Crimson":
                     ViewModel.CanvasBackground = "#4C0519";
+                    ApplyBackgroundGradient("#4C0519", "#26020C");
                     break;
                 case "Grad1":
                     ViewModel.CanvasBackground = "linear-gradient(135deg, #C0C1FF, #A078FF)";
+                    ApplyBackgroundGradient("#C0C1FF", "#A078FF");
                     break;
                 case "Grad2":
                     ViewModel.CanvasBackground = "linear-gradient(135deg, #3B82F6, #9333EA)";
+                    ApplyBackgroundGradient("#3B82F6", "#9333EA");
                     break;
                 case "Grad3":
                     ViewModel.CanvasBackground = "linear-gradient(135deg, #EC4899, #F43F5E)";
+                    ApplyBackgroundGradient("#EC4899", "#F43F5E");
                     break;
                 case "Grad4":
                     ViewModel.CanvasBackground = "linear-gradient(135deg, #10B981, #06B6D4)";
+                    ApplyBackgroundGradient("#10B981", "#06B6D4");
                     break;
                 case "Grad5":
                     ViewModel.CanvasBackground = "linear-gradient(135deg, #F59E0B, #EF4444)";
+                    ApplyBackgroundGradient("#F59E0B", "#EF4444");
                     break;
                 case "Grad6":
                     ViewModel.CanvasBackground = "linear-gradient(135deg, #6366F1, #D946EF)";
+                    ApplyBackgroundGradient("#6366F1", "#D946EF");
                     break;
             }
             ViewModel.SaveProject();
         }
+    }
+
+    private void ApplyBackgroundGradient(string hex1, string hex2)
+    {
+        if (PreviewBackgroundLayer != null)
+        {
+            var brush = new Microsoft.UI.Xaml.Media.LinearGradientBrush
+            {
+                StartPoint = new Windows.Foundation.Point(0, 0),
+                EndPoint = new Windows.Foundation.Point(1, 1)
+            };
+            brush.GradientStops.Add(new Microsoft.UI.Xaml.Media.GradientStop { Color = ParseColor(hex1), Offset = 0 });
+            brush.GradientStops.Add(new Microsoft.UI.Xaml.Media.GradientStop { Color = ParseColor(hex2), Offset = 1 });
+            PreviewBackgroundLayer.Background = brush;
+        }
+    }
+
+    private Windows.UI.Color ParseColor(string hex)
+    {
+        hex = hex.Replace("#", "");
+        byte a = 255, r = 255, g = 255, b = 255;
+        if (hex.Length == 8)
+        {
+            a = Convert.ToByte(hex.Substring(0, 2), 16);
+            r = Convert.ToByte(hex.Substring(2, 2), 16);
+            g = Convert.ToByte(hex.Substring(4, 2), 16);
+            b = Convert.ToByte(hex.Substring(6, 2), 16);
+        }
+        else if (hex.Length == 6)
+        {
+            r = Convert.ToByte(hex.Substring(0, 2), 16);
+            g = Convert.ToByte(hex.Substring(2, 2), 16);
+            b = Convert.ToByte(hex.Substring(4, 2), 16);
+        }
+        return Windows.UI.Color.FromArgb(a, r, g, b);
     }
 
     private void OnAddZoomClicked(object sender, RoutedEventArgs e)

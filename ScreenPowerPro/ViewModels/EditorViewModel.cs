@@ -843,6 +843,56 @@ public partial class EditorViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Timeline üzerindeki tüm kliplerin ve zoom efektlerinin son noktalarını kontrol ederek
+    /// TotalDurationSec değerini günceller.
+    /// </summary>
+    public void RecalculateTotalDuration()
+    {
+        double maxEnd = 0;
+        
+        if (VideoTrack?.Clips != null)
+        {
+            foreach (var clip in VideoTrack.Clips)
+            {
+                double end = clip.TrackOffset + (clip.SourceEnd - clip.SourceStart);
+                if (end > maxEnd) maxEnd = end;
+            }
+        }
+        
+        if (MicTrack?.Clips != null)
+        {
+            foreach (var clip in MicTrack.Clips)
+            {
+                double end = clip.TrackOffset + (clip.SourceEnd - clip.SourceStart);
+                if (end > maxEnd) maxEnd = end;
+            }
+        }
+        
+        if (SysTrack?.Clips != null)
+        {
+            foreach (var clip in SysTrack.Clips)
+            {
+                double end = clip.TrackOffset + (clip.SourceEnd - clip.SourceStart);
+                if (end > maxEnd) maxEnd = end;
+            }
+        }
+        
+        if (ZoomEffects != null)
+        {
+            foreach (var zoom in ZoomEffects)
+            {
+                double end = zoom.StartTime + zoom.Duration;
+                if (end > maxEnd) maxEnd = end;
+            }
+        }
+        
+        if (maxEnd > 0)
+        {
+            TotalDurationSec = maxEnd;
+        }
+    }
+
+    /// <summary>
     /// Süreye göre her bir parça (video, mic, sys) için ilk tam boy klibi oluşturur.
     /// </summary>
     public void InitClipsFromDuration(double duration)

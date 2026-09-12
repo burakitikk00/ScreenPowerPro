@@ -1004,6 +1004,9 @@ public sealed partial class EditorPage : Page
     {
         if (!_isPageLoaded || ViewModel == null) return;
         if (TimeRuler == null || VideoTrack == null || AudioTrack == null || ZoomTrack == null) return;
+        
+        ViewModel.RecalculateTotalDuration();
+        _totalDurationSeconds = ViewModel.TotalDurationSec;
 
         double totalWidth = Math.Max(_totalDurationSeconds * _timelineScale, 800);
         TimelineContentGrid.MinWidth = totalWidth + 120;
@@ -2095,14 +2098,11 @@ public sealed partial class EditorPage : Page
 
     private void UpdatePlayhead()
     {
-        if (PlayheadLine == null) return;
+        if (PlayheadLine == null || PlayheadContainer == null) return;
         double x = _currentTimeSeconds * _timelineScale;
-        Canvas.SetLeft(PlayheadLine, x - 1);
-        if (PlayheadTriangle != null)
-        {
-            Canvas.SetLeft(PlayheadTriangle, x);
-        }
-        PlayheadLine.Height = 22 + 72 + 56 + 56;
+        Canvas.SetLeft(PlayheadContainer, x - 10);
+        PlayheadContainer.Height = 22 + 72 + 56 + 56;
+        PlayheadLine.Height = PlayheadContainer.Height;
     }
 
     private void SelectZoom(ZoomEffect zoom, bool clearOthers = true)
@@ -2864,7 +2864,8 @@ public sealed partial class EditorPage : Page
             // 1. Playhead seek
             double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
             SeekToTime(clickSec);
-            _isDraggingPlayhead = true;
+            // Kırmızı playhead dışındaki bir yere tıklandığında _isDraggingPlayhead true olmasın,
+            // sadece timeline panning yapılsın. Playhead'i sürüklemek için doğrudan playhead'e tıklanacak.
 
             // 2. Drag-to-scroll pan hazırlığı
             _isPanningTimeline = true;
@@ -2906,11 +2907,18 @@ public sealed partial class EditorPage : Page
                     }
                 }
             }
-            else
+            else if (!_isPlaying)
             {
-                // Hover Scrub
+                // Hover Playhead
                 double hoverSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
-                SeekToTime(hoverSec);
+                if (HoverPlayheadLine != null && HoverPlayheadTriangle != null)
+                {
+                    HoverPlayheadLine.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
+                    HoverPlayheadTriangle.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
+                    double x = hoverSec * _timelineScale;
+                    Canvas.SetLeft(HoverPlayheadLine, x);
+                    Canvas.SetLeft(HoverPlayheadTriangle, x);
+                }
             }
         }
     }
@@ -2927,7 +2935,64 @@ public sealed partial class EditorPage : Page
 
     private void OnHoverScrubPointerExited(object sender, PointerRoutedEventArgs e)
     {
-        // No op for now
+        if (HoverPlayheadLine != null) HoverPlayheadLine.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
+        if (HoverPlayheadTriangle != null) HoverPlayheadTriangle.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
+    }
+
+    private void OnPlayheadPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is UIElement element)
+        {
+            e.Handled = true;
+            element.CapturePointer(e.Pointer);
+            
+            var ptr = e.GetCurrentPoint(TimelineContentGrid);
+            double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
+            SeekToTime(clickSec);
+            
+            _isDraggingPlayhead = true;
+            _isPanningTimeline = false; // Playhead sürüklerken timeline panning kapalı
+        }
+    }
+
+    private void OnPlayheadPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (_isDraggingPlayhead && sender is UIElement element)
+        {
+            e.Handled = true;
+            var ptr = e.GetCurrentPoint(TimelineContentGrid);
+            double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
+            SeekToTime(clickSec);
+
+            // Drag-to-scroll (edge scrolling) for playhead dragging
+            if (TimelineScrollViewer != null)
+            {
+                var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
+                if (scrollPt.X > TimelineScrollViewer.ActualWidth - 40)
+                {
+                    TimelineScrollViewer.ChangeView(TimelineScrollViewer.HorizontalOffset + 20, null, null, true);
+                }
+                else if (scrollPt.X < 40)
+                {
+                    TimelineScrollViewer.ChangeView(Math.Max(0, TimelineScrollViewer.HorizontalOffset - 20), null, null, true);
+                }
+            }
+        }
+    }
+
+    private void OnPlayheadPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is UIElement element)
+        {
+            e.Handled = true;
+            element.ReleasePointerCapture(e.Pointer);
+            _isDraggingPlayhead = false;
+        }
+    }
+
+    private void OnPlayheadPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        // Optional
     }
 
     private void OnVideoTrackPointerEntered(object sender, PointerRoutedEventArgs e)
@@ -5217,6 +5282,14 @@ public sealed partial class EditorPage : Page
             CursorCanvasTransform.ScaleY = VideoTransform.ScaleY;
             CursorCanvasTransform.TranslateX = VideoTransform.TranslateX;
             CursorCanvasTransform.TranslateY = VideoTransform.TranslateY;
+
+            if (_cursorTransform != null)
+            {
+                double baseScale = ViewModel.CursorSize > 0 ? ViewModel.CursorSize / 100.0 : 1.0;
+                double invScale = VideoTransform.ScaleX > 0 ? (1.0 / VideoTransform.ScaleX) : 1.0;
+                _cursorTransform.ScaleX = baseScale * invScale;
+                _cursorTransform.ScaleY = baseScale * invScale;
+            }
         }
 
         var moves = ViewModel.MouseMoves;

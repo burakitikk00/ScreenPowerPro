@@ -1460,8 +1460,7 @@ public sealed partial class EditorPage : Page
         contentGrid.Children.Add(lockButton);
         clipBlock.Child = contentGrid;
 
-        // ETKİLEŞİM: Sürükle-Bırak (Drag & Drop), Manyetik Yapışma (Snapping), Kenar Kırpma (Trimming)
-        bool isMoving = false;
+        // ETKİLEŞİM: Manyetik Yapışma (Snapping), Kenar Kırpma (Trimming), Zaman Çizgisi Sürükleme (Scrubbing)
         bool isTrimmingLeft = false;
         bool isTrimmingRight = false;
         bool hasActuallyMoved = false;
@@ -1469,9 +1468,6 @@ public sealed partial class EditorPage : Page
         double origOffset = 0;
         double origStart = 0;
         double origEnd = 0;
-        List<ClipSegment>? movingClips = null;
-        Dictionary<ClipSegment, double>? movingClipOffsets = null;
-        Dictionary<ClipSegment, Border>? movingClipBorders = null;
 
         clipBlock.PointerPressed += (s, e) =>
         {
@@ -1512,7 +1508,6 @@ public sealed partial class EditorPage : Page
             // Kilitli klibi sürükleme veya kırpma
             if (clip.IsLocked)
             {
-                isMoving = false;
                 isTrimmingLeft = false;
                 isTrimmingRight = false;
                 return;
@@ -1530,84 +1525,26 @@ public sealed partial class EditorPage : Page
             }
             else
             {
-                isMoving = true;
-                if (ViewModel != null)
-                {
-                    var trackClips = isAudioTrack ? ViewModel.MicTrack.Clips : ViewModel.VideoTrack.Clips;
-                    movingClips = trackClips.Where(c => ViewModel.IsClipSelected(c.Id) && !c.IsLocked).ToList();
-                    if (!movingClips.Contains(clip))
-                    {
-                        movingClips.Add(clip);
-                    }
-                    movingClipOffsets = movingClips.ToDictionary(c => c, c => c.TrackOffset);
-                    movingClipBorders = targetCanvas.Children.OfType<Border>()
-                        .Where(b => b.Tag is ClipSegment cs && movingClips.Contains(cs))
-                        .ToDictionary(b => (ClipSegment)b.Tag, b => b);
-                }
+                _isDraggingPlayhead = true;
+                _isPanningTimeline = false;
+                
+                double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
+                SeekToTime(clickSec);
             }
         };
 
         clipBlock.PointerMoved += (s, e) =>
         {
-            if (isMoving && movingClips != null && movingClipOffsets != null)
+            if (_isDraggingPlayhead)
             {
                 var ptr = e.GetCurrentPoint(targetCanvas);
-                double rawDx = ptr.Position.X - startPt.X;
-                if (Math.Abs(rawDx) > 3) hasActuallyMoved = true;
+                double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
+                SeekToTime(clickSec, true);
 
-                double dt = rawDx / _timelineScale;
-                double minOffset = movingClipOffsets.Values.Min();
-                if (minOffset + dt < 0)
+                if (TimelineScrollViewer != null)
                 {
-                    dt = -minOffset;
-                }
-
-                // Manyetik yapışma (snapping)
-                double candidatePrimaryOffset = Math.Max(0, origOffset + dt);
-                double curDur = clip.SourceEnd - clip.SourceStart;
-                var snapPoints = GetTimelineSnapPoints(clip);
-                var (snapL, snapTimeL) = TimelineMathService.FindSnapTime(candidatePrimaryOffset, snapPoints, _timelineScale, 15.0);
-                if (snapL)
-                {
-                    dt = snapTimeL - origOffset;
-                }
-                else
-                {
-                    var (snapR, snapTimeR) = TimelineMathService.FindSnapTime(candidatePrimaryOffset + curDur, snapPoints, _timelineScale, 15.0);
-                    if (snapR)
-                    {
-                        dt = (snapTimeR - curDur) - origOffset;
-                    }
-                }
-
-                // Sıkı çarpışma engelleme (Collision detection with stationary clips)
-                if (ViewModel != null)
-                {
-                    var trackClips = isAudioTrack ? ViewModel.MicTrack.Clips : ViewModel.VideoTrack.Clips;
-                    var nonMovingClips = trackClips.Where(c => !movingClips.Contains(c)).ToList();
-                    double minCandidateDt = -minOffset;
-                    double maxCandidateDt = double.MaxValue;
-                    foreach (var c in movingClips)
-                    {
-                        double dur = c.SourceEnd - c.SourceStart;
-                        double orig = movingClipOffsets[c];
-                        double cLeft = nonMovingClips.Where(o => o.TrackOffset + (o.SourceEnd - o.SourceStart) <= orig).Select(o => (double?)(o.TrackOffset + (o.SourceEnd - o.SourceStart))).Max() ?? 0.0;
-                        double cRight = nonMovingClips.Where(o => o.TrackOffset >= orig + dur).Select(o => (double?)o.TrackOffset).Min() ?? double.MaxValue;
-                        minCandidateDt = Math.Max(minCandidateDt, cLeft - orig);
-                        maxCandidateDt = Math.Min(maxCandidateDt, cRight - (orig + dur));
-                    }
-                    dt = Math.Clamp(dt, minCandidateDt, Math.Max(minCandidateDt, maxCandidateDt));
-                }
-
-                if (minOffset + dt < 0) dt = -minOffset;
-
-                foreach (var c in movingClips)
-                {
-                    c.TrackOffset = Math.Max(0, Math.Round(movingClipOffsets[c] + dt, 2));
-                    if (movingClipBorders != null && movingClipBorders.TryGetValue(c, out var b))
-                    {
-                        Canvas.SetLeft(b, TimelineMathService.TimeToPixel(c.TrackOffset, _timelineScale));
-                    }
+                    var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
+                    HandleEdgeScrolling(scrollPt.X);
                 }
             }
             else if (isTrimmingLeft)
@@ -1677,27 +1614,23 @@ public sealed partial class EditorPage : Page
         {
             clipBlock.ReleasePointerCapture(e.Pointer);
 
+            if (_isDraggingPlayhead)
+            {
+                _isDraggingPlayhead = false;
+                SeekToTime(_currentTimeSeconds, false);
+            }
+
             if (hasActuallyMoved)
             {
-                if (isMoving && ViewModel != null)
-                {
-                    var trackClips = isAudioTrack ? ViewModel.MicTrack.Clips : ViewModel.VideoTrack.Clips;
-                    trackClips.Sort((a, b) => a.TrackOffset.CompareTo(b.TrackOffset));
-                }
-
                 ViewModel?.PushHistory();
                 ViewModel?.SaveProject();
                 RenderTimeline();
                 UpdateGapBlackScreen();
             }
 
-            isMoving = false;
             isTrimmingLeft = false;
             isTrimmingRight = false;
             hasActuallyMoved = false;
-            movingClips = null;
-            movingClipOffsets = null;
-            movingClipBorders = null;
         };
 
         Canvas.SetLeft(clipBlock, startX);
@@ -1807,7 +1740,6 @@ public sealed partial class EditorPage : Page
         contentGrid.Children.Add(rightHandle);
         pill.Child = contentGrid;
 
-        bool isDragging = false;
         bool isTrimmingLeft = false;
         bool isTrimmingRight = false;
         bool hasActuallyMoved = false;
@@ -1817,7 +1749,7 @@ public sealed partial class EditorPage : Page
 
         pill.PointerEntered += (s, e) =>
         {
-            if (!isDragging && !isTrimmingLeft && !isTrimmingRight)
+            if (!_isDraggingPlayhead && !isTrimmingLeft && !isTrimmingRight)
             {
                 pill.BorderBrush = new SolidColorBrush(Color.FromArgb(255, 220, 200, 255));
             }
@@ -1825,7 +1757,7 @@ public sealed partial class EditorPage : Page
 
         pill.PointerExited += (s, e) =>
         {
-            if (!isDragging && !isTrimmingLeft && !isTrimmingRight)
+            if (!_isDraggingPlayhead && !isTrimmingLeft && !isTrimmingRight)
             {
                 pill.BorderBrush = isSelected
                     ? new SolidColorBrush(Color.FromArgb(255, 208, 188, 255))
@@ -1901,8 +1833,11 @@ public sealed partial class EditorPage : Page
             }
             else
             {
-                isDragging = true;
-                this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.SizeAll);
+                _isDraggingPlayhead = true;
+                _isPanningTimeline = false;
+                
+                double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
+                SeekToTime(clickSec);
             }
 
             pill.CapturePointer(e.Pointer);
@@ -1910,7 +1845,7 @@ public sealed partial class EditorPage : Page
 
         pill.PointerMoved += (s, e) =>
         {
-            if (!isDragging && !isTrimmingLeft && !isTrimmingRight)
+            if (!_isDraggingPlayhead && !isTrimmingLeft && !isTrimmingRight)
             {
                 var localPt = e.GetCurrentPoint(pill).Position;
                 double edgeThreshold = Math.Clamp(pill.Width * 0.28, 12.0, 18.0);
@@ -1920,12 +1855,26 @@ public sealed partial class EditorPage : Page
                 }
                 else
                 {
-                    this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
+                    this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Arrow);
                 }
                 return;
             }
 
             var ptr = e.GetCurrentPoint(ZoomTrack);
+
+            if (_isDraggingPlayhead)
+            {
+                double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
+                SeekToTime(clickSec, true);
+
+                if (TimelineScrollViewer != null)
+                {
+                    var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
+                    HandleEdgeScrolling(scrollPt.X);
+                }
+                return;
+            }
+
             double rawDx = ptr.Position.X - startPoint.X;
 
             if (!hasActuallyMoved && Math.Abs(rawDx) > 3.0)
@@ -1935,47 +1884,7 @@ public sealed partial class EditorPage : Page
 
             if (!hasActuallyMoved) return;
 
-            if (isDragging)
-            {
-                // Çarpışma / Üst üste binmeyi engelleme limitleri
-                var otherZooms = ViewModel.ZoomEffects.Where(z => z != zoom).ToList();
-                double leftLimit = otherZooms.Where(o => o.StartTime + o.Duration <= origStart).Select(o => (double?)(o.StartTime + o.Duration)).Max() ?? 0.0;
-                double rightLimit = otherZooms.Where(o => o.StartTime >= origStart + origDur).Select(o => (double?)o.StartTime).Min() ?? double.MaxValue;
-
-                double candidateStart = Math.Max(0, origStart + (rawDx / _timelineScale));
-                var snapPoints = GetTimelineSnapPoints(zoom);
-
-                // Sol kenar yapışması
-                var (snapL, snapTimeL) = TimelineMathService.FindSnapTime(candidateStart, snapPoints, _timelineScale, 15.0);
-                if (snapL)
-                {
-                    candidateStart = snapTimeL;
-                }
-                else
-                {
-                    // Sağ kenar yapışması
-                    var (snapR, snapTimeR) = TimelineMathService.FindSnapTime(candidateStart + origDur, snapPoints, _timelineScale, 15.0);
-                    if (snapR)
-                    {
-                        candidateStart = Math.Max(0, snapTimeR - origDur);
-                    }
-                }
-
-                // Sıkı kesişim / çarpışma sınırlandırması (Collision Clamp)
-                candidateStart = Math.Clamp(candidateStart, leftLimit, Math.Max(leftLimit, rightLimit - origDur));
-
-                zoom.StartTime = Math.Max(0, Math.Round(candidateStart, 2));
-                Canvas.SetLeft(pill, TimelineMathService.TimeToPixel(zoom.StartTime, _timelineScale));
-                _isUpdatingZoomInputs = true;
-                try
-                {
-                    if (NbZoomStart != null) NbZoomStart.Value = zoom.StartTime;
-                    if (NbZoomEnd != null) NbZoomEnd.Value = zoom.StartTime + zoom.Duration;
-                }
-                finally { _isUpdatingZoomInputs = false; }
-                UpdateZoomSimulation();
-            }
-            else if (isTrimmingLeft)
+            if (isTrimmingLeft)
             {
                 var otherZooms = ViewModel.ZoomEffects.Where(z => z != zoom).ToList();
                 double leftLimit = otherZooms.Where(o => o.StartTime + o.Duration <= origStart).Select(o => (double?)(o.StartTime + o.Duration)).Max() ?? 0.0;
@@ -2033,6 +1942,12 @@ public sealed partial class EditorPage : Page
             pill.ReleasePointerCapture(e.Pointer);
             this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Arrow);
 
+            if (_isDraggingPlayhead)
+            {
+                _isDraggingPlayhead = false;
+                SeekToTime(_currentTimeSeconds, false);
+            }
+
             if (hasActuallyMoved)
             {
                 ViewModel.PushHistory();
@@ -2041,7 +1956,6 @@ public sealed partial class EditorPage : Page
                 UpdateZoomSimulation();
             }
 
-            isDragging = false;
             isTrimmingLeft = false;
             isTrimmingRight = false;
             hasActuallyMoved = false;
@@ -2923,6 +2837,25 @@ public sealed partial class EditorPage : Page
         return Math.Clamp(rawTime, 0.0, _totalDurationSeconds);
     }
 
+    private void HandleEdgeScrolling(double viewportX)
+    {
+        if (TimelineScrollViewer == null) return;
+        double edgeZone = Math.Max(80.0, TimelineScrollViewer.ActualWidth * 0.08); // %8 veya min 80px
+        
+        if (viewportX > TimelineScrollViewer.ActualWidth - edgeZone)
+        {
+            double depth = Math.Clamp((viewportX - (TimelineScrollViewer.ActualWidth - edgeZone)) / edgeZone, 0.0, 1.0);
+            double speed = 10.0 + (50.0 * depth);
+            TimelineScrollViewer.ChangeView(TimelineScrollViewer.HorizontalOffset + speed, null, null, true);
+        }
+        else if (viewportX < edgeZone)
+        {
+            double depth = Math.Clamp((edgeZone - viewportX) / edgeZone, 0.0, 1.0);
+            double speed = 10.0 + (50.0 * depth);
+            TimelineScrollViewer.ChangeView(Math.Max(0.0, TimelineScrollViewer.HorizontalOffset - speed), null, null, true);
+        }
+    }
+
     private void OnHoverScrubPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         if (sender is UIElement element)
@@ -2966,28 +2899,21 @@ public sealed partial class EditorPage : Page
             if (_isDraggingPlayhead)
             {
                 double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
-                SeekToTime(clickSec);
+                SeekToTime(clickSec, true);
 
-                // Drag-to-scroll
                 if (TimelineScrollViewer != null)
                 {
                     var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
-                    if (scrollPt.X > TimelineScrollViewer.ActualWidth - 40)
-                    {
-                        TimelineScrollViewer.ChangeView(TimelineScrollViewer.HorizontalOffset + 20, null, null, true);
-                    }
-                    else if (scrollPt.X < 40)
-                    {
-                        TimelineScrollViewer.ChangeView(Math.Max(0, TimelineScrollViewer.HorizontalOffset - 20), null, null, true);
-                    }
-                    else if (_isPanningTimeline)
-                    {
-                        double diff = scrollPt.X - _panStartPoint.X;
-                        if (Math.Abs(diff) > 5)
-                        {
-                            TimelineScrollViewer.ChangeView(_panStartOffset - diff, null, null, true);
-                        }
-                    }
+                    HandleEdgeScrolling(scrollPt.X);
+                }
+            }
+            else if (_isPanningTimeline && TimelineScrollViewer != null)
+            {
+                var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
+                double diff = scrollPt.X - _panStartPoint.X;
+                if (Math.Abs(diff) > 5)
+                {
+                    TimelineScrollViewer.ChangeView(_panStartOffset - diff, null, null, true);
                 }
             }
             else if (!_isPlaying)
@@ -3017,6 +2943,10 @@ public sealed partial class EditorPage : Page
         if (sender is UIElement element)
         {
             element.ReleasePointerCapture(e.Pointer);
+            if (_isDraggingPlayhead)
+            {
+                SeekToTime(_currentTimeSeconds, false);
+            }
             _isDraggingPlayhead = false;
             _isPanningTimeline = false;
         }
@@ -3057,20 +2987,12 @@ public sealed partial class EditorPage : Page
             e.Handled = true;
             var ptr = e.GetCurrentPoint(TimelineContentGrid);
             double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
-            SeekToTime(clickSec);
+            SeekToTime(clickSec, true);
 
-            // Drag-to-scroll (edge scrolling) for playhead dragging
             if (TimelineScrollViewer != null)
             {
                 var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
-                if (scrollPt.X > TimelineScrollViewer.ActualWidth - 40)
-                {
-                    TimelineScrollViewer.ChangeView(TimelineScrollViewer.HorizontalOffset + 20, null, null, true);
-                }
-                else if (scrollPt.X < 40)
-                {
-                    TimelineScrollViewer.ChangeView(Math.Max(0, TimelineScrollViewer.HorizontalOffset - 20), null, null, true);
-                }
+                HandleEdgeScrolling(scrollPt.X);
             }
         }
     }
@@ -3081,6 +3003,10 @@ public sealed partial class EditorPage : Page
         {
             e.Handled = true;
             element.ReleasePointerCapture(e.Pointer);
+            if (_isDraggingPlayhead)
+            {
+                SeekToTime(_currentTimeSeconds, false);
+            }
             _isDraggingPlayhead = false;
         }
     }
@@ -3147,7 +3073,9 @@ public sealed partial class EditorPage : Page
         }
     }
 
-    public void SeekToTime(double time)
+    private DateTime _lastMediaSeekTime = DateTime.MinValue;
+
+    public void SeekToTime(double time, bool isFastScrub = false)
     {
         _currentTimeSeconds = Math.Clamp(time, 0, _totalDurationSeconds);
         _lastTriggeredClickTimestamp = -1;
@@ -3156,32 +3084,16 @@ public sealed partial class EditorPage : Page
         UpdateGapBlackScreen();
 
         var ts = TimeSpan.FromSeconds(_currentTimeSeconds);
-        try
-        {
-            if (_micPlayer?.PlaybackSession != null && ts <= _micPlayer.PlaybackSession.NaturalDuration)
-            {
-                _micPlayer.Position = ts;
-            }
-        }
-        catch { }
+        
+        bool shouldUpdateMedia = !isFastScrub || (DateTime.UtcNow - _lastMediaSeekTime).TotalMilliseconds >= 50;
 
-        try
+        if (shouldUpdateMedia)
         {
-            if (_sysPlayer?.PlaybackSession != null && ts <= _sysPlayer.PlaybackSession.NaturalDuration)
-            {
-                _sysPlayer.Position = ts;
-            }
+            try { if (_micPlayer?.PlaybackSession != null && ts <= _micPlayer.PlaybackSession.NaturalDuration) _micPlayer.Position = ts; } catch { }
+            try { if (_sysPlayer?.PlaybackSession != null && ts <= _sysPlayer.PlaybackSession.NaturalDuration) _sysPlayer.Position = ts; } catch { }
+            try { if (VideoPlayer?.MediaPlayer?.PlaybackSession != null && ts <= VideoPlayer.MediaPlayer.PlaybackSession.NaturalDuration) VideoPlayer.MediaPlayer.Position = ts; } catch { }
+            _lastMediaSeekTime = DateTime.UtcNow;
         }
-        catch { }
-
-        try
-        {
-            if (VideoPlayer?.MediaPlayer?.PlaybackSession != null && ts <= VideoPlayer.MediaPlayer.PlaybackSession.NaturalDuration)
-            {
-                VideoPlayer.MediaPlayer.Position = ts;
-            }
-        }
-        catch { }
 
         ViewModel.CurrentTimeSec = _currentTimeSeconds;
         TbCurrentTime.Text = FormatTime(_currentTimeSeconds);

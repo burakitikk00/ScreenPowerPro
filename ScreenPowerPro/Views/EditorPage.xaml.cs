@@ -91,9 +91,7 @@ public sealed partial class EditorPage : Page
     private DateTime _lastPlaybackTick = DateTime.UtcNow;
     private double _savedMasterVolume = 100.0;
 
-    private static Geometry? _arrowGeometry;
-    private static Geometry? _crosshairGeometry;
-    private static Geometry? _ibeamGeometry;
+
     private bool _isPageLoaded = false;
 
     public EditorPage()
@@ -195,7 +193,7 @@ public sealed partial class EditorPage : Page
         }
     }
 
-    private async void OnPageLoaded(object sender, RoutedEventArgs e)
+    private void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         _isPageLoaded = true;
         AppLog.Info("[EditorPage] OnPageLoaded tetiklendi. Bileşenler bağlanıyor...");
@@ -592,7 +590,6 @@ public sealed partial class EditorPage : Page
             if (player != null)
             {
                 player.AutoPlay = false;
-                player.IsVideoFrameServerEnabled = true; // WinUI 3 donanım (Hardware Acceleration) kaynaklı siyah ekran/çökmelerini önlemek için.
                 if (player.PlaybackSession != null)
                     player.PlaybackSession.PlaybackRate = 1.0;
 

@@ -101,7 +101,8 @@ public class GpuOptimizationService
                 
                 if (!wasAlreadySet)
                 {
-                    key.SetValue(exePath, prefValue, RegistryValueKind.String);
+                    // HATA ÇÖZÜMÜ: Bu satır WinUI 3 MediaPlayerElement'in siyah ekran kalmasına (veya çökmesine) sebep oluyor!
+                    // key.SetValue(exePath, prefValue, RegistryValueKind.String);
                     RequiresRestartForGpuChange = true;
                     AppLog.Info($"[GPU] Windows Grafik Tercihi Yüksek Performans olarak ayarlandı: {exePath} -> {prefValue}. Yeniden başlatma gerekiyor.");
                 }

@@ -2787,7 +2787,6 @@ public sealed partial class EditorPage : Page
         _lastTriggeredClickTimestamp = -1;
         _lastPlaybackTick = DateTime.UtcNow;
         PlayPauseIcon.Glyph = "\uE769";
-        if (PlayOverlay != null) PlayOverlay.Opacity = 0;
 
         UpdateGapBlackScreen();
 
@@ -2826,7 +2825,6 @@ public sealed partial class EditorPage : Page
         _isPlaying = false;
         _lastTriggeredClickTimestamp = -1;
         PlayPauseIcon.Glyph = "\uE768";
-        if (PlayOverlay != null) PlayOverlay.Opacity = 1;
 
         try { VideoPlayer?.MediaPlayer?.Pause(); } catch { }
         try { _micPlayer?.Pause(); } catch { }
@@ -2975,18 +2973,14 @@ public sealed partial class EditorPage : Page
 
         if (ViewModel.IsVideoFrameEnabled)
         {
-            // Margin yerine Scale kullanarak en-boy oranını (Aspect Ratio) koruyoruz.
-            // Böylece yanlarda siyah boşluk (letterbox) oluşmaz.
-            var scale = new Microsoft.UI.Xaml.Media.ScaleTransform { ScaleX = 0.92, ScaleY = 0.92 };
-            
             VideoWindowLayer.Margin = new Thickness(0);
-            VideoWindowLayer.RenderTransform = scale;
+            VideoWindowLayer.RenderTransform = null;
             VideoWindowLayer.CornerRadius = new CornerRadius(ViewModel.Roundness > 0 ? ViewModel.Roundness : 12);
             
             if (BlackGapOverlay != null) 
             {
                 BlackGapOverlay.Margin = new Thickness(0);
-                BlackGapOverlay.RenderTransform = scale;
+                BlackGapOverlay.RenderTransform = null;
                 BlackGapOverlay.CornerRadius = new CornerRadius(ViewModel.Roundness > 0 ? ViewModel.Roundness : 12);
             }
         }
@@ -3007,6 +3001,10 @@ public sealed partial class EditorPage : Page
 
     private void OnVideoFrameToggled(object sender, RoutedEventArgs e)
     {
+        if (sender is Microsoft.UI.Xaml.Controls.ToggleSwitch ts && ViewModel != null)
+        {
+            ViewModel.IsVideoFrameEnabled = ts.IsOn;
+        }
         UpdateVideoWindowRoundness();
     }
 

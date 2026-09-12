@@ -1407,12 +1407,10 @@
 
             <!-- 2: VIDEO CANVAS (CENTER) -->
             <Border Grid.Column="2"
-                Margin="16"
-                Background="#0D0E15"
-                CornerRadius="12"
-                BorderBrush="{StaticResource GlassBorderBrush}"
-                BorderThickness="1">
-                <Grid x:Name="VideoCanvasHost" SizeChanged="OnVideoCanvasHostSizeChanged">
+                Margin="0"
+                Background="Transparent"
+                BorderThickness="0">
+                <Grid x:Name="VideoCanvasHost" SizeChanged="OnVideoCanvasHostSizeChanged" Margin="0" Padding="0">
                     <!-- Radial glow background -->
                     <Ellipse Width="600" Height="400" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Ellipse.Fill>
@@ -1426,10 +1424,12 @@
                     <!-- 16:9 Video container -->
                     <Border x:Name="VideoContainer"
                             CornerRadius="10"
-                            HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Grid>
+                            Margin="0" Padding="0"
+                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <Grid Margin="0" Padding="0">
                             <!-- Layer 0: Dynamic Background -->
                             <Border x:Name="PreviewBackgroundLayer"
+                                    Margin="0" Padding="0"
                                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -1442,7 +1442,7 @@
                                    Stretch="UniformToFill" Visibility="Collapsed"/>
 
                             <!-- Zoom Transform Grid -->
-                            <Grid RenderTransformOrigin="0.5,0.5">
+                            <Grid RenderTransformOrigin="0.5,0.5" Margin="0" Padding="0">
                                 <Grid.RenderTransform>
                                     <CompositeTransform x:Name="VideoTransform"
                                         ScaleX="1.0" ScaleY="1.0"
@@ -1450,13 +1450,15 @@
                                 </Grid.RenderTransform>
 
                                 <!-- Layer 1: Scaled Video Window -->
-                                <Border x:Name="VideoWindowLayer" Translation="0,0,32">
+                                <Border x:Name="VideoWindowLayer" Translation="0,0,32" Margin="0" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                     <Border.Shadow>
                                         <ThemeShadow />
                                     </Border.Shadow>
                                     <MediaPlayerElement x:Name="VideoPlayer"
+                                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                                         AutoPlay="False" AreTransportControlsEnabled="False"
                                         Stretch="Uniform" MinHeight="200"/>
+                                        <!-- Alternatif boşluksuz kaplama için: Stretch="UniformToFill" -->
                                 </Border>
 
                                 <!-- Layer 2: Black Gap Overlay -->
@@ -1479,23 +1481,7 @@
                                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                                         Click="OnVideoCanvasClicked"/>
 
-                                <Border x:Name="PlayOverlay"
-                                        Background="#660D0E15"
-                                        CornerRadius="10"
-                                        HorizontalAlignment="Stretch"
-                                        VerticalAlignment="Stretch"
-                                        Opacity="1"
-                                        IsHitTestVisible="False">
-                                    <Border Width="64" Height="64" CornerRadius="32"
-                                            Background="#33C0C1FF"
-                                            BorderBrush="#80C0C1FF" BorderThickness="1"
-                                            HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <FontIcon x:Name="PlayOverlayIcon"
-                                                  Glyph="&#xE768;" FontSize="28"
-                                                  Foreground="{StaticResource PrimaryAccentBrush}"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                </Border>
+
 
                                 <!-- No video file warning message -->
                                 <StackPanel x:Name="NoVideoMessage"

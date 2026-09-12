@@ -2136,8 +2136,9 @@ public sealed partial class EditorPage : Page
         if (PlayheadLine == null || PlayheadContainer == null) return;
         double x = _currentTimeSeconds * _timelineScale;
         Canvas.SetLeft(PlayheadContainer, x - 10);
-        PlayheadContainer.Height = 22 + 72 + 56 + 56;
-        PlayheadLine.Height = PlayheadContainer.Height;
+        // Playhead tıklama alanını (hitbox) sadece üst kısımdaki zaman cetveli ile sınırla (22px)
+        PlayheadContainer.Height = 22;
+        PlayheadLine.Height = 22 + 72 + 56 + 56;
     }
 
     private void SelectZoom(ZoomEffect zoom, bool clearOthers = true)
@@ -3196,6 +3197,17 @@ public sealed partial class EditorPage : Page
             e.Handled = true;
             double targetOffset = TimelineScrollViewer.HorizontalOffset - (delta * 0.7);
             TimelineScrollViewer.ChangeView(targetOffset, null, null, true);
+        }
+    }
+
+    private void OnPageKeyUp(object sender, KeyRoutedEventArgs e)
+    {
+        var focused = FocusManager.GetFocusedElement(this.XamlRoot);
+        if (focused is TextBox || focused is NumberBox) return;
+
+        if (e.Key == Windows.System.VirtualKey.Space)
+        {
+            e.Handled = true;
         }
     }
 

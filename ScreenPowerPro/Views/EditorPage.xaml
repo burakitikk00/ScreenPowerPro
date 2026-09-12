@@ -9,6 +9,7 @@
     mc:Ignorable="d"
     IsTabStop="True"
     PreviewKeyDown="OnPageKeyDown"
+    PreviewKeyUp="OnPageKeyUp"
     Background="{StaticResource SurfaceContainerLowestBrush}">
 
     <Page.Resources>

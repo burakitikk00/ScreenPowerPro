@@ -1463,19 +1463,20 @@
                             <SolidColorBrush Color="#000000"/>
                         </Border.Background>
 
-                        <Grid>
-                            <!-- MediaPlayer with live zoom simulation transform -->
+                        <Grid RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <CompositeTransform x:Name="VideoTransform" ScaleX="1.0" ScaleY="1.0" TranslateX="0" TranslateY="0"/>
+                            </Grid.RenderTransform>
+
+                            <!-- MediaPlayer -->
                             <MediaPlayerElement
                                 x:Name="VideoPlayer"
                                 AutoPlay="False"
                                 AreTransportControlsEnabled="False"
+                                Stretch="Uniform"
                                 HorizontalAlignment="Stretch"
                                 VerticalAlignment="Stretch"
-                                MinHeight="200"
-                                RenderTransformOrigin="0.5,0.5">
-                                <MediaPlayerElement.RenderTransform>
-                                    <CompositeTransform x:Name="VideoTransform" ScaleX="1.0" ScaleY="1.0" TranslateX="0" TranslateY="0"/>
-                                </MediaPlayerElement.RenderTransform>
+                                MinHeight="200">
                             </MediaPlayerElement>
 
                             <!-- Pure Black Screen Overlay for Timeline Gaps -->

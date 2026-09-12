@@ -58,6 +58,12 @@ public sealed partial class EditorPage : Page
 
     private Windows.Media.Playback.MediaPlayer? _micPlayer;
     private Windows.Media.Playback.MediaPlayer? _sysPlayer;
+
+    // Prepared sources - set during OnNavigatedTo, attached to player after OnPageLoaded
+    private MediaSource? _pendingVideoSource;
+    private MediaSource? _pendingMicSource;
+    private MediaSource? _pendingSysSource;
+    private bool _videoAttachInProgress = false; // Guard against double DoAttachVideoToPlayer calls
     private bool _isDraggingPlayhead = false;
 
     // Timeline Pan / Drag / Cut Point state
@@ -184,7 +190,8 @@ public sealed partial class EditorPage : Page
 
         if (CbDontShowGpuWarning != null && CbDontShowGpuWarning.IsChecked == true)
         {
-            Windows.Storage.ApplicationData.Current.LocalSettings.Values["HideGpuWarning"] = true;
+            try { Windows.Storage.ApplicationData.Current.LocalSettings.Values["HideGpuWarning"] = true; }
+            catch { /* Unpackaged modda yoksay */ }
         }
     }
 
@@ -194,7 +201,9 @@ public sealed partial class EditorPage : Page
         AppLog.Info("[EditorPage] OnPageLoaded tetiklendi. Bileşenler bağlanıyor...");
 
         // GPU Uyarı kontrolü
-        bool hideGpuWarning = Windows.Storage.ApplicationData.Current.LocalSettings.Values["HideGpuWarning"] as bool? ?? false;
+        bool hideGpuWarning = false;
+        try { hideGpuWarning = Windows.Storage.ApplicationData.Current.LocalSettings.Values["HideGpuWarning"] as bool? ?? false; }
+        catch { /* Unpackaged modda ApplicationData.Current kullanılamaz */ }
         if (App.ShowIntegratedGpuWarning && GpuWarningBanner != null && !hideGpuWarning)
         {
             GpuWarningBanner.Visibility = Visibility.Visible;
@@ -248,6 +257,14 @@ public sealed partial class EditorPage : Page
 
         AppLog.Success("[EditorPage] OnPageLoaded tamamlandı, sayfa hazır.");
 
+        // Phase 2: Attach media to player now that visual tree + D3D surface are ready.
+        // If LoadVideoAsync already ran and has a pending source, attach it now.
+        if (_pendingVideoSource != null)
+        {
+            AppLog.Info("[EditorPage] OnPageLoaded: Bekleyen video kaynağı bulundu, player'a bağlanıyor.");
+            AttachVideoToPlayer();
+        }
+
         ViewModel.PropertyChanged += (s, args) =>
         {
             if (args.PropertyName == nameof(EditorViewModel.SeekVersion))
@@ -297,10 +314,8 @@ public sealed partial class EditorPage : Page
 
         ViewModel.NavigateToExport += OnNavigateToExport;
 
-        if (VideoPlayer.Source == null && !string.IsNullOrEmpty(ViewModel.VideoPath))
-        {
-            await LoadVideoAsync();
-        }
+        // NOTE: If a video source was already prepared by OnNavigatedTo, it was already
+        // attached above via AttachVideoToPlayer(). Do NOT call LoadVideoAsync() again here.
     }
 
     private void OnNavigateToExport(string projectDir)
@@ -440,41 +455,146 @@ public sealed partial class EditorPage : Page
         if (BtnAddZoomTrack != null) ToolTipService.SetToolTip(BtnAddZoomTrack, _loc["Editor_Timeline_AddZoom"]);
     }
 
+    private bool _isLoadingVideo = false;
+
     public async Task LoadVideoAsync()
     {
-        if (string.IsNullOrEmpty(ViewModel.VideoPath)) return;
-
-        string videoPath = ViewModel.VideoPath;
-
-        if (!File.Exists(videoPath))
-        {
-            if (NoVideoMessage != null)
-            {
-                NoVideoMessage.Visibility = Visibility.Visible;
-                TbMissingVideoPath.Text = videoPath;
-            }
-            return;
-        }
-
-        if (NoVideoMessage != null)
-        {
-            NoVideoMessage.Visibility = Visibility.Collapsed;
-        }
+        if (_isLoadingVideo) return;
+        _isLoadingVideo = true;
 
         try
         {
-            var storageFile = await StorageFile.GetFileFromPathAsync(videoPath);
-            var mediaSource = MediaSource.CreateFromStorageFile(storageFile);
-            VideoPlayer.Source = mediaSource;
+            await Task.Yield();
+            if (string.IsNullOrEmpty(ViewModel.VideoPath)) return;
 
+            string videoPath = ViewModel.VideoPath;
+
+            if (!File.Exists(videoPath))
+            {
+                if (NoVideoMessage != null)
+                {
+                    NoVideoMessage.Visibility = Visibility.Visible;
+                    TbMissingVideoPath.Text = videoPath;
+                }
+                return;
+            }
+
+            if (NoVideoMessage != null)
+                NoVideoMessage.Visibility = Visibility.Collapsed;
+
+            // Phase 1: Create MediaSources (can happen before visual tree is ready)
+            _pendingVideoSource = await CreateMediaSourceSafeAsync(videoPath);
+            if (_pendingVideoSource == null)
+            {
+                AppLog.Error($"[EditorPage] MediaSource oluşturulamadı: {videoPath}");
+                return;
+            }
+
+            _pendingVideoSource.OpenOperationCompleted += (s, e) =>
+            {
+                if (e.Error != null)
+                    DispatcherQueue.TryEnqueue(() => AppLog.Error($"[EditorPage] MediaSource OpenOperation hatası: {e.Error.ExtendedError?.Message} (0x{e.Error.ExtendedError?.HResult:X8})"));
+                else
+                    DispatcherQueue.TryEnqueue(() => AppLog.Success("[EditorPage] MediaSource OpenOperationCompleted başarıyla tetiklendi."));
+            };
+
+            // Audio sources (these don't need visual tree)
+            if (ViewModel != null && !string.IsNullOrEmpty(ViewModel.MicAudioPath) && File.Exists(ViewModel.MicAudioPath))
+                _pendingMicSource = await CreateMediaSourceSafeAsync(ViewModel.MicAudioPath);
+
+            if (ViewModel != null && !string.IsNullOrEmpty(ViewModel.SystemAudioPath) && File.Exists(ViewModel.SystemAudioPath))
+                _pendingSysSource = await CreateMediaSourceSafeAsync(ViewModel.SystemAudioPath);
+
+            if (ViewModel != null && Math.Abs(ViewModel.VideoSpeed - 1.0) > 0.01)
+                ViewModel.VideoSpeed = 1.0;
+
+            // Phase 2: Attach to player - only if visual tree is already ready
+            // If OnPageLoaded hasn't fired yet, it will call AttachVideoToPlayer itself.
+            if (_isPageLoaded)
+            {
+                AppLog.Info("[EditorPage] Sayfa zaten hazır, player'a direkt bağlanılıyor.");
+                AttachVideoToPlayer();
+            }
+            else
+            {
+                AppLog.Info("[EditorPage] Sayfa henüz hazır değil, OnPageLoaded bekleniyor.");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"[EditorPage] LoadVideoAsync hatası: {ex.Message}", ex);
+        }
+        finally
+        {
+            _isLoadingVideo = false;
+        }
+    }
+
+    /// <summary>
+    /// Phase 2: Attaches the prepared MediaSource to the MediaPlayer.
+    /// Must be called AFTER OnPageLoaded so the MediaPlayerElement is in the
+    /// visual tree and has a valid D3D11 render surface.
+    /// We add an extra 150ms delay to let the DXVA2 hardware decoder context
+    /// fully initialise before setting the source.
+    /// </summary>
+    private void AttachVideoToPlayer()
+    {
+        if (_pendingVideoSource == null)
+        {
+            AppLog.Warn("[EditorPage] AttachVideoToPlayer: pendingVideoSource null, atlanıyor.");
+            return;
+        }
+
+        AppLog.Info("[EditorPage] AttachVideoToPlayer: 150ms gecikme başlatılıyor (DXVA2 init bekleniyor)...");
+
+        // Give the D3D11/DXVA2 hardware decoder context a moment to fully initialise
+        // after the visual tree is ready. Without this delay the MediaPlayer may fail
+        // with MF_E_UNSUPPORTED_FORMAT (0xC00D36FA) even though the file is valid.
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        timer.Tick += (s, e) =>
+        {
+            timer.Stop();
+            DoAttachVideoToPlayer();
+        };
+        timer.Start();
+    }
+
+    private void DoAttachVideoToPlayer()
+    {
+        // Guard: prevent double execution (can be triggered from both OnPageLoaded and LoadVideoAsync)
+        if (_videoAttachInProgress)
+        {
+            AppLog.Warn("[EditorPage] DoAttachVideoToPlayer: zaten çalışıyor, tekrar çağrı engellendi.");
+            return;
+        }
+        _videoAttachInProgress = true;
+
+        // Capture and clear the pending source so no other call can use it
+        var videoSource = _pendingVideoSource;
+        var micSource = _pendingMicSource;
+        var sysSource = _pendingSysSource;
+        _pendingVideoSource = null;
+        _pendingMicSource = null;
+        _pendingSysSource = null;
+
+        if (videoSource == null)
+        {
+            AppLog.Warn("[EditorPage] DoAttachVideoToPlayer: videoSource null, atlanıyor.");
+            _videoAttachInProgress = false;
+            return;
+        }
+
+        AppLog.Info("[EditorPage] DoAttachVideoToPlayer başlatılıyor...");
+
+        try
+        {
             var player = VideoPlayer.MediaPlayer;
             if (player != null)
             {
                 player.AutoPlay = false;
                 if (player.PlaybackSession != null)
-                {
                     player.PlaybackSession.PlaybackRate = 1.0;
-                }
+
                 player.MediaEnded -= OnMediaPlayerEnded;
                 player.MediaEnded += OnMediaPlayerEnded;
                 player.MediaOpened -= OnMediaPlayerOpened;
@@ -483,59 +603,64 @@ public sealed partial class EditorPage : Page
                 player.MediaFailed += OnMediaPlayerFailed;
             }
 
-            if (ViewModel != null && Math.Abs(ViewModel.VideoSpeed - 1.0) > 0.01)
-            {
-                ViewModel.VideoSpeed = 1.0;
-            }
+            AppLog.Info("[EditorPage] VideoPlayer.Source set ediliyor (DXVA2 hazır)...");
+            VideoPlayer.Source = videoSource;
 
-            // Mikrofon ses çalarını başlat
-            if (ViewModel != null && !string.IsNullOrEmpty(ViewModel.MicAudioPath) && File.Exists(ViewModel.MicAudioPath))
-            {
-                try
-                {
-                    var micFile = await StorageFile.GetFileFromPathAsync(ViewModel.MicAudioPath);
-                    _micPlayer = new Windows.Media.Playback.MediaPlayer
-                    {
-                        Source = MediaSource.CreateFromStorageFile(micFile),
-                        AutoPlay = false,
-                        Volume = ViewModel.MicMuted ? 0 : (ViewModel.MicVolume / 100.0)
-                    };
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[EditorPage] Mic audio player hatası: {ex}");
-                }
-            }
-
-            // Sistem sesi çalarını başlat
-            if (ViewModel != null && !string.IsNullOrEmpty(ViewModel.SystemAudioPath) && File.Exists(ViewModel.SystemAudioPath))
-            {
-                try
-                {
-                    var sysFile = await StorageFile.GetFileFromPathAsync(ViewModel.SystemAudioPath);
-                    _sysPlayer = new Windows.Media.Playback.MediaPlayer
-                    {
-                        Source = MediaSource.CreateFromStorageFile(sysFile),
-                        AutoPlay = false,
-                        Volume = ViewModel.SysVolume / 100.0
-                    };
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[EditorPage] Sys audio player hatası: {ex}");
-                }
-            }
+            if (player?.PlaybackSession?.NaturalDuration > TimeSpan.Zero)
+                OnMediaPlayerOpened(player, null!);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[EditorPage] LoadVideoAsync hatası: {ex}");
+            AppLog.Error($"[EditorPage] DoAttachVideoToPlayer video player hatası: {ex.Message}", ex);
         }
+        finally
+        {
+            _videoAttachInProgress = false;
+        }
+
+        // Audio players
+        try
+        {
+            _micPlayer?.Dispose();
+            _micPlayer = null;
+            if (micSource != null)
+            {
+                _micPlayer = new Windows.Media.Playback.MediaPlayer
+                {
+                    Source = micSource,
+                    AutoPlay = false,
+                    Volume = ViewModel?.MicMuted == true ? 0 : ((ViewModel?.MicVolume ?? 100) / 100.0)
+                };
+                AppLog.Info("[EditorPage] Mikrofon player bağlandı.");
+            }
+        }
+        catch (Exception ex) { AppLog.Warn($"[EditorPage] Mic audio player hatası: {ex.Message}"); }
+
+        try
+        {
+            _sysPlayer?.Dispose();
+            _sysPlayer = null;
+            if (sysSource != null)
+            {
+                _sysPlayer = new Windows.Media.Playback.MediaPlayer
+                {
+                    Source = sysSource,
+                    AutoPlay = false,
+                    Volume = (ViewModel?.SysVolume ?? 100) / 100.0
+                };
+                AppLog.Info("[EditorPage] Sistem sesi player bağlandı.");
+            }
+        }
+        catch (Exception ex) { AppLog.Warn($"[EditorPage] Sys audio player hatası: {ex.Message}"); }
+
+        AppLog.Success("[EditorPage] DoAttachVideoToPlayer tamamlandı.");
     }
 
     private void OnMediaPlayerOpened(Windows.Media.Playback.MediaPlayer sender, object args)
     {
         DispatcherQueue.TryEnqueue(() =>
         {
+            AppLog.Success("[EditorPage] MediaPlayer başarıyla yüklendi (MediaOpened).");
             var session = sender.PlaybackSession;
             if (session != null && session.NaturalDuration > TimeSpan.Zero)
             {
@@ -566,6 +691,9 @@ public sealed partial class EditorPage : Page
                     }
                     UpdateVideoContainerBounds();
                 }
+
+                // İlk frame'i göster (AutoPlay=false ile kara ekran olmaması için)
+                try { sender.PlaybackSession.Position = TimeSpan.Zero; } catch { }
             }
         });
     }
@@ -579,11 +707,82 @@ public sealed partial class EditorPage : Page
         });
     }
 
+    private static async Task<MediaSource> CreateMediaSourceSafeAsync(string filePath)
+    {
+        AppLog.Info($"[EditorPage] CreateMediaSourceSafeAsync çağrıldı. Dosya: {filePath}");
+
+        if (!System.IO.File.Exists(filePath))
+        {
+            AppLog.Warn($"[EditorPage] Uyarı: {filePath} dosyası bulunamadı.");
+            return null!;
+        }
+
+        var fileInfo = new System.IO.FileInfo(filePath);
+        AppLog.Info($"[EditorPage] Dosya boyutu: {fileInfo.Length} byte, Uzantı: {fileInfo.Extension}");
+
+        string ext = fileInfo.Extension.ToLowerInvariant();
+
+        // Primary: CreateFromStream with explicit MIME type.
+        // This forces Windows MF to use the correct decoder without URI-based
+        // format guessing, which can fail with MF_E_UNSUPPORTED_FORMAT (0xC00D36FA)
+        // for H.264 in unpackaged WinUI3 apps.
+        try
+        {
+            var storageFile = await StorageFile.GetFileFromPathAsync(filePath);
+            var stream = await storageFile.OpenReadAsync();
+            string mimeType = ext switch
+            {
+                ".mp4"  => "video/mp4",
+                ".mov"  => "video/quicktime",
+                ".mkv"  => "video/x-matroska",
+                ".avi"  => "video/avi",
+                ".wmv"  => "video/x-ms-wmv",
+                ".wav"  => "audio/wav",
+                ".mp3"  => "audio/mpeg",
+                ".aac"  => "audio/aac",
+                ".m4a"  => "audio/mp4",
+                _       => "application/octet-stream"
+            };
+            var source = MediaSource.CreateFromStream(stream, mimeType);
+            AppLog.Info($"[EditorPage] MediaSource.CreateFromStream başarılı (MIME: {mimeType}).");
+            return source;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"[EditorPage] CreateFromStream başarısız, CreateFromUri deneniyor: {ex.Message}");
+        }
+
+        // Fallback: CreateFromUri
+        try
+        {
+            var fileUri = new Uri(filePath);
+            var source = MediaSource.CreateFromUri(fileUri);
+            AppLog.Info($"[EditorPage] MediaSource.CreateFromUri başarılı.");
+            return source;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"[EditorPage] Her iki yöntem de başarısız oldu: {ex.Message} \nStack Trace: {ex.StackTrace}");
+            return null!;
+        }
+    }
+
     private void OnMediaPlayerFailed(Windows.Media.Playback.MediaPlayer sender, MediaPlayerFailedEventArgs args)
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            System.Diagnostics.Debug.WriteLine($"[EditorPage] Medya oynatıcı hatası: {args.ErrorMessage}");
+            string currentVideoPath = ViewModel?.VideoPath ?? "Bilinmiyor";
+            string currentAudioPath = ViewModel?.SystemAudioPath ?? "Bilinmiyor";
+            string currentMicPath = ViewModel?.MicAudioPath ?? "Bilinmiyor";
+
+            AppLog.Error($"[EditorPage] Medya oynatıcı hatası! \n" +
+                         $"Error: {args.Error}\n" +
+                         $"HResult: 0x{args.ExtendedErrorCode?.HResult:X8}\n" +
+                         $"Message: '{args.ErrorMessage}'\n" +
+                         $"Exception: '{args.ExtendedErrorCode?.Message}'\n" +
+                         $"Active VideoPath: {currentVideoPath}\n" +
+                         $"Active SystemAudioPath: {currentAudioPath}\n" +
+                         $"Active MicAudioPath: {currentMicPath}");
         });
     }
 
@@ -1460,7 +1659,8 @@ public sealed partial class EditorPage : Page
     private Border AddZoomPill(ZoomEffect zoom)
     {
         double x = TimelineMathService.TimeToPixel(zoom.StartTime, _timelineScale);
-        double width = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 24);
+        double exactWidth = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 0);
+        double width = Math.Max(exactWidth, 10); // Ensure it's at least 10px to be clickable, but not 24px which breaks sync heavily.
 
         bool isSelected = _selectedZoomIds.Contains(zoom.Id) || _selectedZoom == zoom;
 
@@ -1498,7 +1698,7 @@ public sealed partial class EditorPage : Page
         // 2. Sol Kenar Tutamacı (In-Point / Start Time Trimming)
         var leftHandle = new Border
         {
-            Width = 14,
+            Width = 8,
             HorizontalAlignment = HorizontalAlignment.Left,
             Background = isSelected
                 ? new SolidColorBrush(Color.FromArgb(90, 255, 255, 255))
@@ -1522,7 +1722,7 @@ public sealed partial class EditorPage : Page
         // 3. Sağ Kenar Tutamacı (Out-Point / Duration Trimming)
         var rightHandle = new Border
         {
-            Width = 14,
+            Width = 8,
             HorizontalAlignment = HorizontalAlignment.Right,
             Background = isSelected
                 ? new SolidColorBrush(Color.FromArgb(90, 255, 255, 255))
@@ -1731,7 +1931,8 @@ public sealed partial class EditorPage : Page
                 zoom.StartTime = Math.Round(candidateStart, 2);
                 zoom.Duration = Math.Round(fixedEnd - zoom.StartTime, 2);
 
-                pill.Width = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 24);
+                double exactPillWidth = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 0);
+                pill.Width = Math.Max(exactPillWidth, 10);
                 Canvas.SetLeft(pill, TimelineMathService.TimeToPixel(zoom.StartTime, _timelineScale));
                 _isUpdatingZoomInputs = true;
                 try
@@ -1755,7 +1956,8 @@ public sealed partial class EditorPage : Page
                 candidateEnd = Math.Clamp(candidateEnd, zoom.StartTime + 0.2, rightLimit);
                 zoom.Duration = Math.Round(candidateEnd - zoom.StartTime, 2);
 
-                pill.Width = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 24);
+                double exactPillWidth = TimelineMathService.DurationToWidth(zoom.Duration, _timelineScale, 0);
+                pill.Width = Math.Max(exactPillWidth, 10);
                 _isUpdatingZoomInputs = true;
                 try
                 {
@@ -2128,7 +2330,7 @@ public sealed partial class EditorPage : Page
     private bool IsCurrentTimeInVideoGap(double time)
     {
         if (ViewModel?.VideoTrack?.Clips == null || ViewModel.VideoTrack.Clips.Count == 0)
-            return true;
+            return false;
 
         foreach (var clip in ViewModel.VideoTrack.Clips)
         {
@@ -2163,18 +2365,29 @@ public sealed partial class EditorPage : Page
                     try { VideoPlayer.MediaPlayer.Position = targetTs; } catch { }
                 }
 
-                if (_isPlaying && VideoPlayer.MediaPlayer.PlaybackSession.PlaybackState != Windows.Media.Playback.MediaPlaybackState.Playing)
+                try
                 {
-                    try { VideoPlayer.MediaPlayer.Play(); } catch { }
+                    if (_isPlaying && VideoPlayer.MediaPlayer.PlaybackSession.PlaybackState != Windows.Media.Playback.MediaPlaybackState.Playing)
+                    {
+                        VideoPlayer.MediaPlayer.Play();
+                    }
                 }
+                catch { }
             }
         }
         else if (isGap)
         {
-            if (VideoPlayer?.MediaPlayer != null && VideoPlayer.MediaPlayer.PlaybackSession.CanPause &&
-                VideoPlayer.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing)
+            if (VideoPlayer?.MediaPlayer != null)
             {
-                try { VideoPlayer.MediaPlayer.Pause(); } catch { }
+                try
+                {
+                    if (VideoPlayer.MediaPlayer.PlaybackSession.CanPause &&
+                        VideoPlayer.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing)
+                    {
+                        VideoPlayer.MediaPlayer.Pause();
+                    }
+                }
+                catch { }
             }
         }
     }
@@ -3199,6 +3412,7 @@ public sealed partial class EditorPage : Page
 
     private void OnVideoAudioAnimTick(object? sender, object e)
     {
+        if (!_isPlaying) return;
         if (VideoAudioBar1 == null || VideoAudioBar2 == null || VideoAudioBar3 == null || ViewModel == null) return;
 
         bool isMuted = (ViewModel.VideoTrack?.Muted ?? false) || ViewModel.SysVolume <= 0;
@@ -3459,6 +3673,7 @@ public sealed partial class EditorPage : Page
 
     private void OnZoomPreviewTimerTick(object? sender, object e)
     {
+        if (PanelTabZoom == null || PanelTabZoom.Visibility != Visibility.Visible) return;
         if (_previewTargetTransform == null || PreviewTargetBox == null) return;
 
         double totalMs = 2800.0;

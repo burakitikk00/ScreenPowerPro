@@ -274,11 +274,24 @@ public class ScreenRecorderService : IDisposable
                 "Low" => 28,
                 _ => 18
             };
-            // Fragmented MP4 (+frag_keyframe+empty_moov+default_base_moof) ensures instant indexing per GOP,
-            // completely eliminating "moov atom not found" corruption even if terminated or power is lost.
+            // Standart MP4 çıkışı (MediaFoundation ile tam uyumlu)
             // scale=trunc(iw/2)*2:trunc(ih/2)*2 prevents x264 crash when window dimensions are odd.
+            // -profile:v baseline -level 3.1: Windows MF hardware H.264 decoder ile tam uyumlu.
+            // -tune zerolatency kaldırıldı: WMF ile uyumsuz SEI/B-frame yapısı üretiyordu.
             string vfFilter = "-vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2\"";
-            string fullFfmpegArgs = $"-y {videoInputArgs} {vfFilter} -c:v libx264 -preset ultrafast -tune zerolatency -crf {crf} -pix_fmt yuv420p -movflags +frag_keyframe+empty_moov+default_base_moof \"{_currentVideoPath}\"";
+
+            // Encoder seçimi: h264_mf (Windows MF) > h264_nvenc (NVIDIA) > libx264 (fallback)
+            // h264_nvenc ve h264_mf ile encode edilen videolar Windows MF tarafından garantili decode edilir.
+            string videoEncodeArgs = BuildVideoEncodeArgs(ffmpegExe, crf);
+
+            // WinUI 3 MediaPlayerElement (unpackaged) BUG FIX:
+            // MediaPlayerElement fails with 0xC00D36FA (SourceNotSupported) if the MP4 file
+            // only contains a video stream and lacks an audio stream.
+            // We use lavfi anullsrc to mix a silent audio track into the recording.
+            string dummyAudioInput = "-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100";
+            string audioEncodeArgs = "-c:a aac -shortest";
+
+            string fullFfmpegArgs = $"-y {videoInputArgs} {dummyAudioInput} {vfFilter} {videoEncodeArgs} {audioEncodeArgs} -movflags +faststart \"{_currentVideoPath}\"";
 
             var psi = new ProcessStartInfo
             {
@@ -317,6 +330,54 @@ public class ScreenRecorderService : IDisposable
         RecordingStarted?.Invoke();
 
         return _currentVideoPath!;
+    }
+
+    /// <summary>
+    /// Selects the best available H.264 encoder in priority order:
+    ///   1. h264_mf     (Windows Media Foundation MFT - guaranteed WMF decode)
+    ///   2. h264_nvenc  (NVIDIA GPU - WMF compatible, high quality)
+    ///   3. libx264     (software fallback)
+    /// h264_mf is first priority because it is guaranteed to produce output
+    /// decodeable by Windows Media Foundation (same encoder = same decoder).
+    /// </summary>
+    private static string BuildVideoEncodeArgs(string ffmpegExe, int crf)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = ffmpegExe,
+                Arguments = "-encoders",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            using var p = Process.Start(psi)!;
+            string output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
+            p.WaitForExit(3000);
+
+            if (output.Contains("h264_mf"))
+            {
+                // Windows Media Foundation hardware encode — guaranteed WMF decode
+                // Same encoder as the WinUI3 MediaPlayer decoder path.
+                System.Diagnostics.Debug.WriteLine("[Recorder] Encoder: h264_mf");
+                return "-c:v h264_mf -pix_fmt yuv420p";
+            }
+
+            if (output.Contains("h264_nvenc"))
+            {
+                // NVIDIA hardware encode — WMF compatible output
+                int bitrate = crf switch { <= 15 => 8000, <= 18 => 5000, <= 23 => 3000, _ => 2000 };
+                System.Diagnostics.Debug.WriteLine($"[Recorder] Encoder: h264_nvenc ({bitrate}k)");
+                return $"-c:v h264_nvenc -preset p1 -b:v {bitrate}k -pix_fmt yuv420p";
+            }
+        }
+        catch { }
+
+        // Fallback: libx264 software encode
+        System.Diagnostics.Debug.WriteLine($"[Recorder] Encoder: libx264 (crf={crf})");
+        return $"-c:v libx264 -preset ultrafast -profile:v baseline -level 3.1 -crf {crf} -pix_fmt yuv420p";
     }
 
     public async Task StopRecordingAsync()
@@ -424,12 +485,7 @@ public class ScreenRecorderService : IDisposable
             }
         }
 
-        // Fragmented MP4 dosyasını standart faststart MP4 formatına normalize et
-        if (!string.IsNullOrEmpty(_currentVideoPath) && File.Exists(_currentVideoPath))
-        {
-            await NormalizeVideoFaststartAsync(_currentVideoPath);
-        }
-
+        // Ses kanalları ve temizlik yapıldı. FFmpeg gracefully kapatıldı, moov atom otomatik MP4 sonuna yazıldı.
 
         if (_windowCaptureService != null)
         {
@@ -439,58 +495,19 @@ public class ScreenRecorderService : IDisposable
         }
 
         if (!string.IsNullOrEmpty(_currentProjectDir))
-
         {
             RecordingStopped?.Invoke(_currentProjectDir);
         }
     }
 
-    /// <summary>
-    /// Kayıt esnasında fMP4 (fragmented mp4) olarak yazılan video dosyasını
-    /// -c copy -movflags +faststart ile anında standart ve ultra akıcı MP4 formatına dönüştürür.
-    /// </summary>
-    private static async Task NormalizeVideoFaststartAsync(string videoPath)
-    {
-        await Task.Run(() =>
-        {
-            try
-            {
-                string ffmpegExe = FFmpegHelper.FindFFmpeg();
-                string dir = Path.GetDirectoryName(videoPath)!;
-                string tempPath = Path.Combine(dir, "temp_faststart.mp4");
 
-                var psi = new ProcessStartInfo
-                {
-                    FileName = ffmpegExe,
-                    Arguments = $"-y -i \"{videoPath}\" -c copy -movflags +faststart \"{tempPath}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var proc = Process.Start(psi);
-                if (proc != null)
-                {
-                    proc.WaitForExit(4000);
-                    if (proc.HasExited && proc.ExitCode == 0 && File.Exists(tempPath) && new FileInfo(tempPath).Length > 0)
-                    {
-                        File.Delete(videoPath);
-                        File.Move(tempPath, videoPath);
-                    }
-                    else if (File.Exists(tempPath))
-                    {
-                        File.Delete(tempPath);
-                    }
-                }
-            }
-            catch { }
-        });
-    }
 
     public void Dispose()
     {
         if (IsRecording)
         {
-            StopRecordingAsync().Wait(2000);
+            // .Wait() UI thread'ini bloke eder — fire-and-forget yeterli
+            _ = StopRecordingAsync();
         }
         GC.SuppressFinalize(this);
     }

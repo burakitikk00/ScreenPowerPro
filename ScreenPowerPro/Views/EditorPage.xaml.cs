@@ -592,6 +592,7 @@ public sealed partial class EditorPage : Page
             if (player != null)
             {
                 player.AutoPlay = false;
+                player.IsVideoFrameServerEnabled = true; // WinUI 3 donanım (Hardware Acceleration) kaynaklı siyah ekran/çökmelerini önlemek için.
                 if (player.PlaybackSession != null)
                     player.PlaybackSession.PlaybackRate = 1.0;
 
@@ -936,12 +937,14 @@ public sealed partial class EditorPage : Page
         ViewModel.AspectRatio = tag;
 
         HighlightButtonChoice(new[] { BtnRatioOrig, BtnRatio169, BtnRatio11, BtnRatio43, BtnRatio916 }, btn);
+        UpdateVideoContainerBounds();
     }
 
     private void OnPaddingValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
         if (!_isPageLoaded) return;
         if (TbPaddingVal != null) TbPaddingVal.Text = $"{(int)e.NewValue}";
+        UpdateVideoWindowPadding();
     }
 
     private void OnInsetValueChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -954,6 +957,7 @@ public sealed partial class EditorPage : Page
     {
         if (!_isPageLoaded) return;
         if (TbRoundnessVal != null) TbRoundnessVal.Text = $"{(int)e.NewValue}";
+        UpdateVideoWindowPadding();
     }
 
     private void OnShadowValueChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -2344,6 +2348,67 @@ public sealed partial class EditorPage : Page
         return true;
     }
 
+    // Field declarations for Camera tracking
+    private double _cameraCurrentX = 0.5, _cameraCurrentY = 0.5;
+    private double _cameraTargetX  = 0.5, _cameraTargetY  = 0.5;
+    private double _cameraCurrentScale = 1.0, _cameraTargetScale = 1.0;
+    private const double CameraLerpSpeed = 0.08;
+
+    private static double CubicEaseOut(double t)
+        => 1.0 - Math.Pow(1.0 - Math.Clamp(t, 0.0, 1.0), 3.0);
+
+    private static double LerpCubicOut(double from, double to, double t)
+        => from + (to - from) * CubicEaseOut(t);
+
+    private void UpdateCameraForZoomEffect(double currentTimeSec)
+    {
+        if (ViewModel == null || VideoTransform == null) return;
+
+        var activeZoom = ViewModel.ZoomEffects?.FirstOrDefault(z =>
+            currentTimeSec >= z.StartTime &&
+            currentTimeSec <= z.StartTime + z.Duration);
+
+        if (activeZoom == null)
+        {
+            _cameraTargetScale = 1.0;
+            _cameraTargetX = 0.5;
+            _cameraTargetY = 0.5;
+        }
+        else
+        {
+            _cameraTargetScale = activeZoom.Scale;
+            _cameraTargetX = _naturalVideoWidth  > 0 ? activeZoom.TargetX / _naturalVideoWidth  : 0.5;
+            _cameraTargetY = _naturalVideoHeight > 0 ? activeZoom.TargetY / _naturalVideoHeight : 0.5;
+        }
+
+        _cameraCurrentScale = LerpCubicOut(_cameraCurrentScale, _cameraTargetScale, CameraLerpSpeed);
+        _cameraCurrentX     = LerpCubicOut(_cameraCurrentX,     _cameraTargetX,     CameraLerpSpeed);
+        _cameraCurrentY     = LerpCubicOut(_cameraCurrentY,     _cameraTargetY,     CameraLerpSpeed);
+
+        ApplyCameraTransform(_cameraCurrentScale, _cameraCurrentX, _cameraCurrentY);
+    }
+
+    private void ApplyCameraTransform(double scale, double normX, double normY)
+    {
+        if (VideoTransform == null || VideoWindowLayer == null) return;
+        double W = VideoWindowLayer.ActualWidth;
+        double H = VideoWindowLayer.ActualHeight;
+        if (W <= 0 || H <= 0) return;
+
+        scale = Math.Clamp(scale, 1.0, 2.2);
+
+        double tx = (W * 0.5) - (normX * W * scale);
+        double ty = (H * 0.5) - (normY * H * scale);
+
+        tx = Math.Clamp(tx, W * (1.0 - scale), 0);
+        ty = Math.Clamp(ty, H * (1.0 - scale), 0);
+
+        VideoTransform.ScaleX     = scale;
+        VideoTransform.ScaleY     = scale;
+        VideoTransform.TranslateX = tx;
+        VideoTransform.TranslateY = ty;
+    }
+
     private void UpdateGapBlackScreen()
     {
         if (BlackGapOverlay == null) return;
@@ -2497,6 +2562,7 @@ public sealed partial class EditorPage : Page
         }
 
         UpdateGapBlackScreen();
+        UpdateCameraForZoomEffect(_currentTimeSeconds);
 
         var ts = TimeSpan.FromSeconds(_currentTimeSeconds);
         if (_isPlaying)
@@ -2541,6 +2607,8 @@ public sealed partial class EditorPage : Page
     {
         if (VideoContainer == null) return;
 
+        UpdateVideoWindowPadding();
+
         double hostW = VideoCanvasHost?.ActualWidth > 0 ? VideoCanvasHost.ActualWidth : 920;
         double hostH = VideoCanvasHost?.ActualHeight > 0 ? VideoCanvasHost.ActualHeight : 540;
 
@@ -2549,7 +2617,18 @@ public sealed partial class EditorPage : Page
 
         double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel?.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
         double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel?.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
+        
         double aspect = natW / natH;
+        if (ViewModel != null && !string.IsNullOrEmpty(ViewModel.AspectRatio))
+        {
+            switch (ViewModel.AspectRatio)
+            {
+                case "16:9": aspect = 16.0 / 9.0; break;
+                case "4:3": aspect = 4.0 / 3.0; break;
+                case "1:1": aspect = 1.0; break;
+                case "9:16": aspect = 9.0 / 16.0; break;
+            }
+        }
 
         double targetW = Math.Min(availW, 960);
         double targetH = targetW / aspect;
@@ -2564,6 +2643,17 @@ public sealed partial class EditorPage : Page
         VideoContainer.Height = Math.Round(targetH);
 
         UpdatePlaybackCursor(_currentTimeSeconds);
+    }
+
+    private void UpdateVideoWindowPadding()
+    {
+        if (VideoWindowLayer == null || ViewModel == null) return;
+        double padding = ViewModel.Padding;
+        double margin = 8 + padding * 3.6; // 8px to 80px
+        var t = new Thickness(margin);
+        VideoWindowLayer.Margin = t;
+        VideoWindowLayer.CornerRadius = new CornerRadius(ViewModel.Roundness);
+        if (BlackGapOverlay != null) BlackGapOverlay.Margin = t;
     }
 
     private Rect GetVideoContentRect()
@@ -2666,34 +2756,35 @@ public sealed partial class EditorPage : Page
     // TIMELINE POINTER EVENTS (PANNING + PLAYHEAD SEEK + CTRL ZOOM)
     // =========================================================================
 
-    private void OnTimelinePointerPressed(object sender, PointerRoutedEventArgs e)
+    private double CalculateTimeFromPointerX(double pointerX, double timelineScale, double rulerOffset = 40.0)
+    {
+        double rawTime = (pointerX - rulerOffset) / timelineScale;
+        return Math.Clamp(rawTime, 0.0, _totalDurationSeconds);
+    }
+
+    private void OnHoverScrubPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         if (sender is UIElement element)
         {
             element.CapturePointer(e.Pointer);
             var ptr = e.GetCurrentPoint(element);
 
-            // Eğer boş bir alana tıklandıysa veya cetvele tıklandıysa:
-            if (ReferenceEquals(e.OriginalSource, VideoTrack) || ReferenceEquals(e.OriginalSource, AudioTrack) ||
-                ReferenceEquals(e.OriginalSource, ZoomTrack) || ReferenceEquals(e.OriginalSource, TimeRuler))
+            if (_selectedZoom != null || _selectedZooms.Count > 0 || !string.IsNullOrEmpty(ViewModel?.SelectedClipId) || (ViewModel?.SelectedClipIds.Count > 0))
             {
-                if (_selectedZoom != null || _selectedZooms.Count > 0 || !string.IsNullOrEmpty(ViewModel?.SelectedClipId) || (ViewModel?.SelectedClipIds.Count > 0))
+                _selectedZoom = null;
+                _selectedZooms.Clear();
+                _selectedZoomIds.Clear();
+                if (ViewModel != null)
                 {
-                    _selectedZoom = null;
-                    _selectedZooms.Clear();
-                    _selectedZoomIds.Clear();
-                    if (ViewModel != null)
-                    {
-                        ViewModel.ClearClipSelection();
-                        ViewModel.SelectedTrackType = null;
-                    }
-                    UpdateClipSelectionVisuals();
-                    RenderZoomPills();
+                    ViewModel.ClearClipSelection();
+                    ViewModel.SelectedTrackType = null;
                 }
+                UpdateClipSelectionVisuals();
+                RenderZoomPills();
             }
 
             // 1. Playhead seek
-            double clickSec = Math.Max(0, (ptr.Position.X - 40) / _timelineScale);
+            double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
             SeekToTime(clickSec);
             _isDraggingPlayhead = true;
 
@@ -2702,6 +2793,63 @@ public sealed partial class EditorPage : Page
             _panStartPoint = e.GetCurrentPoint(TimelineScrollViewer).Position;
             _panStartOffset = TimelineScrollViewer.HorizontalOffset;
         }
+    }
+
+    private void OnHoverScrubPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is UIElement element)
+        {
+            var ptr = e.GetCurrentPoint(element);
+            
+            if (_isDraggingPlayhead)
+            {
+                double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
+                SeekToTime(clickSec);
+
+                // Drag-to-scroll
+                if (TimelineScrollViewer != null)
+                {
+                    var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
+                    if (scrollPt.X > TimelineScrollViewer.ActualWidth - 40)
+                    {
+                        TimelineScrollViewer.ChangeView(TimelineScrollViewer.HorizontalOffset + 20, null, null, true);
+                    }
+                    else if (scrollPt.X < 40)
+                    {
+                        TimelineScrollViewer.ChangeView(Math.Max(0, TimelineScrollViewer.HorizontalOffset - 20), null, null, true);
+                    }
+                    else if (_isPanningTimeline)
+                    {
+                        double diff = scrollPt.X - _panStartPoint.X;
+                        if (Math.Abs(diff) > 5)
+                        {
+                            TimelineScrollViewer.ChangeView(_panStartOffset - diff, null, null, true);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Hover Scrub
+                double hoverSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
+                SeekToTime(hoverSec);
+            }
+        }
+    }
+
+    private void OnHoverScrubPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is UIElement element)
+        {
+            element.ReleasePointerCapture(e.Pointer);
+            _isDraggingPlayhead = false;
+            _isPanningTimeline = false;
+        }
+    }
+
+    private void OnHoverScrubPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        // No op for now
     }
 
     private void OnVideoTrackPointerEntered(object sender, PointerRoutedEventArgs e)
@@ -2722,13 +2870,7 @@ public sealed partial class EditorPage : Page
     private void OnZoomTrackPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         _activeTrack = TimelineTrackType.Zoom;
-        OnTimelinePointerPressed(sender, e);
-    }
-
-    private void OnAudioTrackPointerPressed(object sender, PointerRoutedEventArgs e)
-    {
-        _activeTrack = TimelineTrackType.Audio;
-        OnTimelinePointerPressed(sender, e);
+        OnHoverScrubPointerPressed(sender, e);
     }
 
     private void OnClickTrackPointerEntered(object sender, PointerRoutedEventArgs e)
@@ -2739,7 +2881,7 @@ public sealed partial class EditorPage : Page
     private void OnClickTrackPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         _activeTrack = TimelineTrackType.Click;
-        OnTimelinePointerPressed(sender, e);
+        OnHoverScrubPointerPressed(sender, e);
     }
 
     private void OnToggleClickLaneClicked(object sender, RoutedEventArgs e)
@@ -2764,48 +2906,6 @@ public sealed partial class EditorPage : Page
                     TimelineContentGrid.RowDefinitions[4].Height = new GridLength(48);
                 }
             }
-        }
-    }
-
-    private void OnTimelinePointerMoved(object sender, PointerRoutedEventArgs e)
-    {
-        if (_isDraggingPlayhead && sender is UIElement element)
-        {
-            var ptr = e.GetCurrentPoint(element);
-            double clickSec = Math.Max(0, (ptr.Position.X - 40) / _timelineScale);
-            SeekToTime(clickSec);
-
-            // Sürüklerken kenara gelindiğinde kaydır (drag-to-scroll)
-            if (TimelineScrollViewer != null)
-            {
-                var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
-                if (scrollPt.X > TimelineScrollViewer.ActualWidth - 40)
-                {
-                    TimelineScrollViewer.ChangeView(TimelineScrollViewer.HorizontalOffset + 20, null, null, true);
-                }
-                else if (scrollPt.X < 40)
-                {
-                    TimelineScrollViewer.ChangeView(Math.Max(0, TimelineScrollViewer.HorizontalOffset - 20), null, null, true);
-                }
-                else if (_isPanningTimeline)
-                {
-                    double diff = scrollPt.X - _panStartPoint.X;
-                    if (Math.Abs(diff) > 5)
-                    {
-                        TimelineScrollViewer.ChangeView(_panStartOffset - diff, null, null, true);
-                    }
-                }
-            }
-        }
-    }
-
-    private void OnTimelinePointerReleased(object sender, PointerRoutedEventArgs e)
-    {
-        if (sender is UIElement element)
-        {
-            element.ReleasePointerCapture(e.Pointer);
-            _isDraggingPlayhead = false;
-            _isPanningTimeline = false;
         }
     }
 
@@ -3958,19 +4058,10 @@ public sealed partial class EditorPage : Page
         }
 
         UpdateBezierGraphVisuals();
-
+        
+        // Data updating is now handled by TwoWay binding in SelectedZoomEasing pass-through property
         if (_selectedZoom != null)
         {
-            if (selected == "Özel (Custom Eğri)")
-            {
-                _selectedZoom.Easing = FormattableString.Invariant($"cubic-bezier({_bezierP1.X:F2}, {_bezierP1.Y:F2}, {_bezierP2.X:F2}, {_bezierP2.Y:F2})");
-            }
-            else
-            {
-                _selectedZoom.Easing = selected;
-            }
-            ViewModel?.PushHistory();
-            ViewModel?.SaveProject();
             UpdateZoomSimulation();
         }
     }
@@ -4633,9 +4724,9 @@ public sealed partial class EditorPage : Page
     // DYNAMIC CURSOR ENGINE, 10 SHAPES & CLICK EFFECTS
     // =========================================================================
 
-    private static Geometry ArrowGeometry => _arrowGeometry ??= ParseGeometry("M 0,0 L 0,16 L 4.5,12.5 L 8.5,20 L 11,18.5 L 7,11.5 L 13,11.5 Z");
-    private static Geometry CrosshairGeometry => _crosshairGeometry ??= ParseGeometry("M 10,0 L 10,6 M 10,14 L 10,20 M 0,10 L 6,10 M 14,10 L 20,10");
-    private static Geometry IBeamGeometry => _ibeamGeometry ??= ParseGeometry("M 3,0 L 11,0 M 7,0 L 7,18 M 3,18 L 11,18");
+    private static Geometry ArrowGeometry => ParseGeometry("M 0,0 L 0,16 L 4.5,12.5 L 8.5,20 L 11,18.5 L 7,11.5 L 13,11.5 Z");
+    private static Geometry CrosshairGeometry => ParseGeometry("M 10,0 L 10,6 M 10,14 L 10,20 M 0,10 L 6,10 M 14,10 L 20,10");
+    private static Geometry IBeamGeometry => ParseGeometry("M 3,0 L 11,0 M 7,0 L 7,18 M 3,18 L 11,18");
 
     private static Geometry ParseGeometry(string pathData)
     {

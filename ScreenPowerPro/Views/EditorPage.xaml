@@ -1252,11 +1252,11 @@
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock x:Name="TbZoomFactor" Text="Zoom Factor" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
                                                 <Border Grid.Column="1" Background="{StaticResource PrimaryGlowBrush}" CornerRadius="4" Padding="6,2">
-                                                    <TextBlock x:Name="TbSelectedZoomFactor" Text="1.5x" FontSize="11" FontWeight="SemiBold"
+                                                    <TextBlock x:Name="TbSelectedZoomFactor" Text="{x:Bind ViewModel.SelectedZoomScale, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
                                                         Foreground="{StaticResource PrimaryAccentBrush}"/>
                                                 </Border>
                                             </Grid>
-                                            <Slider x:Name="SelectedZoomSlider" Maximum="2.2" Minimum="1.0" Value="1.5" StepFrequency="0.1"/>
+                                            <Slider x:Name="SelectedZoomSlider" Maximum="2.2" Minimum="1.0" Value="{x:Bind ViewModel.SelectedZoomScale, Mode=TwoWay}" StepFrequency="0.1"/>
                                         </StackPanel>
 
                                         <!-- Start / End Sec -->
@@ -1295,7 +1295,7 @@
                                             </Grid>
                                             <ComboBox x:Name="CbSelectedZoomEasing" HorizontalAlignment="Stretch" 
                                                 Background="{StaticResource SurfaceContainerLowestBrush}"
-                                                SelectionChanged="OnSelectedZoomEasingChanged">
+                                                SelectedItem="{x:Bind ViewModel.SelectedZoomEasing, Mode=TwoWay}">
                                                 <x:String>Linear</x:String>
                                                 <x:String>Quad-Out</x:String>
                                                 <x:String>Cubic-Out</x:String>
@@ -1452,127 +1452,115 @@
                     </Ellipse>
 
                     <!-- 16:9 Video container -->
-                    <Border
-                        x:Name="VideoContainer"
-                        MaxWidth="920"
-                        CornerRadius="10"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Margin="24">
-                        <Border.Background>
-                            <SolidColorBrush Color="#000000"/>
-                        </Border.Background>
+                    <Border x:Name="VideoContainer"
+                            MaxWidth="920" CornerRadius="10"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Margin="24">
+                        <Grid>
+                            <!-- Layer 0: Dynamic Background -->
+                            <Border x:Name="PreviewBackgroundLayer"
+                                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#1E2A4A" Offset="0"/>
+                                        <GradientStop Color="#0F172A" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Image x:Name="PreviewBackgroundImage"
+                                   Stretch="UniformToFill" Visibility="Collapsed"/>
 
-                        <Grid RenderTransformOrigin="0.5,0.5">
-                            <Grid.RenderTransform>
-                                <CompositeTransform x:Name="VideoTransform" ScaleX="1.0" ScaleY="1.0" TranslateX="0" TranslateY="0"/>
-                            </Grid.RenderTransform>
+                            <!-- Zoom Transform Grid -->
+                            <Grid RenderTransformOrigin="0.5,0.5">
+                                <Grid.RenderTransform>
+                                    <CompositeTransform x:Name="VideoTransform"
+                                        ScaleX="1.0" ScaleY="1.0"
+                                        TranslateX="0" TranslateY="0"/>
+                                </Grid.RenderTransform>
 
-                            <!-- MediaPlayer -->
-                            <MediaPlayerElement
-                                x:Name="VideoPlayer"
-                                AutoPlay="False"
-                                AreTransportControlsEnabled="False"
-                                Stretch="Uniform"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"
-                                MinHeight="200">
-                            </MediaPlayerElement>
-
-                            <!-- Pure Black Screen Overlay for Timeline Gaps -->
-                            <Border
-                                x:Name="BlackGapOverlay"
-                                Background="#000000"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"
-                                Visibility="Collapsed"
-                                IsHitTestVisible="False"/>
-
-                            <!-- Dynamic Cursor & Click Effect Overlay Canvas -->
-                            <Canvas x:Name="CursorOverlayCanvas"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"
-                                IsHitTestVisible="False"
-                                RenderTransformOrigin="0.5,0.5">
-                                <Canvas.RenderTransform>
-                                    <CompositeTransform x:Name="CursorCanvasTransform" ScaleX="1.0" ScaleY="1.0" TranslateX="0" TranslateY="0"/>
-                                </Canvas.RenderTransform>
-                            </Canvas>
-
-                            <!-- Click overlay for play/pause -->
-                            <Button
-                                x:Name="VideoClickOverlay"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"
-                                Click="OnVideoCanvasClicked"/>
-
-                            <!-- Hover play button -->
-                            <Border
-                                x:Name="PlayOverlay"
-                                Background="#660D0E15"
-                                CornerRadius="10"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"
-                                Opacity="1"
-                                IsHitTestVisible="False">
-                                <Border
-                                    Width="64" Height="64" CornerRadius="32"
-                                    Background="#33C0C1FF"
-                                    BorderBrush="#80C0C1FF" BorderThickness="1"
-                                    HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <FontIcon x:Name="PlayOverlayIcon"
-                                        Glyph="&#xE768;" FontSize="28"
-                                        Foreground="{StaticResource PrimaryAccentBrush}"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <!-- Layer 1: Scaled Video Window — NO Shadow -->
+                                <Border x:Name="VideoWindowLayer"
+                                        Margin="48" CornerRadius="8">
+                                    <MediaPlayerElement x:Name="VideoPlayer"
+                                        AutoPlay="False" AreTransportControlsEnabled="False"
+                                        Stretch="Uniform" MinHeight="200"/>
                                 </Border>
-                            </Border>
 
-                            <!-- No video file warning message -->
-                            <StackPanel
-                                x:Name="NoVideoMessage"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Spacing="8"
-                                Visibility="Collapsed"
-                                IsHitTestVisible="False">
-                                <FontIcon Glyph="&#xE7BA;" FontSize="36" Foreground="#F59E0B" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TbNoVideoMessage" Text="Video Dosyası Yüklenemedi" FontSize="15" FontWeight="SemiBold"
-                                    Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TbMissingVideoPath" Text="" FontSize="11"
-                                    Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" MaxWidth="400" TextAlignment="Center"/>
-                            </StackPanel>
+                                <!-- Layer 2: Black Gap Overlay -->
+                                <Border x:Name="BlackGapOverlay"
+                                        Background="#000000" Margin="48" CornerRadius="8"
+                                        Visibility="Collapsed" IsHitTestVisible="False"/>
 
-                            <!-- Resolution badge top-right -->
-                            <Border
-                                HorizontalAlignment="Right" VerticalAlignment="Top"
-                                Margin="12"
-                                Background="#990D0E15"
-                                CornerRadius="6" Padding="8,4"
-                                BorderBrush="#1AFFFFFF" BorderThickness="1">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <Ellipse Width="7" Height="7" Fill="#22C55E" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="TbResolution" Text="1080p • 60fps"
-                                        FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                <!-- Layer 3: Cursor Overlay -->
+                                <Canvas x:Name="CursorOverlayCanvas"
+                                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                        IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
+                                    <Canvas.RenderTransform>
+                                        <CompositeTransform x:Name="CursorCanvasTransform" ScaleX="1.0" ScaleY="1.0" TranslateX="0" TranslateY="0"/>
+                                    </Canvas.RenderTransform>
+                                </Canvas>
+
+                                <!-- Layer 4: UI Overlays -->
+                                <Button x:Name="VideoClickOverlay"
+                                        Background="Transparent" BorderThickness="0"
+                                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                        Click="OnVideoCanvasClicked"/>
+
+                                <Border x:Name="PlayOverlay"
+                                        Background="#660D0E15"
+                                        CornerRadius="10"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                        Opacity="1"
+                                        IsHitTestVisible="False">
+                                    <Border Width="64" Height="64" CornerRadius="32"
+                                            Background="#33C0C1FF"
+                                            BorderBrush="#80C0C1FF" BorderThickness="1"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <FontIcon x:Name="PlayOverlayIcon"
+                                                  Glyph="&#xE768;" FontSize="28"
+                                                  Foreground="{StaticResource PrimaryAccentBrush}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </Border>
+
+                                <!-- No video file warning message -->
+                                <StackPanel x:Name="NoVideoMessage"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            Spacing="8" Visibility="Collapsed" IsHitTestVisible="False">
+                                    <FontIcon Glyph="&#xE7BA;" FontSize="36" Foreground="#F59E0B" HorizontalAlignment="Center"/>
+                                    <TextBlock x:Name="TbNoVideoMessage" Text="Video Dosyası Yüklenemedi" FontSize="15" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock x:Name="TbMissingVideoPath" Text="" FontSize="11"
+                                               Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" MaxWidth="400" TextAlignment="Center"/>
                                 </StackPanel>
-                            </Border>
 
-                            <!-- Zoom level badge bottom-left -->
-                            <Border
-                                HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                                Margin="12"
-                                Background="#990D0E15"
-                                CornerRadius="6" Padding="8,4"
-                                BorderBrush="#1AFFFFFF" BorderThickness="1">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon Glyph="&#xE71E;" FontSize="11"
-                                        Foreground="{StaticResource PrimaryAccentBrush}"/>
-                                    <TextBlock x:Name="ZoomLevelBadge" Text="1.0x"
-                                        FontSize="11" FontWeight="SemiBold"
-                                        Foreground="{StaticResource TextPrimaryBrush}"/>
-                                </StackPanel>
-                            </Border>
+                                <!-- Resolution badge top-right -->
+                                <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Margin="12" Background="#990D0E15"
+                                        CornerRadius="6" Padding="8,4"
+                                        BorderBrush="#1AFFFFFF" BorderThickness="1">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Ellipse Width="7" Height="7" Fill="#22C55E" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TbResolution" Text="1080p • 60fps"
+                                                   FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Zoom level badge bottom-left -->
+                                <Border HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                        Margin="12" Background="#990D0E15"
+                                        CornerRadius="6" Padding="8,4"
+                                        BorderBrush="#1AFFFFFF" BorderThickness="1">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE71E;" FontSize="11"
+                                                  Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                        <TextBlock x:Name="ZoomLevelBadge" Text="1.0x"
+                                                   FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                         </Grid>
                     </Border>
                 </Grid>
@@ -1931,7 +1919,8 @@
                                 Background="Transparent"
                                 BorderBrush="{StaticResource GlassBorderBrush}"
                                 BorderThickness="0,0,0,1"
-                                Padding="12,0">
+                                Padding="12,0"
+                                Visibility="Collapsed">
                                 <Grid VerticalAlignment="Center">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -2015,14 +2004,20 @@
                                 <RowDefinition Height="48"/>
                             </Grid.RowDefinitions>
 
+                            <!-- HOVER SCRUB OVERLAY -->
+                            <Canvas Grid.Row="0" Grid.RowSpan="4"
+                                x:Name="HoverScrubOverlay"
+                                Background="Transparent"
+                                PointerPressed="OnHoverScrubPointerPressed"
+                                PointerMoved="OnHoverScrubPointerMoved"
+                                PointerReleased="OnHoverScrubPointerReleased"
+                                PointerExited="OnHoverScrubPointerExited" />
+
                             <!-- TIME RULER (Row 0) -->
                             <Canvas Grid.Row="0"
                                 x:Name="TimeRuler"
                                 Background="{StaticResource SurfaceContainerLowestBrush}"
-                                Height="22"
-                                PointerPressed="OnTimelinePointerPressed"
-                                PointerMoved="OnTimelinePointerMoved"
-                                PointerReleased="OnTimelinePointerReleased">
+                                Height="22">
                                 <!-- Ruler ticks are generated in code-behind -->
                             </Canvas>
 
@@ -2030,10 +2025,7 @@
                             <Canvas Grid.Row="1"
                                 x:Name="VideoTrack"
                                 Background="#080D0E15"
-                                PointerEntered="OnVideoTrackPointerEntered"
-                                PointerPressed="OnTimelinePointerPressed"
-                                PointerMoved="OnTimelinePointerMoved"
-                                PointerReleased="OnTimelinePointerReleased">
+                                PointerEntered="OnVideoTrackPointerEntered">
                                 <!-- Base clip block (fallback/rendered in code-behind) -->
                                 <Border
                                     x:Name="VideoClipBlock"
@@ -2054,10 +2046,7 @@
                             <Canvas Grid.Row="2"
                                 x:Name="AudioTrack"
                                 Background="#0500FF88"
-                                PointerEntered="OnAudioTrackPointerEntered"
-                                PointerPressed="OnAudioTrackPointerPressed"
-                                PointerMoved="OnTimelinePointerMoved"
-                                PointerReleased="OnTimelinePointerReleased">
+                                PointerEntered="OnAudioTrackPointerEntered">
                                 <!-- Waveform bars and audio clips are drawn dynamically in code-behind -->
                             </Canvas>
 
@@ -2076,17 +2065,18 @@
                                 x:Name="ClickTrack"
                                 Background="#0400D2FF"
                                 PointerEntered="OnClickTrackPointerEntered"
-                                PointerPressed="OnClickTrackPointerPressed">
+                                PointerPressed="OnClickTrackPointerPressed"
+                                Visibility="Collapsed">
                                 <!-- Click sound markers are added dynamically in code-behind -->
                             </Canvas>
 
-                            <!-- PLAYHEAD (spans all 5 rows, rendered on top) -->
-                            <Canvas Grid.Row="0" Grid.RowSpan="5"
+                            <!-- PLAYHEAD (spans all 4 rows, rendered on top) -->
+                            <Canvas Grid.Row="0" Grid.RowSpan="4"
                                 IsHitTestVisible="False" ZIndex="100">
                                 <Rectangle
                                     x:Name="PlayheadLine"
                                     Width="2"
-                                    Height="254"
+                                    Height="206"
                                     Fill="{StaticResource SecondaryBrush}"
                                     Canvas.Left="200"
                                     Canvas.Top="0"/>

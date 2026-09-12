@@ -121,6 +121,63 @@ public partial class EditorViewModel : ObservableObject
     [ObservableProperty]
     private ZoomEffect? _selectedZoomEffect;
 
+    partial void OnSelectedZoomEffectChanged(ZoomEffect? value)
+    {
+        OnPropertyChanged(nameof(SelectedZoomScale));
+        OnPropertyChanged(nameof(SelectedZoomEasing));
+        OnPropertyChanged(nameof(SelectedZoomDuration));
+    }
+
+    public double SelectedZoomScale
+    {
+        get => SelectedZoomEffect?.Scale ?? 1.5;
+        set
+        {
+            if (SelectedZoomEffect != null)
+            {
+                var clamped = Math.Clamp(value, 1.0, 2.2);
+                if (SelectedZoomEffect.Scale != clamped)
+                {
+                    SelectedZoomEffect.Scale = clamped;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(SelectedZoomEffect));
+                }
+            }
+        }
+    }
+
+    public string SelectedZoomEasing
+    {
+        get => SelectedZoomEffect?.Easing ?? "Cubic-Out";
+        set
+        {
+            if (SelectedZoomEffect != null && SelectedZoomEffect.Easing != value)
+            {
+                SelectedZoomEffect.Easing = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectedZoomEffect));
+            }
+        }
+    }
+
+    public double SelectedZoomDuration
+    {
+        get => SelectedZoomEffect?.Duration ?? 2.0;
+        set
+        {
+            if (SelectedZoomEffect != null && value >= 0.2)
+            {
+                var rounded = Math.Round(value, 2);
+                if (SelectedZoomEffect.Duration != rounded)
+                {
+                    SelectedZoomEffect.Duration = rounded;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(SelectedZoomEffect));
+                }
+            }
+        }
+    }
+
     [ObservableProperty]
     private string? _selectedClipId;
 

@@ -2056,6 +2056,20 @@
                                 <!-- Click sound markers are added dynamically in code-behind -->
                             </Canvas>
 
+                            <!-- DROP INDICATOR -->
+                            <Border x:Name="DropIndicator" 
+                                    Grid.Row="1"
+                                    Width="4" 
+                                    HorizontalAlignment="Left"
+                                    Background="{StaticResource PrimaryAccentBrush}"
+                                    CornerRadius="2"
+                                    Visibility="Collapsed"
+                                    Canvas.ZIndex="1000">
+                                <Border.Shadow>
+                                    <ThemeShadow/>
+                                </Border.Shadow>
+                            </Border>
+
                             <!-- PLAYHEAD (spans all 4 rows, rendered on top) -->
                             <Canvas Grid.Row="0" Grid.RowSpan="4"
                                 HorizontalAlignment="Left"

@@ -1219,46 +1219,87 @@ public sealed partial class EditorPage : Page
         }
     }
 
-    private List<double> GetTimelineSnapPoints(object? excludeItem = null)
+    private List<double> GetTimelineSnapPoints(object? excludeItem = null, bool sameTrackOnly = false)
     {
         var snaps = new HashSet<double>
         {
-            0.0,
-            _currentTimeSeconds
+            0.0 // Timeline start
         };
         if (_totalDurationSeconds > 0) snaps.Add(_totalDurationSeconds);
 
-        if (ViewModel?.VideoTrack?.Clips != null)
+        if (ViewModel != null)
         {
-            foreach (var c in ViewModel.VideoTrack.Clips)
+            bool isVideo = false, isMic = false, isSys = false, isZoom = false;
+            if (sameTrackOnly && excludeItem != null)
             {
-                if (c == excludeItem) continue;
-                snaps.Add(c.TrackOffset);
-                snaps.Add(c.TrackOffset + Math.Max(0, c.SourceEnd - c.SourceStart));
+                if (excludeItem is Models.ClipSegment clip)
+                {
+                    if (ViewModel.VideoTrack.Clips.Contains(clip)) isVideo = true;
+                    else if (ViewModel.MicTrack.Clips.Contains(clip)) isMic = true;
+                    else if (ViewModel.SysTrack.Clips.Contains(clip)) isSys = true;
+                }
+                else if (excludeItem is Models.ZoomEffect)
+                {
+                    isZoom = true;
+                }
+            }
+
+            if (!sameTrackOnly || isVideo)
+            {
+                if (ViewModel.VideoTrack?.Clips != null)
+                {
+                    foreach (var c in ViewModel.VideoTrack.Clips)
+                    {
+                        if (c == excludeItem) continue;
+                        snaps.Add(c.TrackOffset);
+                        snaps.Add(c.TrackOffset + Math.Max(0, c.SourceEnd - c.SourceStart));
+                    }
+                }
+            }
+
+            if (!sameTrackOnly || isMic)
+            {
+                if (ViewModel.MicTrack?.Clips != null)
+                {
+                    foreach (var c in ViewModel.MicTrack.Clips)
+                    {
+                        if (c == excludeItem) continue;
+                        snaps.Add(c.TrackOffset);
+                        snaps.Add(c.TrackOffset + Math.Max(0, c.SourceEnd - c.SourceStart));
+                    }
+                }
+            }
+
+            if (!sameTrackOnly || isSys)
+            {
+                if (ViewModel.SysTrack?.Clips != null)
+                {
+                    foreach (var c in ViewModel.SysTrack.Clips)
+                    {
+                        if (c == excludeItem) continue;
+                        snaps.Add(c.TrackOffset);
+                        snaps.Add(c.TrackOffset + Math.Max(0, c.SourceEnd - c.SourceStart));
+                    }
+                }
+            }
+
+            if (!sameTrackOnly || isZoom)
+            {
+                if (ViewModel.ZoomEffects != null)
+                {
+                    foreach (var z in ViewModel.ZoomEffects)
+                    {
+                        if (z == excludeItem) continue;
+                        snaps.Add(z.StartTime);
+                        snaps.Add(z.StartTime + z.Duration);
+                    }
+                }
             }
         }
 
-        if (ViewModel?.MicTrack?.Clips != null)
-        {
-            foreach (var c in ViewModel.MicTrack.Clips)
-            {
-                if (c == excludeItem) continue;
-                snaps.Add(c.TrackOffset);
-                snaps.Add(c.TrackOffset + Math.Max(0, c.SourceEnd - c.SourceStart));
-            }
-        }
-
-        if (ViewModel?.ZoomEffects != null)
-        {
-            foreach (var z in ViewModel.ZoomEffects)
-            {
-                if (z == excludeItem) continue;
-                snaps.Add(z.StartTime);
-                snaps.Add(z.StartTime + z.Duration);
-            }
-        }
-
-        return snaps.ToList();
+        var sorted = snaps.ToList();
+        sorted.Sort();
+        return sorted;
     }
 
     private void UpdateClipSelectionVisuals()
@@ -1463,6 +1504,7 @@ public sealed partial class EditorPage : Page
         // ETKİLEŞİM: Manyetik Yapışma (Snapping), Kenar Kırpma (Trimming), Zaman Çizgisi Sürükleme (Scrubbing)
         bool isTrimmingLeft = false;
         bool isTrimmingRight = false;
+        bool isMovingClip = false;
         bool hasActuallyMoved = false;
         Point startPt = default;
         double origOffset = 0;
@@ -1525,17 +1567,45 @@ public sealed partial class EditorPage : Page
             }
             else
             {
-                _isDraggingPlayhead = true;
+                isMovingClip = true;
                 _isPanningTimeline = false;
-                
-                double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
-                SeekToTime(clickSec);
+                Canvas.SetZIndex(clipBlock, 500); // Ghost render
             }
         };
 
         clipBlock.PointerMoved += (s, e) =>
         {
-            if (_isDraggingPlayhead)
+            if (isMovingClip)
+            {
+                var ptr = e.GetCurrentPoint(targetCanvas);
+                double rawDx = ptr.Position.X - startPt.X;
+                if (Math.Abs(rawDx) > 3) hasActuallyMoved = true;
+
+                if (hasActuallyMoved)
+                {
+                    double candidateOffset = origOffset + (rawDx / _timelineScale);
+                    Canvas.SetLeft(clipBlock, TimelineMathService.TimeToPixel(candidateOffset, _timelineScale));
+
+                    var snapPoints = GetTimelineSnapPoints(clip, true); // Sadece kendi track'ine snap!
+                    if (snapPoints.Count > 0)
+                    {
+                        double bestSnap = snapPoints.OrderBy(p => Math.Abs(p - candidateOffset)).First();
+                        if (DropIndicator != null)
+                        {
+                            DropIndicator.Visibility = Visibility.Visible;
+                            DropIndicator.Margin = new Thickness(TimelineMathService.TimeToPixel(bestSnap, _timelineScale), 0, 0, 0);
+                            DropIndicator.SetValue(Grid.RowProperty, isAudioTrack ? 2 : 1);
+                        }
+                    }
+
+                    if (TimelineScrollViewer != null)
+                    {
+                        var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
+                        HandleEdgeScrolling(scrollPt.X);
+                    }
+                }
+            }
+            else if (_isDraggingPlayhead)
             {
                 var ptr = e.GetCurrentPoint(targetCanvas);
                 double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
@@ -1622,11 +1692,57 @@ public sealed partial class EditorPage : Page
         clipBlock.PointerReleased += (s, e) =>
         {
             clipBlock.ReleasePointerCapture(e.Pointer);
+            Canvas.SetZIndex(clipBlock, 0);
+            if (DropIndicator != null) DropIndicator.Visibility = Visibility.Collapsed;
 
             if (_isDraggingPlayhead)
             {
                 _isDraggingPlayhead = false;
                 SeekToTime(_currentTimeSeconds, false);
+            }
+            else if (isMovingClip && hasActuallyMoved)
+            {
+                var ptr = e.GetCurrentPoint(targetCanvas);
+                double rawDx = ptr.Position.X - startPt.X;
+                double candidateOffset = origOffset + (rawDx / _timelineScale);
+                
+                var snapPoints = GetTimelineSnapPoints(clip, true); // Sadece kendi track'ine snap!
+                if (snapPoints.Count > 0)
+                {
+                    candidateOffset = snapPoints.OrderBy(p => Math.Abs(p - candidateOffset)).First();
+                }
+                else
+                {
+                    candidateOffset = Math.Max(0, candidateOffset);
+                }
+
+                if (ViewModel != null)
+                {
+                    var trackClips = isAudioTrack ? ViewModel.MicTrack.Clips : ViewModel.VideoTrack.Clips;
+                    double clipDur = origEnd - origStart;
+                    double EPSILON = 0.01;
+
+                    foreach (var other in trackClips)
+                    {
+                        if (other != clip && other.TrackOffset >= origOffset - EPSILON)
+                            other.TrackOffset -= clipDur;
+                    }
+
+                    if (candidateOffset > origOffset + EPSILON)
+                        candidateOffset -= clipDur;
+
+                    foreach (var other in trackClips)
+                    {
+                        if (other != clip && other.TrackOffset >= candidateOffset - EPSILON)
+                            other.TrackOffset += clipDur;
+                    }
+
+                    clip.TrackOffset = candidateOffset;
+
+                    var sorted = trackClips.OrderBy(c => c.TrackOffset).ToList();
+                    trackClips.Clear();
+                    foreach (var c in sorted) trackClips.Add(c);
+                }
             }
 
             if (hasActuallyMoved)
@@ -1639,6 +1755,7 @@ public sealed partial class EditorPage : Page
 
             isTrimmingLeft = false;
             isTrimmingRight = false;
+            isMovingClip = false;
             hasActuallyMoved = false;
         };
 
@@ -3091,6 +3208,13 @@ public sealed partial class EditorPage : Page
             var ptr = e.GetCurrentPoint(TimelineContentGrid);
             double clickSec = CalculateTimeFromPointerX(ptr.Position.X, _timelineScale);
             SeekToTime(clickSec, true);
+
+            if (HoverPlayheadLine != null && HoverPlayheadTriangle != null)
+            {
+                double x = clickSec * _timelineScale;
+                Canvas.SetLeft(HoverPlayheadLine, x);
+                Canvas.SetLeft(HoverPlayheadTriangle, x);
+            }
 
             if (TimelineScrollViewer != null)
             {

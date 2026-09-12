@@ -284,7 +284,7 @@ public sealed partial class EditorPage : Page
 
         if (TimelineScrollViewer != null)
         {
-            TimelineScrollViewer.PointerWheelChanged += OnTimelineWheelChanged;
+            TimelineScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnTimelineWheelChanged), true);
         }
 
         AppLog.Success("[EditorPage] OnPageLoaded tamamlandı, sayfa hazır.");
@@ -1608,6 +1608,15 @@ public sealed partial class EditorPage : Page
                     ? $"Audio #{clipIndex + 1} ({newDur:F1}s)"
                     : $"Video #{clipIndex + 1} ({newDur:F1}s)";
             }
+
+            if (isTrimmingLeft || isTrimmingRight)
+            {
+                if (TimelineScrollViewer != null)
+                {
+                    var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
+                    HandleEdgeScrolling(scrollPt.X);
+                }
+            }
         };
 
         clipBlock.PointerReleased += (s, e) =>
@@ -1973,6 +1982,15 @@ public sealed partial class EditorPage : Page
                 }
                 finally { _isUpdatingZoomInputs = false; }
                 UpdateZoomSimulation();
+            }
+
+            if (isTrimmingLeft || isTrimmingRight || isMovingZoom)
+            {
+                if (TimelineScrollViewer != null)
+                {
+                    var scrollPt = e.GetCurrentPoint(TimelineScrollViewer).Position;
+                    HandleEdgeScrolling(scrollPt.X);
+                }
             }
         };
 

@@ -1689,7 +1689,7 @@ public sealed partial class EditorPage : Page
             }
         };
 
-        clipBlock.PointerReleased += (s, e) =>
+        clipBlock.PointerReleased += async (s, e) =>
         {
             clipBlock.ReleasePointerCapture(e.Pointer);
             Canvas.SetZIndex(clipBlock, 0);
@@ -1722,26 +1722,60 @@ public sealed partial class EditorPage : Page
                     double clipDur = origEnd - origStart;
                     double EPSILON = 0.01;
 
-                    foreach (var other in trackClips)
+                    ApplyRippleEdit(trackClips, clip, origOffset, candidateOffset, clipDur, EPSILON);
+
+                    double deltaOffset = candidateOffset - origOffset;
+                    if (!isAudioTrack && Math.Abs(deltaOffset) > EPSILON)
                     {
-                        if (other != clip && other.TrackOffset >= origOffset - EPSILON)
-                            other.TrackOffset -= clipDur;
+                        var linkedMics = ViewModel.MicTrack.Clips.Where(m => Math.Abs(m.TrackOffset - origOffset) < EPSILON && Math.Abs((m.SourceEnd - m.SourceStart) - clipDur) < EPSILON).ToList();
+                        var linkedSys = ViewModel.SysTrack.Clips.Where(m => Math.Abs(m.TrackOffset - origOffset) < EPSILON && Math.Abs((m.SourceEnd - m.SourceStart) - clipDur) < EPSILON).ToList();
+
+                        if (linkedMics.Any() || linkedSys.Any())
+                        {
+                            var audioDialog = new Microsoft.UI.Xaml.Controls.ContentDialog
+                            {
+                                Title = "Bağlantılı Ses Klipleri",
+                                Content = "Bu video parçasıyla bağlantılı kaydedilmiş ses parçaları bulundu. İlgili konuma taşınsınlar mı?",
+                                PrimaryButtonText = "Evet",
+                                CloseButtonText = "Hayır",
+                                XamlRoot = this.Content.XamlRoot
+                            };
+                            
+                            var res = await audioDialog.ShowAsync();
+                            if (res == Microsoft.UI.Xaml.Controls.ContentDialogResult.Primary)
+                            {
+                                foreach (var m in linkedMics)
+                                    ApplyRippleEdit(ViewModel.MicTrack.Clips, m, origOffset, candidateOffset, clipDur, EPSILON);
+                                foreach (var m in linkedSys)
+                                    ApplyRippleEdit(ViewModel.SysTrack.Clips, m, origOffset, candidateOffset, clipDur, EPSILON);
+                            }
+                        }
+
+                        var linkedZooms = ViewModel.ZoomEffects.Where(z => z.StartTime >= origOffset - EPSILON && z.StartTime < origOffset + clipDur - EPSILON).ToList();
+                        if (linkedZooms.Any())
+                        {
+                            var zoomDialog = new Microsoft.UI.Xaml.Controls.ContentDialog
+                            {
+                                Title = "Bağlantılı Zoom Efektleri",
+                                Content = "Bu video parçasına ait zoom efektleri bulundu. Yeni taşınan konumda tekrar oluşturulsun mu?\n(Hayır derseniz silineceklerdir)",
+                                PrimaryButtonText = "Evet",
+                                CloseButtonText = "Hayır",
+                                XamlRoot = this.Content.XamlRoot
+                            };
+
+                            var res = await zoomDialog.ShowAsync();
+                            if (res == Microsoft.UI.Xaml.Controls.ContentDialogResult.Primary)
+                            {
+                                foreach (var z in linkedZooms)
+                                    z.StartTime += deltaOffset;
+                            }
+                            else
+                            {
+                                foreach (var z in linkedZooms)
+                                    ViewModel.ZoomEffects.Remove(z);
+                            }
+                        }
                     }
-
-                    if (candidateOffset > origOffset + EPSILON)
-                        candidateOffset -= clipDur;
-
-                    foreach (var other in trackClips)
-                    {
-                        if (other != clip && other.TrackOffset >= candidateOffset - EPSILON)
-                            other.TrackOffset += clipDur;
-                    }
-
-                    clip.TrackOffset = candidateOffset;
-
-                    var sorted = trackClips.OrderBy(c => c.TrackOffset).ToList();
-                    trackClips.Clear();
-                    foreach (var c in sorted) trackClips.Add(c);
                 }
             }
 
@@ -1762,6 +1796,31 @@ public sealed partial class EditorPage : Page
         Canvas.SetLeft(clipBlock, startX);
         Canvas.SetTop(clipBlock, top);
         targetCanvas.Children.Add(clipBlock);
+    }
+
+    private void ApplyRippleEdit(System.Collections.Generic.List<Models.ClipSegment> trackClips, Models.ClipSegment clip, double origOffset, double candidateOffset, double clipDur, double EPSILON)
+    {
+        foreach (var other in trackClips)
+        {
+            if (other != clip && other.TrackOffset >= origOffset - EPSILON)
+                other.TrackOffset -= clipDur;
+        }
+
+        double shiftCandidate = candidateOffset;
+        if (shiftCandidate > origOffset + EPSILON)
+            shiftCandidate -= clipDur;
+
+        foreach (var other in trackClips)
+        {
+            if (other != clip && other.TrackOffset >= shiftCandidate - EPSILON)
+                other.TrackOffset += clipDur;
+        }
+
+        clip.TrackOffset = candidateOffset;
+
+        var sorted = trackClips.OrderBy(c => c.TrackOffset).ToList();
+        trackClips.Clear();
+        foreach (var c in sorted) trackClips.Add(c);
     }
 
     private void RenderZoomPills()

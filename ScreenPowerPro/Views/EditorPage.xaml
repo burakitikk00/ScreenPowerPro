@@ -8,7 +8,7 @@
     xmlns:models="using:ScreenPowerPro.Models"
     mc:Ignorable="d"
     IsTabStop="True"
-    KeyDown="OnPageKeyDown"
+    PreviewKeyDown="OnPageKeyDown"
     Background="{StaticResource SurfaceContainerLowestBrush}">
 
     <Page.Resources>

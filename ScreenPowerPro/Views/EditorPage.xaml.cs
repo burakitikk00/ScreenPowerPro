@@ -660,6 +660,7 @@ public sealed partial class EditorPage : Page
                     ViewModel.TotalDurationSec = dur;
                     ViewModel.InitClipsFromDuration(dur);
                     UpdateFromViewModel();
+                    AutoZoomToFit();
                     RenderTimeline();
                 }
 
@@ -773,6 +774,40 @@ public sealed partial class EditorPage : Page
                          $"Active SystemAudioPath: {currentAudioPath}\n" +
                          $"Active MicAudioPath: {currentMicPath}");
         });
+    }
+
+    private void AutoZoomToFit()
+    {
+        if (TimelineScrollViewer == null || _totalDurationSeconds <= 0) return;
+        
+        double w = TimelineScrollViewer.ActualWidth;
+        if (w == 0)
+        {
+            // Eğer arayüz tam yüklenmediyse bekle
+            Microsoft.UI.Xaml.SizeChangedEventHandler sizeChangedHandler = null;
+            sizeChangedHandler = (s, e) =>
+            {
+                TimelineScrollViewer.SizeChanged -= sizeChangedHandler;
+                AutoZoomToFit();
+            };
+            TimelineScrollViewer.SizeChanged += sizeChangedHandler;
+            return;
+        }
+
+        // 40px margin sağdan soldan toplam pay
+        double desiredScale = (w - 40) / _totalDurationSeconds; 
+        desiredScale = Math.Clamp(desiredScale, 20.0, 300.0);
+        
+        _timelineScale = desiredScale;
+        
+        if (TimelineZoomSlider != null)
+        {
+            _isUpdatingZoomSlider = true;
+            double sliderVal = Math.Clamp(((_timelineScale - 20) / 280.0) * 100.0, 1, 100);
+            TimelineZoomSlider.Value = sliderVal;
+            if (ViewModel != null) ViewModel.TimelineZoom = sliderVal;
+            _isUpdatingZoomSlider = false;
+        }
     }
 
     private void UpdateFromViewModel()
@@ -2918,6 +2953,12 @@ public sealed partial class EditorPage : Page
                     double x = hoverSec * _timelineScale;
                     Canvas.SetLeft(HoverPlayheadLine, x);
                     Canvas.SetLeft(HoverPlayheadTriangle, x);
+
+                    // Hover (önizleme) anında videoyu da o frame'e getir
+                    if (VideoPlayer?.MediaPlayer != null)
+                    {
+                        try { VideoPlayer.MediaPlayer.Position = TimeSpan.FromSeconds(hoverSec); } catch { }
+                    }
                 }
             }
         }
@@ -2937,6 +2978,12 @@ public sealed partial class EditorPage : Page
     {
         if (HoverPlayheadLine != null) HoverPlayheadLine.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
         if (HoverPlayheadTriangle != null) HoverPlayheadTriangle.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
+
+        // Fare timeline'dan çıkınca videoyu tekrar asıl zamana (kırmızı çizgi) döndür
+        if (!_isPlaying && VideoPlayer?.MediaPlayer != null)
+        {
+            try { VideoPlayer.MediaPlayer.Position = TimeSpan.FromSeconds(_currentTimeSeconds); } catch { }
+        }
     }
 
     private void OnPlayheadPointerPressed(object sender, PointerRoutedEventArgs e)

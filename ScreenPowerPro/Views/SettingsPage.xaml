@@ -249,7 +249,7 @@
                                             <TextBlock Text="Animasyon Eğrisi (Spring Fizik)" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
                                             <TextBlock Text="Yakınlaşma hissini belirler · Spring-Damper motoru eğriden otomatik türetir" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                                         </StackPanel>
-                                        <ComboBox Grid.Column="1" SelectedValue="{x:Bind ViewModel.ZoomEasingFunction, Mode=TwoWay}"
+                                        <ComboBox Grid.Column="1" SelectedItem="{x:Bind ViewModel.ZoomEasingFunction, Mode=TwoWay}"
                                             Width="180">
                                             <x:String>Linear</x:String>
                                             <x:String>Quad-Out</x:String>

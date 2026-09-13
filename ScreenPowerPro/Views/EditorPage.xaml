@@ -1126,72 +1126,113 @@
                                     </StackPanel>
                                 </Grid>
                                 
-                                <!-- Global Dynamic Zoom Settings -->
+                                <!-- Global Zoom Settings (Genel Ayarlar) -->
                                 <Border Background="{StaticResource SurfaceHighBrush}" CornerRadius="10" Padding="14"
                                     BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                                     <StackPanel Spacing="14">
-                                        
-                                        <!-- Easing Function -->
-                                        <StackPanel Spacing="6">
-                                            <TextBlock Text="Animasyon Eğrisi (Easing)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <ComboBox x:Name="CbZoomEasing" SelectedItem="{x:Bind ViewModel.ZoomEasingFunction, Mode=TwoWay}" HorizontalAlignment="Stretch" Background="{StaticResource SurfaceContainerLowestBrush}">
-                                                <x:String>Linear</x:String>
-                                                <x:String>Quad-Out</x:String>
-                                                <x:String>Cubic-Out</x:String>
-                                                <x:String>Quartic-Out</x:String>
-                                            </ComboBox>
-                                        </StackPanel>
 
-                                        <!-- Zoom Speed (Duration) ms -->
+                                        <!-- Spring Fizik Göstergesi -->
+                                        <Border Background="#12A855F7" CornerRadius="8" Padding="10,8"
+                                                BorderBrush="#33A855F7" BorderThickness="1">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="2">
+                                                    <TextBlock Text="Spring-Damper Fizik" FontSize="11" FontWeight="SemiBold"
+                                                        Foreground="#A855F7"/>
+                                                    <TextBlock Text="Easing eğrisinden otomatik türetilir" FontSize="10"
+                                                        Foreground="{StaticResource TextMutedBrush}"/>
+                                                </StackPanel>
+                                                <Border Grid.Column="1" Background="#1FA855F7" CornerRadius="4" Padding="8,3">
+                                                    <TextBlock x:Name="TbSpringConfigBadge" Text="Cubic-Out" FontSize="10"
+                                                        FontWeight="Bold" Foreground="#A855F7" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Maksimum Büyütme Katsayısı -->
                                         <StackPanel Spacing="6">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Yakınlaştırma Hızı" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                                <TextBlock Text="{x:Bind ViewModel.ZoomSpeedMs, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
+                                                <TextBlock Text="Maksimum Büyütme (Scale)" FontSize="13"
+                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <Border Grid.Column="1" Background="{StaticResource PrimaryGlowBrush}"
+                                                    CornerRadius="4" Padding="6,2">
+                                                    <TextBlock Text="{x:Bind ViewModel.ZoomMaxScale, Mode=OneWay}"
+                                                        FontSize="11" FontWeight="SemiBold"
+                                                        Foreground="{StaticResource PrimaryAccentBrush}"/>
+                                                </Border>
                                             </Grid>
-                                            <Slider x:Name="SliderZoomSpeed" Maximum="1500" Minimum="200" Value="{x:Bind ViewModel.ZoomSpeedMs, Mode=TwoWay}" StepFrequency="50"/>
+                                            <Slider x:Name="SliderZoomMaxScale" Maximum="2.2" Minimum="1.0"
+                                                Value="{x:Bind ViewModel.ZoomMaxScale, Mode=TwoWay}"
+                                                StepFrequency="0.1"/>
+                                            <TextBlock Text="Öneri: 1.5 – 1.8x (profesyonel)" FontSize="10"
+                                                Foreground="{StaticResource TextMutedBrush}"/>
                                         </StackPanel>
 
-                                        <!-- Zoom Hold Duration s -->
+                                        <!-- Geçiş Hızı (Spring Tepki Süresi) -->
                                         <StackPanel Spacing="6">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Odakta Kalma Süresi (sn)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                                <TextBlock Text="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
+                                                <TextBlock Text="Geçiş Hızı (ms)" FontSize="13"
+                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock x:Name="TbZoomSpeedDisplay"
+                                                    Text="{x:Bind ViewModel.ZoomSpeedMs, Mode=OneWay}"
+                                                    FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                                                    Grid.Column="1"/>
                                             </Grid>
-                                            <Slider x:Name="SliderZoomHoldDuration" Maximum="10.0" Minimum="0.5" Value="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=TwoWay}" StepFrequency="0.5"/>
+                                            <Slider x:Name="SliderZoomSpeed" Maximum="1500" Minimum="150"
+                                                Value="{x:Bind ViewModel.ZoomSpeedMs, Mode=TwoWay}"
+                                                StepFrequency="50"/>
                                         </StackPanel>
 
-                                        <!-- Max Scale -->
+                                        <!-- Odakta Kalma Süresi -->
                                         <StackPanel Spacing="6">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Maksimum Büyütme" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                                <TextBlock Text="{x:Bind ViewModel.ZoomMaxScale, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
+                                                <TextBlock Text="Odakta Kalma (sn)" FontSize="13"
+                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock x:Name="TbZoomHoldDisplay"
+                                                    Text="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=OneWay}"
+                                                    FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                                                    Grid.Column="1"/>
                                             </Grid>
-                                            <Slider x:Name="SliderZoomMaxScale" Maximum="2.2" Minimum="1.0" Value="{x:Bind ViewModel.ZoomMaxScale, Mode=TwoWay}" StepFrequency="0.1"/>
+                                            <Slider x:Name="SliderZoomHoldDuration" Maximum="10.0" Minimum="0.5"
+                                                Value="{x:Bind ViewModel.ZoomHoldDurationSec, Mode=TwoWay}"
+                                                StepFrequency="0.5"/>
                                         </StackPanel>
 
-                                        <!-- Pre-Click Anticipation -->
+                                        <!-- Tıklama Öncesi Odak -->
                                         <StackPanel Spacing="6">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Tıklama Öncesi Odak (ms)" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                                <TextBlock Text="{x:Bind ViewModel.PreClickAnticipationMs, Mode=OneWay}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Grid.Column="1"/>
+                                                <StackPanel Spacing="1">
+                                                    <TextBlock Text="Tıklama Öncesi Odak" FontSize="13"
+                                                        Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                    <TextBlock Text="(ms, hidden ease-in)" FontSize="10"
+                                                        Foreground="{StaticResource TextMutedBrush}"/>
+                                                </StackPanel>
+                                                <TextBlock Text="{x:Bind ViewModel.PreClickAnticipationMs, Mode=OneWay}"
+                                                    FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                                                    Grid.Column="1" VerticalAlignment="Center"/>
                                             </Grid>
-                                            <Slider Maximum="1000" Minimum="0" Value="{x:Bind ViewModel.PreClickAnticipationMs, Mode=TwoWay}" StepFrequency="50"/>
+                                            <Slider Maximum="500" Minimum="0"
+                                                Value="{x:Bind ViewModel.PreClickAnticipationMs, Mode=TwoWay}"
+                                                StepFrequency="25"/>
                                         </StackPanel>
 
                                     </StackPanel>
@@ -1273,7 +1314,6 @@
                                                 <x:String>Cubic-Out</x:String>
                                                 <x:String>Quartic-Out</x:String>
                                                 <x:String>Ease-In-Out</x:String>
-                                                <x:String>Özel (Custom Eğri)</x:String>
                                             </ComboBox>
                                         </StackPanel>
 
@@ -1284,7 +1324,10 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Eğri Düzenleyici (Bézier)" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                <StackPanel Spacing="1">
+                                                    <TextBlock Text="Eğri Düzenleyici (Bézier)" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
+                                                    <TextBlock Text="→ Spring-Damper motoruna otomatik aktarılır" FontSize="9" Foreground="#88A855F7"/>
+                                                </StackPanel>
                                                 <TextBlock x:Name="TbBezierCoords" Text="P1: 0.22, 0.61 | P2: 0.36, 1.00" FontSize="10" Foreground="{StaticResource PrimaryAccentBrush}" Grid.Column="1"/>
                                             </Grid>
                                             <Border Background="{StaticResource SurfaceContainerLowestBrush}"

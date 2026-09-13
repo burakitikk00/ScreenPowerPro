@@ -239,17 +239,24 @@
 
                                     <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />
 
-                                    <!-- Cancel on Out of Bounds -->
+                                    <!-- Animasyon Eğrisi → Spring Fizik Parametresini Belirler -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Spacing="2">
-                                            <TextBlock Text="Sanal Sınır İhlalinde Zoomu İptal Et" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
-                                            <TextBlock Text="Fare tıklanan bölgenin dışına çıktığında beklemeden pürüzsüzce uzaklaşır" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            <TextBlock Text="Animasyon Eğrisi (Spring Fizik)" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="Yakınlaşma hissini belirler · Spring-Damper motoru eğriden otomatik türetir" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                                         </StackPanel>
-                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.CancelOnOutOfBounds, Mode=TwoWay}" MinWidth="0" />
+                                        <ComboBox Grid.Column="1" SelectedValue="{x:Bind ViewModel.ZoomEasingFunction, Mode=TwoWay}"
+                                            Width="180">
+                                            <x:String>Linear</x:String>
+                                            <x:String>Quad-Out</x:String>
+                                            <x:String>Cubic-Out</x:String>
+                                            <x:String>Quartic-Out</x:String>
+                                            <x:String>Ease-In-Out</x:String>
+                                        </ComboBox>
                                     </Grid>
 
                                     <MenuFlyoutSeparator Background="{StaticResource GlassBorderBrush}" />

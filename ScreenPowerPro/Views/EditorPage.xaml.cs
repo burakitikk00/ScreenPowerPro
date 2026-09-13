@@ -4346,6 +4346,14 @@ public sealed partial class EditorPage : Page
         {
             TbBezierCoords.Text = $"P1: {_bezierP1.X:F2}, {_bezierP1.Y:F2} | P2: {_bezierP2.X:F2}, {_bezierP2.Y:F2}";
         }
+
+        // Spring-Damper badge: Bezier kontrol noktalarından türetilen spring parametrelerini göster
+        if (TbSpringConfigBadge != null)
+        {
+            var cfg = ScreenPowerPro.Core.Zoom.SpringConfig.FromBezier(
+                _bezierP1.X, _bezierP1.Y, _bezierP2.X, _bezierP2.Y);
+            TbSpringConfigBadge.Text = $"k={cfg.Stiffness:F0}  d={cfg.Damping:F0}";
+        }
     }
 
     private void OnBezierGraphPointerPressed(object sender, PointerRoutedEventArgs e)

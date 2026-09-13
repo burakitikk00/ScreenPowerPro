@@ -115,7 +115,21 @@ public class ScreenRecorderService : IDisposable
                     {
                         try
                         {
-                            _micWriter?.Write(buffer.ToArray(), 0, buffer.Length);
+                            if (_micWriter != null && _recordStopwatch != null)
+                            {
+                                long expectedBytes = (long)(_recordStopwatch.Elapsed.TotalSeconds * _micWriter.WaveFormat.AverageBytesPerSecond);
+                                long gapBytes = expectedBytes - _micWriter.Length;
+                                long thresholdBytes = (long)(0.1 * _micWriter.WaveFormat.AverageBytesPerSecond);
+                                if (gapBytes > thresholdBytes)
+                                {
+                                    gapBytes -= gapBytes % _micWriter.WaveFormat.BlockAlign;
+                                    if (gapBytes > 0 && gapBytes < int.MaxValue)
+                                    {
+                                        _micWriter.Write(new byte[gapBytes], 0, (int)gapBytes);
+                                    }
+                                }
+                                _micWriter.Write(buffer.ToArray(), 0, buffer.Length);
+                            }
                         }
                         catch { }
                     };
@@ -132,7 +146,21 @@ public class ScreenRecorderService : IDisposable
                         {
                             try
                             {
-                                _micWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                                if (_micWriter != null && _recordStopwatch != null)
+                                {
+                                    long expectedBytes = (long)(_recordStopwatch.Elapsed.TotalSeconds * _micWriter.WaveFormat.AverageBytesPerSecond);
+                                    long gapBytes = expectedBytes - _micWriter.Length;
+                                    long thresholdBytes = (long)(0.1 * _micWriter.WaveFormat.AverageBytesPerSecond);
+                                    if (gapBytes > thresholdBytes)
+                                    {
+                                        gapBytes -= gapBytes % _micWriter.WaveFormat.BlockAlign;
+                                        if (gapBytes > 0 && gapBytes < int.MaxValue)
+                                        {
+                                            _micWriter.Write(new byte[gapBytes], 0, (int)gapBytes);
+                                        }
+                                    }
+                                    _micWriter.Write(e.Buffer, 0, e.BytesRecorded);
+                                }
                             }
                             catch { }
                         };
@@ -193,7 +221,21 @@ public class ScreenRecorderService : IDisposable
                     {
                         try
                         {
-                            _loopbackWriter?.Write(buffer.ToArray(), 0, buffer.Length);
+                            if (_loopbackWriter != null && _recordStopwatch != null)
+                            {
+                                long expectedBytes = (long)(_recordStopwatch.Elapsed.TotalSeconds * _loopbackWriter.WaveFormat.AverageBytesPerSecond);
+                                long gapBytes = expectedBytes - _loopbackWriter.Length;
+                                long thresholdBytes = (long)(0.1 * _loopbackWriter.WaveFormat.AverageBytesPerSecond);
+                                if (gapBytes > thresholdBytes)
+                                {
+                                    gapBytes -= gapBytes % _loopbackWriter.WaveFormat.BlockAlign;
+                                    if (gapBytes > 0 && gapBytes < int.MaxValue)
+                                    {
+                                        _loopbackWriter.Write(new byte[gapBytes], 0, (int)gapBytes);
+                                    }
+                                }
+                                _loopbackWriter.Write(buffer.ToArray(), 0, buffer.Length);
+                            }
                         }
                         catch { }
                     };
@@ -212,7 +254,21 @@ public class ScreenRecorderService : IDisposable
                         {
                             try
                             {
-                                _loopbackWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                                if (_loopbackWriter != null && _recordStopwatch != null)
+                                {
+                                    long expectedBytes = (long)(_recordStopwatch.Elapsed.TotalSeconds * _loopbackWriter.WaveFormat.AverageBytesPerSecond);
+                                    long gapBytes = expectedBytes - _loopbackWriter.Length;
+                                    long thresholdBytes = (long)(0.1 * _loopbackWriter.WaveFormat.AverageBytesPerSecond);
+                                    if (gapBytes > thresholdBytes)
+                                    {
+                                        gapBytes -= gapBytes % _loopbackWriter.WaveFormat.BlockAlign;
+                                        if (gapBytes > 0 && gapBytes < int.MaxValue)
+                                        {
+                                            _loopbackWriter.Write(new byte[gapBytes], 0, (int)gapBytes);
+                                        }
+                                    }
+                                    _loopbackWriter.Write(e.Buffer, 0, e.BytesRecorded);
+                                }
                             }
                             catch { }
                         };
@@ -288,7 +344,7 @@ public class ScreenRecorderService : IDisposable
             // MediaPlayerElement fails with 0xC00D36FA (SourceNotSupported) if the MP4 file
             // only contains a video stream and lacks an audio stream.
             // We use lavfi anullsrc to mix a silent audio track into the recording.
-            string dummyAudioInput = "-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100";
+            string dummyAudioInput = "-f lavfi -re -i anullsrc=channel_layout=stereo:sample_rate=44100";
             string audioEncodeArgs = "-c:a aac -shortest";
 
             string fullFfmpegArgs = $"-y {videoInputArgs} {dummyAudioInput} {vfFilter} {videoEncodeArgs} {audioEncodeArgs} -movflags +faststart \"{_currentVideoPath}\"";

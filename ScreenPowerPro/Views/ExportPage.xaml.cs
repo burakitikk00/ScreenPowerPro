@@ -92,7 +92,7 @@ public sealed partial class ExportPage : Page
         TbFormatLabel.Text = _loc["Format"].ToUpperInvariant();
         TbResLabel.Text = _loc["Resolution"].ToUpperInvariant();
         TbFpsLabel.Text = _loc["Fps"].ToUpperInvariant();
-        TbBtnCancelText.Text = _loc["Export_Cancel"];
+        TbBtnCancelText.Text = "İptal";
         TbDoneTitle.Text = _loc["Export_SuccessTitle"];
         TbBtnOpenFolderText.Text = _loc["Export_OpenFolder"];
         TbBtnBackToEditorText.Text = _loc["Export_BackToEditor"];

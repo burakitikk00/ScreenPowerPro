@@ -42,6 +42,36 @@ public sealed partial class MainWindow : Window
         // İlk sayfa olarak Dashboard'a yönlendir
         AppLog.Event("NAV", "İlk açılış: Dashboard'a yönlendiriliyor.");
         RootFrame.Navigate(typeof(DashboardPage));
+
+        AppWindow.Closing += AppWindow_Closing;
+    }
+
+    private async void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+    {
+        if (RootFrame.Content is ExportPage exportPage)
+        {
+            if (!exportPage.ViewModel.IsCompleted && !exportPage.ViewModel.HasError)
+            {
+                args.Cancel = true;
+
+                ContentDialog dialog = new ContentDialog
+                {
+                    Title = "Lütfen kapatmayın, render ediliyor",
+                    Content = "Tüm işlemi iptal etmek istiyor musunuz?",
+                    PrimaryButtonText = "Evet, İptal Et",
+                    CloseButtonText = "Hayır, Devam Et",
+                    XamlRoot = this.Content.XamlRoot
+                };
+
+                var result = await dialog.ShowAsync();
+
+                if (result == ContentDialogResult.Primary)
+                {
+                    exportPage.ViewModel.CancelExport();
+                    NavigateToEditor(exportPage.ViewModel.ProjectDir);
+                }
+            }
+        }
     }
 
     public IntPtr GetWindowHandle()
@@ -157,10 +187,10 @@ public sealed partial class MainWindow : Window
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
             presenter.Restore();
-            presenter.IsResizable = true;
-            presenter.IsMaximizable = true;
+            presenter.IsResizable = false;
+            presenter.IsMaximizable = false;
         }
-        ResizeAndCenter(1000, 650);
+        ResizeAndCenter(750, 520);
         RootFrame.Navigate(typeof(ExportPage), projectDir, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
     }
 
@@ -170,10 +200,10 @@ public sealed partial class MainWindow : Window
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
             presenter.Restore();
-            presenter.IsResizable = true;
-            presenter.IsMaximizable = true;
+            presenter.IsResizable = false;
+            presenter.IsMaximizable = false;
         }
-        ResizeAndCenter(1000, 650);
+        ResizeAndCenter(750, 520);
         RootFrame.Navigate(typeof(ExportPage), options, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
     }
 }

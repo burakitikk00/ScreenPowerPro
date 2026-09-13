@@ -205,6 +205,10 @@ public sealed partial class EditorPage : Page
 
         try
         {
+            if (VideoPlayer != null)
+            {
+                VideoPlayer.Source = null;
+            }
             _micPlayer?.Dispose();
             _micPlayer = null;
             _sysPlayer?.Dispose();

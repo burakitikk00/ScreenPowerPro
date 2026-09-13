@@ -42,34 +42,17 @@ public sealed partial class MainWindow : Window
         // İlk sayfa olarak Dashboard'a yönlendir
         AppLog.Event("NAV", "İlk açılış: Dashboard'a yönlendiriliyor.");
         RootFrame.Navigate(typeof(DashboardPage));
-
         AppWindow.Closing += AppWindow_Closing;
     }
 
-    private async void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+    private void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
     {
-        if (RootFrame.Content is ExportPage exportPage)
+        if (RootFrame.Content is EditorPage editorPage)
         {
-            if (!exportPage.ViewModel.IsCompleted && !exportPage.ViewModel.HasError)
+            if (!editorPage.IsReadyToClose)
             {
                 args.Cancel = true;
-
-                ContentDialog dialog = new ContentDialog
-                {
-                    Title = "Lütfen kapatmayın, render ediliyor",
-                    Content = "Tüm işlemi iptal etmek istiyor musunuz?",
-                    PrimaryButtonText = "Evet, İptal Et",
-                    CloseButtonText = "Hayır, Devam Et",
-                    XamlRoot = this.Content.XamlRoot
-                };
-
-                var result = await dialog.ShowAsync();
-
-                if (result == ContentDialogResult.Primary)
-                {
-                    exportPage.ViewModel.CancelExport();
-                    NavigateToEditor(exportPage.ViewModel.ProjectDir);
-                }
+                editorPage.ShowExitConfirmationOverlay();
             }
         }
     }
@@ -139,19 +122,26 @@ public sealed partial class MainWindow : Window
         RootFrame.Navigate(typeof(LibraryPage), null, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
     }
 
-    public void NavigateToEditor(string projectDir)
+    public async void NavigateToEditor(string projectDir)
     {
         AppLog.Event("NAV", $"EditorPage sayfasına geçiliyor. Proje: {projectDir}");
         try
         {
-            HideProcessingOverlay();
+            ShowProcessingOverlay();
             ResizeForEditor();
+            
+            await System.Threading.Tasks.Task.Delay(1500); // 1.5 saniye animasyon göster (siyah ekranları gizler)
+
             bool result = RootFrame.Navigate(typeof(EditorPage), projectDir, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
             AppLog.Success($"EditorPage navigasyonu tamamlandı (Result: {result}).");
+
+            await System.Threading.Tasks.Task.Delay(500); // UI render süresi için ek bekleme
+            HideProcessingOverlay();
         }
         catch (Exception ex)
         {
             AppLog.Error($"[MainWindow] EditorPage sayfasına navigasyon sırasında KRİTİK HATA!", ex);
+            HideProcessingOverlay();
         }
     }
 
@@ -163,47 +153,19 @@ public sealed partial class MainWindow : Window
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            ProcessingRing.IsActive = true;
+            var anim = RootGrid.Resources["LoadingMainAnimation"] as Microsoft.UI.Xaml.Media.Animation.Storyboard;
+            anim?.Begin();
             LoadingOverlay.Visibility = Visibility.Visible;
         });
     }
 
-    /// <summary>
-    /// Tam ekran yükleme overlay'ini gizler.
-    /// Herhangi bir thread'den güvenle çağrılabilir.
-    /// </summary>
     public void HideProcessingOverlay()
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            ProcessingRing.IsActive = false;
+            var anim = RootGrid.Resources["LoadingMainAnimation"] as Microsoft.UI.Xaml.Media.Animation.Storyboard;
+            anim?.Stop();
             LoadingOverlay.Visibility = Visibility.Collapsed;
         });
-    }
-
-    public void NavigateToExport(string projectDir)
-    {
-        AppLog.Event("NAV", $"ExportPage sayfasına geçiliyor (Proje: '{projectDir}').");
-        if (AppWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.Restore();
-            presenter.IsResizable = false;
-            presenter.IsMaximizable = false;
-        }
-        ResizeAndCenter(750, 520);
-        RootFrame.Navigate(typeof(ExportPage), projectDir, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
-    }
-
-    public void NavigateToExport(ScreenPowerPro.Models.ExportOptions options)
-    {
-        AppLog.Event("NAV", "ExportPage sayfasına geçiliyor (ExportOptions).");
-        if (AppWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.Restore();
-            presenter.IsResizable = false;
-            presenter.IsMaximizable = false;
-        }
-        ResizeAndCenter(750, 520);
-        RootFrame.Navigate(typeof(ExportPage), options, new Microsoft.UI.Xaml.Media.Animation.SuppressNavigationTransitionInfo());
     }
 }

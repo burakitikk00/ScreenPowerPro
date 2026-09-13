@@ -5168,7 +5168,16 @@ public sealed partial class EditorPage : Page
         }
     }
 
-    private void OnConfirmExportClicked(object sender, RoutedEventArgs e)
+
+    // --- EXPORT PROGRESS VARIABLES ---
+    private CancellationTokenSource? _exportCts;
+    private DispatcherTimer? _exportSmoothTimer;
+    private double _exportTargetProgress = 0.0;
+    private double _exportDisplayProgress = 0.0;
+    private const double ExportRingCircumference = 72.885;
+    private string? _lastOutputPath;
+
+    private async void OnConfirmExportClicked(object sender, RoutedEventArgs e)
     {
         ViewModel?.SaveProject();
 
@@ -5215,19 +5224,193 @@ public sealed partial class EditorPage : Page
             fps = parsedFps;
         }
 
-        var options = new ScreenPowerPro.Models.ExportOptions
+        ExportModalOverlay.Visibility = Visibility.Collapsed;
+        
+        await StartRenderAsync(outPath, targetWidth, targetHeight, fps);
+    }
+
+    private void OptimizeMemoryForRender()
+    {
+        try
         {
-            ProjectDir = ViewModel?.ProjectDir ?? string.Empty,
-            OutputPath = outPath,
-            TargetWidth = targetWidth,
-            TargetHeight = targetHeight,
-            TargetFps = fps,
-            Format = "mp4",
-            ResolutionLabel = $"{targetWidth}×{targetHeight}"
+            AppLog.Info("[EditorPage] Bellek optimizasyonu başlatılıyor...");
+            PausePlayback();
+            _playbackTimer?.Stop();
+            _videoAudioAnimTimer?.Stop();
+            _zoomPreviewTimer?.Stop();
+            
+            if (VideoPlayer != null) VideoPlayer.Source = null;
+            _micPlayer?.Dispose();
+            _micPlayer = null;
+            _sysPlayer?.Dispose();
+            _sysPlayer = null;
+            _pendingVideoSource?.Dispose();
+            _pendingVideoSource = null;
+
+            GC.Collect(2, GCCollectionMode.Forced, true);
+            GC.WaitForPendingFinalizers();
+            AppLog.Success("[EditorPage] Bellek optimizasyonu tamamlandı.");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"[EditorPage] OptimizeMemoryForRender hatası: {ex.Message}", ex);
+        }
+    }
+
+    private async Task RestoreMemoryAfterCancel()
+    {
+        try
+        {
+            AppLog.Info("[EditorPage] Kaynaklar geri yükleniyor...");
+            await LoadVideoAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"[EditorPage] RestoreMemoryAfterCancel hatası: {ex.Message}", ex);
+        }
+    }
+
+    private async Task StartRenderAsync(string outputPath, int width, int height, int fps)
+    {
+        if (ViewModel == null || string.IsNullOrEmpty(ViewModel.ProjectDir)) return;
+        
+        var projectService = App.Current.Services.GetRequiredService<ScreenPowerPro.Services.ProjectService>();
+        var manifest = projectService.LoadProject(ViewModel.ProjectDir);
+        if (manifest == null) return;
+        
+        _lastOutputPath = outputPath;
+        _exportCts = new CancellationTokenSource();
+        _exportTargetProgress = 0.0;
+        _exportDisplayProgress = 0.0;
+
+        // Overlay UI update
+        TbRenderFormat.Text = "MP4 (H.264)";
+        TbRenderResolution.Text = $"{width}×{height}";
+        TbRenderFps.Text = fps.ToString();
+        TbExportPercentage.Text = "0%";
+        ExportProgressRingArc.StrokeDashOffset = ExportRingCircumference;
+        TbExportStatusTitle.Text = _loc["Export_Title"] ?? "Videounuz dışa aktarılıyor...";
+        TbExportEstimatedTime.Text = "Hesaplanıyor...";
+        TbExportOperation.Text = "İşlem başlatılıyor...";
+        
+        BtnCancelRender.Visibility = Visibility.Visible;
+        RenderDoneState.Visibility = Visibility.Collapsed;
+        RenderErrorState.Visibility = Visibility.Collapsed;
+        RenderProgressOverlay.Visibility = Visibility.Visible;
+
+        if (_exportSmoothTimer == null)
+        {
+            _exportSmoothTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(25) };
+            _exportSmoothTimer.Tick += ExportSmoothTimer_Tick;
+        }
+        _exportSmoothTimer.Start();
+
+        var exportService = App.Current.Services.GetRequiredService<ExportService>();
+
+        Action<ExportProgressReport> progressHandler = (report) =>
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                _exportTargetProgress = Math.Clamp(report.ProgressPercent, 0.0, 100.0);
+                TbExportEstimatedTime.Text = report.FormattedRemainingTime;
+                TbExportOperation.Text = report.Speed > 0 ? $"Render ediliyor: %{_exportTargetProgress:F0} ({report.Speed:F1}x)" : $"Render ediliyor: %{_exportTargetProgress:F0}";
+            });
         };
 
-        ExportModalOverlay.Visibility = Visibility.Collapsed;
-        MainWindow.CurrentInstance?.NavigateToExport(options);
+        exportService.ProgressUpdated += progressHandler;
+        
+        OptimizeMemoryForRender();
+
+        try
+        {
+            await exportService.ExportVideoAsync(
+                manifest,
+                outputPath,
+                ViewModel.ProjectDir,
+                width,
+                height,
+                fps,
+                _exportCts.Token
+            );
+
+            // Success
+            _exportTargetProgress = 100.0;
+            _exportDisplayProgress = 100.0;
+            TbExportPercentage.Text = "100%";
+            ExportProgressRingArc.StrokeDashOffset = 0;
+            
+            TbExportStatusTitle.Text = _loc["Export_SuccessTitle"] ?? "Export Tamamlandı!";
+            TbExportEstimatedTime.Text = _loc["Export_SuccessDesc"] ?? "Video başarıyla aktarıldı.";
+            BtnCancelRender.Visibility = Visibility.Collapsed;
+            RenderDoneState.Visibility = Visibility.Visible;
+        }
+        catch (OperationCanceledException)
+        {
+            AppLog.Info("[EditorPage] Dışa aktarma iptal edildi.");
+            RenderProgressOverlay.Visibility = Visibility.Collapsed;
+            await RestoreMemoryAfterCancel();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"[EditorPage] Dışa aktarma hatası: {ex.Message}", ex);
+            _exportSmoothTimer?.Stop();
+            TbExportStatusTitle.Text = _loc["Export_FailedTitle"] ?? "Hata oluştu";
+            TbExportEstimatedTime.Text = "Hata oluştu";
+            TbExportOperation.Text = ex.Message;
+            TbExportPercentage.Text = "!";
+            BtnCancelRender.Visibility = Visibility.Collapsed;
+            RenderErrorState.Visibility = Visibility.Visible;
+            await RestoreMemoryAfterCancel();
+        }
+        finally
+        {
+            exportService.ProgressUpdated -= progressHandler;
+        }
+    }
+
+    private void ExportSmoothTimer_Tick(object? sender, object e)
+    {
+        if (Math.Abs(_exportDisplayProgress - _exportTargetProgress) > 0.05)
+        {
+            _exportDisplayProgress += (_exportTargetProgress - _exportDisplayProgress) * 0.18;
+            if (_exportTargetProgress >= 100.0 && _exportDisplayProgress > 99.5) _exportDisplayProgress = 100.0;
+        }
+        else
+        {
+            _exportDisplayProgress = _exportTargetProgress;
+        }
+
+        int pct = (int)Math.Round(_exportDisplayProgress);
+        TbExportPercentage.Text = $"{pct}%";
+
+        double offset = ExportRingCircumference * (1.0 - (Math.Clamp(_exportDisplayProgress, 0.0, 100.0) / 100.0));
+        ExportProgressRingArc.StrokeDashOffset = offset;
+    }
+
+    private void OnCancelRenderClicked(object sender, RoutedEventArgs e)
+    {
+        _exportCts?.Cancel();
+    }
+
+    private void OnRenderOpenFolderClicked(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_lastOutputPath))
+        {
+            if (System.IO.File.Exists(_lastOutputPath))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{_lastOutputPath}\"");
+            }
+            else if (System.IO.Directory.Exists(System.IO.Path.GetDirectoryName(_lastOutputPath)))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", System.IO.Path.GetDirectoryName(_lastOutputPath)!);
+            }
+        }
+    }
+
+    private void OnRenderBackToEditorClicked(object sender, RoutedEventArgs e)
+    {
+        RenderProgressOverlay.Visibility = Visibility.Collapsed;
+        _ = RestoreMemoryAfterCancel();
     }
 
     private static string FormatTime(double seconds)
@@ -5894,5 +6077,25 @@ public sealed partial class EditorPage : Page
                 }
             }
         }
+    }
+
+    // --- EXIT MODAL LOGIC ---
+    public bool IsReadyToClose { get; private set; } = false;
+
+    public void ShowExitConfirmationOverlay()
+    {
+        ExitModalOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void OnExitSaveAndCloseClicked(object sender, RoutedEventArgs e)
+    {
+        ViewModel?.SaveProject();
+        IsReadyToClose = true;
+        MainWindow.CurrentInstance?.Close();
+    }
+
+    private void OnExitCancelClicked(object sender, RoutedEventArgs e)
+    {
+        ExitModalOverlay.Visibility = Visibility.Collapsed;
     }
 }

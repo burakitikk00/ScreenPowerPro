@@ -91,11 +91,6 @@ public sealed partial class DashboardPage : Page
         if (TbSelectMicTitle != null) TbSelectMicTitle.Text = _loc.CurrentLanguage == "en" ? "Select Microphone" : "Mikrofon Seçin";
         if (TbSelectAudioAppTitle != null) TbSelectAudioAppTitle.Text = _loc.CurrentLanguage == "en" ? "Select Running Applications" : "Çalışan Uygulamaları Seçin";
 
-        if (TbHistoryTitle != null) TbHistoryTitle.Text = _loc["Dashboard_History_Title"];
-        if (TbTabProjectHistory != null) TbTabProjectHistory.Text = _loc["Dashboard_History_TabRecordings"];
-        if (TbTabSharingHistory != null) TbTabSharingHistory.Text = _loc["Dashboard_History_TabShared"];
-        if (TbHistoryEmpty != null) TbHistoryEmpty.Text = _loc["Dashboard_History_Empty"];
-
         UpdateOnlyAppMenuText();
     }
 
@@ -392,137 +387,32 @@ public sealed partial class DashboardPage : Page
 
     #region File Menu & History Modal
 
-    private void OnFileHistoryClicked(object sender, RoutedEventArgs e)
-    {
-        ViewModel.RefreshRecentProjects();
-        RefreshHistoryProjectsList();
-        FileHistoryModalOverlay.Visibility = Visibility.Visible;
-    }
+    private HistoryWindow _historyWindow;
 
-    private void OnCloseFileHistory(object sender, RoutedEventArgs e)
+    private async void OnFileHistoryClicked(object sender, RoutedEventArgs e)
     {
-        FileHistoryModalOverlay.Visibility = Visibility.Collapsed;
-    }
+        // Yükleniyor animasyonunu göster
+        LoadingHistoryOverlay.Visibility = Visibility.Visible;
+        LoadingHistoryAnimation.Begin();
 
-    private void RefreshHistoryProjectsList()
-    {
-        var projects = ViewModel.RecentProjects;
-        if (projects == null || !projects.Any())
+        // Gerçekçi bir "yükleniyor" hissi için biraz bekletelim
+        await System.Threading.Tasks.Task.Delay(1500);
+
+        if (_historyWindow == null)
         {
-            TbHistoryEmpty.Visibility = Visibility.Visible;
-            HistoryProjectsList.ItemsSource = null;
+            _historyWindow = new HistoryWindow(ViewModel);
+            _historyWindow.Closed += (s, args) => _historyWindow = null;
         }
-        else
-        {
-            TbHistoryEmpty.Visibility = Visibility.Collapsed;
-            HistoryProjectsList.ItemsSource = projects;
-        }
+
+        // Animasyonu durdur ve gizle
+        LoadingHistoryAnimation.Stop();
+        LoadingHistoryOverlay.Visibility = Visibility.Collapsed;
+
+        _historyWindow.Activate();
     }
 
-    private void OnTabProjectHistoryClicked(object sender, RoutedEventArgs e)
-    {
-        BtnTabProjectHistory.Background = new SolidColorBrush(ColorHelper.FromArgb(255, 30, 58, 138));
-        BtnTabProjectHistory.BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 59, 130, 246));
-        BtnTabProjectHistory.BorderThickness = new Thickness(1);
 
-        BtnTabSharingHistory.Background = new SolidColorBrush(ColorHelper.FromArgb(255, 26, 27, 36));
-        BtnTabSharingHistory.BorderThickness = new Thickness(0);
 
-        TbHistoryEmpty.Text = _loc["Dashboard_History_Empty"];
-        RefreshHistoryProjectsList();
-    }
-
-    private void OnTabSharingHistoryClicked(object sender, RoutedEventArgs e)
-    {
-        BtnTabSharingHistory.Background = new SolidColorBrush(ColorHelper.FromArgb(255, 30, 58, 138));
-        BtnTabSharingHistory.BorderBrush = new SolidColorBrush(ColorHelper.FromArgb(255, 59, 130, 246));
-        BtnTabSharingHistory.BorderThickness = new Thickness(1);
-
-        BtnTabProjectHistory.Background = new SolidColorBrush(ColorHelper.FromArgb(255, 26, 27, 36));
-        BtnTabProjectHistory.BorderThickness = new Thickness(0);
-
-        // Sharing history empty placeholder
-        TbHistoryEmpty.Text = _loc["Dashboard_History_SharedEmpty"];
-        TbHistoryEmpty.Visibility = Visibility.Visible;
-        HistoryProjectsList.ItemsSource = null;
-    }
-
-    private void OnOpenProjectFromHistory(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is ProjectInfo project)
-        {
-            FileHistoryModalOverlay.Visibility = Visibility.Collapsed;
-            MainWindow.CurrentInstance?.NavigateToEditor(project.FolderPath);
-        }
-    }
-
-    private async void OnRenameProjectClicked(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is ProjectInfo project)
-        {
-            var textBox = new TextBox
-            {
-                Text = project.Name,
-                PlaceholderText = _loc["Dashboard_Rename_Placeholder"],
-                Margin = new Thickness(0, 8, 0, 0)
-            };
-
-            var dialog = new ContentDialog
-            {
-                Title = _loc["Dashboard_Rename_Title"],
-                Content = textBox,
-                PrimaryButtonText = _loc["Common_Save"],
-                CloseButtonText = _loc["Common_Cancel"],
-                XamlRoot = XamlRoot
-            };
-
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(textBox.Text))
-            {
-                ViewModel.RenameProject(project.FolderPath, textBox.Text.Trim());
-                RefreshHistoryProjectsList();
-            }
-        }
-    }
-
-    private void OnRevealProjectClicked(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is ProjectInfo project)
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "explorer.exe",
-                    Arguments = $"/select,\"{project.FolderPath}\"",
-                    UseShellExecute = true
-                });
-            }
-            catch { }
-        }
-    }
-
-    private async void OnDeleteProjectClicked(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is ProjectInfo project)
-        {
-            var dialog = new ContentDialog
-            {
-                Title = _loc["Dashboard_Delete_Title"],
-                Content = _loc.Get("Dashboard_Delete_Confirm", project.Name),
-                PrimaryButtonText = _loc["Common_Delete"],
-                CloseButtonText = _loc["Common_Cancel"],
-                XamlRoot = XamlRoot
-            };
-
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-                ViewModel.DeleteProject(project.FolderPath);
-                RefreshHistoryProjectsList();
-            }
-        }
-    }
 
     private async void OnImportVideoClicked(object sender, RoutedEventArgs e)
     {

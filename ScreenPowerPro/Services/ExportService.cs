@@ -318,10 +318,12 @@ public class ExportService
         }
         catch (OperationCanceledException)
         {
+            try { if (File.Exists(outputPath)) File.Delete(outputPath); } catch { }
             throw;
         }
         catch (Exception) when (cancellationToken.IsCancellationRequested)
         {
+            try { if (File.Exists(outputPath)) File.Delete(outputPath); } catch { }
             throw new OperationCanceledException(cancellationToken);
         }
         finally

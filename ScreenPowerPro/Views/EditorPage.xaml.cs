@@ -51,10 +51,15 @@ public sealed partial class EditorPage : Page
     private int _activeBezierHandle = 0; // 0 = none, 1 = P1, 2 = P2
     private bool _isUpdatingBezierUI = false;
 
-    // Real-Time Zoom Preview State
+    // Real-Time Zoom Preview State (Bezier easing demo paneli için)
     private DispatcherTimer? _zoomPreviewTimer;
     private readonly System.Diagnostics.Stopwatch _zoomPreviewStopwatch = new();
     private CompositeTransform? _previewTargetTransform;
+
+    // Sinematik Kamera — Spring-Damper + Idle Timeout + Look-Ahead
+    private readonly CinematicCameraController _cinematicCamera = new();
+    private DateTime _lastCameraTickTime = DateTime.UtcNow;
+    private bool _cinematicCameraInitialized = false;
 
     private Windows.Media.Playback.MediaPlayer? _micPlayer;
     private Windows.Media.Playback.MediaPlayer? _sysPlayer;
@@ -63,6 +68,7 @@ public sealed partial class EditorPage : Page
     private MediaSource? _pendingVideoSource;
     private MediaSource? _pendingMicSource;
     private MediaSource? _pendingSysSource;
+    private readonly ZoomEngineService _zoomEngine;
     private bool _videoAttachInProgress = false; // Guard against double DoAttachVideoToPlayer calls
     private bool _isDraggingPlayhead = false;
 
@@ -101,6 +107,7 @@ public sealed partial class EditorPage : Page
         {
             ViewModel = App.Current.Services.GetRequiredService<EditorViewModel>();
             _loc = App.Current.Services.GetRequiredService<LocalizationService>();
+            _zoomEngine = App.Current.Services.GetRequiredService<ZoomEngineService>();
             DataContext = ViewModel;
 
             InitializeComponent();
@@ -202,6 +209,7 @@ public sealed partial class EditorPage : Page
         _videoAudioAnimTimer?.Stop();
         _zoomPreviewTimer?.Stop();
         _zoomPreviewStopwatch.Stop();
+        _cinematicCameraInitialized = false;
 
         try
         {
@@ -2550,46 +2558,85 @@ public sealed partial class EditorPage : Page
         return true;
     }
 
-    // Field declarations for Camera tracking
-    private double _cameraCurrentX = 0.5, _cameraCurrentY = 0.5;
-    private double _cameraTargetX  = 0.5, _cameraTargetY  = 0.5;
-    private double _cameraCurrentScale = 1.0, _cameraTargetScale = 1.0;
-    private const double CameraLerpSpeed = 0.025;
+    // =========================================================================
+    // SİNEMATİK KAMERA SİSTEMİ — Spring-Damper + Idle Timeout + Look-Ahead
+    // Eski sabit-lerp sistemi kaldırıldı; CinematicCameraController kullanılıyor.
+    // =========================================================================
 
-    private static double CubicEaseOut(double t)
-        => 1.0 - Math.Pow(1.0 - Math.Clamp(t, 0.0, 1.0), 3.0);
-
-    private static double LerpCubicOut(double from, double to, double t)
-        => from + (to - from) * CubicEaseOut(t);
-
+    /// <summary>
+    /// Her oynatma tick'inde çağrılır. Δt tabanlı Spring-Damper fiziğini çalıştırır
+    /// ve VideoTransform'a uygular.
+    ///
+    /// Algoritma 1 (Direct Target Zoom): Scale(t) ve Position(t) aynı Spring fiziğine bağlı.
+    /// Algoritma 2 (Dinamik Zoom-Out): Look-ahead içinde fare hızı hesaplanıyor.
+    /// Algoritma 3 (Idle Timeout): Fare hareketsizse 2sn sonra zoom-out tetikleniyor.
+    /// Algoritma 4 (Spring-Damper): F = k*(P_future - P_cam) - c*V_cam
+    /// </summary>
     private void UpdateCameraForZoomEffect(double currentTimeSec)
     {
         if (ViewModel == null || VideoTransform == null) return;
 
-        var activeZoom = ViewModel.ZoomEffects?.FirstOrDefault(z =>
-            currentTimeSec >= z.StartTime &&
-            currentTimeSec <= z.StartTime + z.Duration);
+        double natW = _naturalVideoWidth  > 0 ? _naturalVideoWidth  : (ViewModel.VideoWidth  > 0 ? ViewModel.VideoWidth  : 1920.0);
+        double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
 
-        if (activeZoom == null)
+        // İlk çalıştırmada veya proje değişiminde kamerayı başlat
+        if (!_cinematicCameraInitialized)
         {
-            _cameraTargetScale = 1.0;
-            _cameraTargetX = 0.5;
-            _cameraTargetY = 0.5;
+            _cinematicCamera.Initialize(natW, natH);
+            _cinematicCameraInitialized = true;
+            _lastCameraTickTime = DateTime.UtcNow;
+        }
+
+        // Δt hesapla — gerçek geçen süre (saniye)
+        var now = DateTime.UtcNow;
+        double deltaT = (now - _lastCameraTickTime).TotalSeconds;
+        _lastCameraTickTime = now;
+        if (deltaT <= 0 || deltaT > 0.15) deltaT = 0.025; // İlk kare veya uzun pause sonrası güvenlik
+
+        // Algoritma 3: Fare konumunu telemetriden al ve idle detection'a ver
+        double cursorSrcX = natW / 2.0, cursorSrcY = natH / 2.0;
+        if (ViewModel.MouseMoves != null && ViewModel.MouseMoves.Count > 0)
+        {
+            var pt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, currentTimeSec);
+            if (pt.HasValue)
+            {
+                cursorSrcX = pt.Value.X;
+                cursorSrcY = pt.Value.Y;
+            }
+        }
+        _cinematicCamera.UpdateIdleDetection(cursorSrcX, cursorSrcY, deltaT);
+
+        // Algoritma 3: Idle timeout tetiklenirse zoom-out
+        if (_cinematicCamera.IsIdleTriggered)
+        {
+            _cinematicCamera.SetTargetCenter(natW / 2.0, natH / 2.0);
         }
         else
         {
-            _cameraTargetScale = activeZoom.Scale;
-            _cameraTargetX = _naturalVideoWidth  > 0 ? activeZoom.TargetX / _naturalVideoWidth  : 0.5;
-            _cameraTargetY = _naturalVideoHeight > 0 ? activeZoom.TargetY / _naturalVideoHeight : 0.5;
+            // Algoritma 4 (Look-Ahead) + Algoritma 2 (Dinamik Zoom-Out)
+            // 200ms ilerisi okunarak Spring hedefi güncelleniyor
+            _cinematicCamera.UpdateLookAheadFromTimeline(
+                _zoomEngine,
+                ViewModel.ZoomEffects,
+                currentTimeSec,
+                natW, natH,
+                lookAheadSec: 0.200,
+                mouseMoves: ViewModel.MouseMoves);
         }
 
-        _cameraCurrentScale = LerpCubicOut(_cameraCurrentScale, _cameraTargetScale, CameraLerpSpeed);
-        _cameraCurrentX     = LerpCubicOut(_cameraCurrentX,     _cameraTargetX,     CameraLerpSpeed);
-        _cameraCurrentY     = LerpCubicOut(_cameraCurrentY,     _cameraTargetY,     CameraLerpSpeed);
+        // Algoritma 4: Spring-Damper fiziği uygula
+        var (springPos, springScale) = _cinematicCamera.Update(deltaT);
 
-        ApplyCameraTransform(_cameraCurrentScale, _cameraCurrentX, _cameraCurrentY);
+        // Algoritma 1: Hedef noktasını ekranın ortasına hizalayan offset hesapla
+        ApplyCameraTransform(springScale, springPos.X / natW, springPos.Y / natH);
     }
 
+    /// <summary>
+    /// Normalized (0..1) koordinatları VideoTransform'a uygular.
+    /// Algoritma 1 — Doğrudan Hedefe Yakınlaştırma:
+    ///   Transform origin = ekran merkezi (0.5, 0.5)
+    ///   Odak noktası farklıysa gerekli TranslateX/Y offset hesaplanır.
+    /// </summary>
     private void ApplyCameraTransform(double scale, double normX, double normY)
     {
         if (VideoTransform == null || VideoWindowLayer == null) return;
@@ -2597,16 +2644,17 @@ public sealed partial class EditorPage : Page
         double H = VideoWindowLayer.ActualHeight;
         if (W <= 0 || H <= 0) return;
 
-        scale = Math.Clamp(scale, 1.0, 2.2);
+        scale = Math.Clamp(scale, 1.0, 5.0);
 
         // Gerçek video içeriğinin ekrandaki sınırlarını al (Letterbox hesabı)
         Windows.Foundation.Rect contentRect = GetVideoContentRect();
 
-        // Odak noktasının konteyner üzerindeki gerçek piksel koordinatı
+        // Algoritma 1: Odak noktasının konteyner üzerindeki gerçek piksel koordinatı
         double targetPx = contentRect.X + (normX * contentRect.Width);
         double targetPy = contentRect.Y + (normY * contentRect.Height);
 
         // Odak noktasını ekranın merkezine (W/2, H/2) hizalamak için gereken Translate
+        // Bu formül: Transform origin = merkez, ancak scale ile birlikte odak noktası kaymasını telafi eder
         double tx = (W * 0.5) - (targetPx * scale);
         double ty = (H * 0.5) - (targetPy * scale);
 
@@ -2617,11 +2665,11 @@ public sealed partial class EditorPage : Page
         VideoTransform.ScaleY     = scale;
         VideoTransform.TranslateX = tx;
         VideoTransform.TranslateY = ty;
-        
+
         if (BlackGapOverlay != null && BlackGapOverlay.RenderTransform is Microsoft.UI.Xaml.Media.CompositeTransform bgT)
         {
-            bgT.ScaleX = scale;
-            bgT.ScaleY = scale;
+            bgT.ScaleX     = scale;
+            bgT.ScaleY     = scale;
             bgT.TranslateX = tx;
             bgT.TranslateY = ty;
         }

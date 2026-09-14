@@ -2861,7 +2861,6 @@ public sealed partial class EditorPage : Page
         }
 
         UpdateGapBlackScreen();
-        UpdateCameraForZoomEffect(_currentTimeSeconds);
 
         var ts = TimeSpan.FromSeconds(_currentTimeSeconds);
         if (_isPlaying)
@@ -3056,15 +3055,17 @@ public sealed partial class EditorPage : Page
         return new Rect(offsetX, offsetY, renderW, renderH);
     }
 
-    private void UpdateZoomSimulation()
+    private void UpdateZoomSimulation(double? customTimeSec = null)
     {
         if (!_isPageLoaded || ZoomLevelBadge == null) return;
+        
+        double timeToUse = customTimeSec ?? _currentTimeSeconds;
 
         // Mevcut fare konumunu telemetriden doğrudan kaynak video koordinatlarında al
         double cursorSrcX = -1, cursorSrcY = -1;
         if (ViewModel?.MouseMoves != null && ViewModel.MouseMoves.Count > 0)
         {
-            var pt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, _currentTimeSeconds);
+            var pt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, timeToUse);
             if (pt.HasValue)
             {
                 cursorSrcX = pt.Value.X;
@@ -3072,31 +3073,19 @@ public sealed partial class EditorPage : Page
             }
         }
 
-        var activeZoom = ViewModel?.GetCurrentZoom(cursorSrcX, cursorSrcY);
+        var activeZoom = ViewModel?.GetCurrentZoom(cursorSrcX, cursorSrcY, timeToUse);
         if (activeZoom != null)
         {
             ZoomLevelBadge.Text = $"{activeZoom.Scale:F1}x";
             if (VideoTransform != null)
             {
-                VideoTransform.ScaleX = activeZoom.Scale;
-                VideoTransform.ScaleY = activeZoom.Scale;
-
                 double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel?.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
                 double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel?.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
-                var rect = GetVideoContentRect();
 
-                double normCenterX = natW / 2.0;
-                double normCenterY = natH / 2.0;
-
-                // Zoom ölçeğine göre kenar boşlukları ve tam merkezleme ofseti hesabı
-                double maxOffsetX = (rect.Width * (activeZoom.Scale - 1.0)) / 2.0;
-                double maxOffsetY = (rect.Height * (activeZoom.Scale - 1.0)) / 2.0;
-
-                double offsetX = (normCenterX - activeZoom.TargetX) * (rect.Width / natW) * activeZoom.Scale;
-                double offsetY = (normCenterY - activeZoom.TargetY) * (rect.Height / natH) * activeZoom.Scale;
-
-                VideoTransform.TranslateX = Math.Clamp(offsetX, -maxOffsetX, maxOffsetX);
-                VideoTransform.TranslateY = Math.Clamp(offsetY, -maxOffsetY, maxOffsetY);
+                double normX = activeZoom.TargetX / natW;
+                double normY = activeZoom.TargetY / natH;
+                
+                ApplyCameraTransform(activeZoom.Scale, normX, normY);
             }
         }
         else
@@ -3104,10 +3093,7 @@ public sealed partial class EditorPage : Page
             ZoomLevelBadge.Text = "1.0x";
             if (VideoTransform != null)
             {
-                VideoTransform.ScaleX = 1.0;
-                VideoTransform.ScaleY = 1.0;
-                VideoTransform.TranslateX = 0;
-                VideoTransform.TranslateY = 0;
+                ApplyCameraTransform(1.0, 0.5, 0.5);
             }
         }
     }
@@ -3218,6 +3204,7 @@ public sealed partial class EditorPage : Page
                     {
                         try { VideoPlayer.MediaPlayer.Position = TimeSpan.FromSeconds(hoverSec); } catch { }
                     }
+                    UpdateZoomSimulation(hoverSec);
                 }
             }
         }
@@ -3246,6 +3233,7 @@ public sealed partial class EditorPage : Page
         if (!_isPlaying && VideoPlayer?.MediaPlayer != null)
         {
             try { VideoPlayer.MediaPlayer.Position = TimeSpan.FromSeconds(_currentTimeSeconds); } catch { }
+            UpdateZoomSimulation();
         }
     }
 

@@ -1343,11 +1343,13 @@ public partial class EditorViewModel : ObservableObject
     /// Belirli bir zamandaki canlı zoom transformunu hesaplamak için motordan faydalanır.
     /// cursorX/cursorY: Kaynak video koordinatlarındaki fare konumu (fare takibi için).
     /// </summary>
-    public ZoomEngineService.ActiveZoomState? GetCurrentZoom(double cursorX = -1, double cursorY = -1)
+    public ZoomEngineService.ActiveZoomState? GetCurrentZoom(double cursorX = -1, double cursorY = -1, double? customTimeSec = null)
     {
+        double timeToUse = customTimeSec ?? CurrentTimeSec;
+
         if ((cursorX < 0 || cursorY < 0) && MouseMoves != null && MouseMoves.Count > 0)
         {
-            var pt = ZoomEngineService.GetInterpolatedCursorPosition(MouseMoves, CurrentTimeSec);
+            var pt = ZoomEngineService.GetInterpolatedCursorPosition(MouseMoves, timeToUse);
             if (pt.HasValue)
             {
                 cursorX = pt.Value.X;
@@ -1360,7 +1362,7 @@ public partial class EditorViewModel : ObservableObject
 
         return _zoomEngineService.GetActiveZoomAtTime(
             ZoomEffects.ToList(),
-            CurrentTimeSec,
+            timeToUse,
             defaultCenterX: defW / 2.0,
             defaultCenterY: defH / 2.0,
             cursorX: cursorX,

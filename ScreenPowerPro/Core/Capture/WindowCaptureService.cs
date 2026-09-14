@@ -74,6 +74,8 @@ public class WindowCaptureService : IDisposable
     private readonly object _swapLock = new object();
     private Task? _writerTask;
     private CancellationTokenSource? _writerCts;
+    private bool _newFrameArrived = false;
+    private bool _firstFrameArrived = false;
 
     public int Width => _width;
     public int Height => _height;
@@ -177,6 +179,8 @@ public class WindowCaptureService : IDisposable
         _writeBuffer = new byte[bufferSize];
 
         _writerCts = new CancellationTokenSource();
+        _newFrameArrived = false;
+        _firstFrameArrived = false;
         _writerTask = Task.Run(async () =>
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -184,13 +188,17 @@ public class WindowCaptureService : IDisposable
             double nextFrameTime = frameInterval;
             while (!_writerCts.Token.IsCancellationRequested)
             {
-                if (_outputStream != null && _outputStream.CanWrite)
+                if (_outputStream != null && _outputStream.CanWrite && _firstFrameArrived)
                 {
                     lock (_swapLock)
                     {
-                        var temp = _captureBuffer;
-                        _captureBuffer = _writeBuffer;
-                        _writeBuffer = temp;
+                        if (_newFrameArrived)
+                        {
+                            var temp = _captureBuffer;
+                            _captureBuffer = _writeBuffer;
+                            _writeBuffer = temp;
+                            _newFrameArrived = false;
+                        }
                     }
 
                     try
@@ -248,6 +256,8 @@ public class WindowCaptureService : IDisposable
                     if (_captureBuffer != null && capacity <= _captureBuffer.Length)
                     {
                         span.CopyTo(_captureBuffer);
+                        _newFrameArrived = true;
+                        _firstFrameArrived = true;
                     }
                 }
             }

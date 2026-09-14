@@ -47,6 +47,9 @@ public partial class SettingsViewModel : ObservableObject
     private double _zoomDuration = 2.5;
 
     [ObservableProperty]
+    private string _zoomEasingFunction = "Cubic-Out";
+
+    [ObservableProperty]
     private bool _cancelOnOutOfBounds = true;
 
     [ObservableProperty]
@@ -129,6 +132,7 @@ public partial class SettingsViewModel : ObservableObject
         ZoomSpeed = s.ZoomSpeed;
         MaxZoomRatio = s.MaxZoomRatio;
         ZoomDuration = s.ZoomDuration;
+        ZoomEasingFunction = SettingsManager.Instance.ZoomEasingFunction ?? "Cubic-Out";
         CancelOnOutOfBounds = s.CancelOnOutOfBounds;
         HideDesktopIcons = s.HideDesktopIcons;
         HideTaskbar = s.HideTaskbar;
@@ -203,6 +207,7 @@ public partial class SettingsViewModel : ObservableObject
         SettingsManager.Instance.ZoomSpeed = ZoomSpeed;
         SettingsManager.Instance.MaxZoomRatio = MaxZoomRatio;
         SettingsManager.Instance.ZoomDuration = ZoomDuration;
+        SettingsManager.Instance.ZoomEasingFunction = ZoomEasingFunction;
         SettingsManager.Instance.CancelOnOutOfBounds = CancelOnOutOfBounds;
 
         SaveStatusMessage = "Ayarlar başarıyla kaydedildi.";

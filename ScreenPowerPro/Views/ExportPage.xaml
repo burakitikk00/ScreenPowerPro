@@ -22,8 +22,9 @@
         </Ellipse>
 
         <!-- Main content -->
-        <StackPanel
-            HorizontalAlignment="Center"
+        <Viewbox Stretch="Uniform" Margin="20,40,20,20">
+            <StackPanel
+                HorizontalAlignment="Center"
             VerticalAlignment="Center"
             Spacing="0">
 
@@ -31,7 +32,7 @@
             <Grid
                 Width="256" Height="256"
                 HorizontalAlignment="Center"
-                Margin="0,0,0,40">
+                Margin="0,0,0,20">
 
                 <!-- Ring background glow -->
                 <Ellipse Width="256" Height="256">
@@ -92,7 +93,7 @@
             </Grid>
 
             <!-- Status text -->
-            <StackPanel HorizontalAlignment="Center" Spacing="8" Margin="0,0,0,60">
+            <StackPanel HorizontalAlignment="Center" Spacing="8" Margin="0,0,0,30">
                 <TextBlock
                     x:Name="TbStatusTitle"
                     Text="Videounuz dışa aktarılıyor..."
@@ -183,7 +184,7 @@
                         Foreground="{StaticResource TextMutedBrush}"/>
                     <TextBlock
                         x:Name="TbBtnCancelText"
-                        Text="Dışa Aktarmayı İptal Et"
+                        Text="İptal"
                         FontSize="14" FontWeight="SemiBold"
                         Foreground="{StaticResource TextMutedBrush}"/>
                 </StackPanel>
@@ -258,5 +259,6 @@
             </StackPanel>
 
         </StackPanel>
+        </Viewbox>
     </Grid>
 </Page>

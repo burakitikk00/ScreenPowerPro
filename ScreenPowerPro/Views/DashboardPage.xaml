@@ -11,6 +11,32 @@
     Background="#0E0F14">
 
     <Page.Resources>
+        <Storyboard x:Name="LoadingHistoryAnimation" RepeatBehavior="Forever">
+            <!-- Dot 1 -->
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="TransDot1History" Storyboard.TargetProperty="Y">
+                <LinearDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.3" Value="-10" KeySpline="0.25,0.1 0.25,1.0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.6" Value="0" KeySpline="0.25,0.1 0.25,1.0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.0" Value="0"/>
+            </DoubleAnimationUsingKeyFrames>
+            <!-- Pill -->
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="TransPillHistory" Storyboard.TargetProperty="Y">
+                <LinearDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:0.1" Value="0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.4" Value="-10" KeySpline="0.25,0.1 0.25,1.0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.7" Value="0" KeySpline="0.25,0.1 0.25,1.0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.0" Value="0"/>
+            </DoubleAnimationUsingKeyFrames>
+            <!-- Dot 2 -->
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="TransDot2History" Storyboard.TargetProperty="Y">
+                <LinearDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:0.2" Value="0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.5" Value="-10" KeySpline="0.25,0.1 0.25,1.0"/>
+                <SplineDoubleKeyFrame KeyTime="0:0:0.8" Value="0" KeySpline="0.25,0.1 0.25,1.0"/>
+                <LinearDoubleKeyFrame KeyTime="0:0:1.0" Value="0"/>
+            </DoubleAnimationUsingKeyFrames>
+        </Storyboard>
+
         <!-- Device dropdown button style -->
         <Style x:Key="DeviceDropdownButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#171821" />
@@ -704,120 +730,28 @@
             </Grid>
         </Border>
 
-        <!-- ====================================================
-             FILE HISTORY MODAL DIALOG (IMAGE 3)
-             ==================================================== -->
-        <Grid x:Name="FileHistoryModalOverlay" Visibility="Collapsed" Background="#B3000000">
-            <Border Width="640" Height="480" CornerRadius="18" Background="#14151E" BorderBrush="#252736" BorderThickness="1"
-                Padding="24,20" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Grid RowSpacing="16">
-                    <Grid.RowDefinitions>
-                        <!-- Header -->
-                        <RowDefinition Height="Auto" />
-                        <!-- Tabs -->
-                        <RowDefinition Height="Auto" />
-                        <!-- Project List Area -->
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <!-- Header with Title & Close button -->
-                    <Grid Grid.Row="0">
-                        <TextBlock x:Name="TbHistoryTitle" Text="File History" FontSize="17" FontWeight="Bold" Foreground="#F5F5FA"
-                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        <Button Click="OnCloseFileHistory"
-                            Background="Transparent" BorderThickness="0" CornerRadius="6" Width="30" Height="30" Padding="0"
-                            HorizontalAlignment="Right">
-                            <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="#CCCCCC"/>
-                        </Button>
-                    </Grid>
-
-                    <!-- Tabs: Project History & Sharing History -->
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="BtnTabProjectHistory" Click="OnTabProjectHistoryClicked"
-                            Background="#1E3A8A" BorderBrush="#3B82F6" BorderThickness="1"
-                            CornerRadius="8" Padding="16,8">
-                            <TextBlock x:Name="TbTabProjectHistory" Text="Project History" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
-                        </Button>
-                        <Button x:Name="BtnTabSharingHistory" Click="OnTabSharingHistoryClicked"
-                            Background="#1A1B24" BorderThickness="0"
-                            CornerRadius="8" Padding="16,8">
-                            <TextBlock x:Name="TbTabSharingHistory" Text="Sharing History" FontSize="13" FontWeight="Normal" Foreground="#8E8E9F"/>
-                        </Button>
-                    </StackPanel>
-
-                    <!-- Projects List -->
-                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                        <StackPanel Spacing="8">
-                            <!-- Empty message -->
-                            <TextBlock x:Name="TbHistoryEmpty" Text="No recorded projects found."
-                                FontSize="13" Foreground="#7A7B8C" HorizontalAlignment="Center" Margin="0,40,0,0"
-                                Visibility="Collapsed"/>
-
-                            <ItemsControl x:Name="HistoryProjectsList">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="models:ProjectInfo">
-                                        <Border Background="#1A1B25" CornerRadius="10" Padding="14,10" Margin="0,0,0,4">
-                                            <Grid ColumnSpacing="12">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-
-                                                <!-- Project Icon (Swirl) -->
-                                                <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16">
-                                                    <Border.Background>
-                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                            <GradientStop Color="#00D2FF" Offset="0.0"/>
-                                                            <GradientStop Color="#9B51E0" Offset="0.6"/>
-                                                            <GradientStop Color="#FF007A" Offset="1.0"/>
-                                                        </LinearGradientBrush>
-                                                    </Border.Background>
-                                                    <FontIcon Glyph="&#xE768;" FontSize="13" Foreground="White"
-                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
-
-                                                <!-- Project Info (Click to open) -->
-                                                <Button Grid.Column="1" Click="OnOpenProjectFromHistory" Tag="{x:Bind}"
-                                                    Background="Transparent" BorderThickness="0" Padding="0"
-                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
-                                                    <StackPanel Spacing="2">
-                                                        <TextBlock Text="{x:Bind Name}" FontSize="13" FontWeight="SemiBold"
-                                                            Foreground="#E3E1EC" TextTrimming="CharacterEllipsis"/>
-                                                        <TextBlock Text="{x:Bind FormattedDate}" FontSize="11" Foreground="#7A7B8C"/>
-                                                    </StackPanel>
-                                                </Button>
-
-                                                <!-- Action Buttons: Rename, Reveal in Explorer, Delete -->
-                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                    <!-- Rename -->
-                                                    <Button Click="OnRenameProjectClicked" Tag="{x:Bind}"
-                                                        Background="Transparent" BorderThickness="0" CornerRadius="6" Width="30" Height="30" Padding="0"
-                                                        ToolTipService.ToolTip="Rename">
-                                                        <FontIcon Glyph="&#xE70F;" FontSize="13" Foreground="#94A3B8"/>
-                                                    </Button>
-                                                    <!-- Open in Explorer -->
-                                                    <Button Click="OnRevealProjectClicked" Tag="{x:Bind}"
-                                                        Background="Transparent" BorderThickness="0" CornerRadius="6" Width="30" Height="30" Padding="0"
-                                                        ToolTipService.ToolTip="Open in Folder">
-                                                        <FontIcon Glyph="&#xED25;" FontSize="13" Foreground="#94A3B8"/>
-                                                    </Button>
-                                                    <!-- Delete -->
-                                                    <Button Click="OnDeleteProjectClicked" Tag="{x:Bind}"
-                                                        Background="Transparent" BorderThickness="0" CornerRadius="6" Width="30" Height="30" Padding="0"
-                                                        ToolTipService.ToolTip="Delete">
-                                                        <FontIcon Glyph="&#xE74D;" FontSize="13" Foreground="#EF4444"/>
-                                                    </Button>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </ScrollViewer>
-                </Grid>
-            </Border>
+        <!-- Loading Overlay for History -->
+        <Grid x:Name="LoadingHistoryOverlay" Visibility="Collapsed" Background="#B3000000" Canvas.ZIndex="9999">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                    <Ellipse Width="12" Height="12" Fill="#A078FF">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="TransDot1History"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Border Width="36" Height="12" CornerRadius="6" Background="#00E5FF">
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="TransPillHistory"/>
+                        </Border.RenderTransform>
+                    </Border>
+                    <Ellipse Width="12" Height="12" Fill="#FACC15">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="TransDot2History"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </StackPanel>
+                <TextBlock Text="Kayıtlar Yükleniyor..." Foreground="#E3E1EC" FontSize="14" HorizontalAlignment="Center"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </Page>

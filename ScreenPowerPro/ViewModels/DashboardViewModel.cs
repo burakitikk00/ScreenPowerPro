@@ -291,7 +291,17 @@ public partial class DashboardViewModel : ObservableObject
         try
         {
             await _recorderService.StartRecordingAsync(projectDir, SelectedMode, winHandle, cropX, cropY, cropW, cropH);
-            RequestStartRecording?.Invoke(projectDir);
+            if (ScreenPowerPro.MainWindow.CurrentInstance != null)
+            {
+                ScreenPowerPro.MainWindow.CurrentInstance.DispatcherQueue.TryEnqueue(() =>
+                {
+                    RequestStartRecording?.Invoke(projectDir);
+                });
+            }
+            else
+            {
+                RequestStartRecording?.Invoke(projectDir);
+            }
         }
         catch
         {

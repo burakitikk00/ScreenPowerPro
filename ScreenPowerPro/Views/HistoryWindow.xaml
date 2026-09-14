@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="ScreenPowerPro.Views.HistoryWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:ScreenPowerPro.Models"
+    mc:Ignorable="d">
+
+    <Grid Background="#14151E">
+        <Grid.RowDefinitions>
+            <!-- Title bar area -->
+            <RowDefinition Height="40" />
+            <!-- Content -->
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Title Bar -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Background="Transparent">
+            <TextBlock x:Name="TbHistoryTitle" Text="File History" FontSize="16" FontWeight="SemiBold" Foreground="#F5F5FA"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Content Area -->
+        <Grid Grid.Row="1" Padding="24,10,24,20" RowSpacing="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Tabs: Project History & Sharing History -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="BtnTabProjectHistory" Click="OnTabProjectHistoryClicked"
+                    Background="#1E3A8A" BorderBrush="#3B82F6" BorderThickness="1"
+                    CornerRadius="8" Padding="16,8">
+                    <TextBlock x:Name="TbTabProjectHistory" Text="Project History" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                </Button>
+                <Button x:Name="BtnTabSharingHistory" Click="OnTabSharingHistoryClicked"
+                    Background="#1A1B24" BorderThickness="0"
+                    CornerRadius="8" Padding="16,8">
+                    <TextBlock x:Name="TbTabSharingHistory" Text="Sharing History" FontSize="13" FontWeight="Normal" Foreground="#8E8E9F"/>
+                </Button>
+            </StackPanel>
+
+            <!-- Projects List -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="8">
+                    <!-- Empty message -->
+                    <TextBlock x:Name="TbHistoryEmpty" Text="No recorded projects found."
+                        FontSize="13" Foreground="#7A7B8C" HorizontalAlignment="Center" Margin="0,40,0,0"
+                        Visibility="Collapsed"/>
+
+                    <ItemsControl x:Name="HistoryProjectsList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:ProjectInfo">
+                                <Border Background="#1A1B25" CornerRadius="10" Padding="14,10" Margin="0,0,0,4">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Project Icon (Swirl) -->
+                                        <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#00D2FF" Offset="0.0"/>
+                                                    <GradientStop Color="#9B51E0" Offset="0.6"/>
+                                                    <GradientStop Color="#FF007A" Offset="1.0"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                            <FontIcon Glyph="&#xE768;" FontSize="13" Foreground="White"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Project Info (Click to open) -->
+                                        <Button Grid.Column="1" Click="OnOpenProjectFromHistory" Tag="{x:Bind}"
+                                            Background="Transparent" BorderThickness="0" Padding="0"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{x:Bind Name}" FontSize="13" FontWeight="SemiBold"
+                                                    Foreground="#E3E1EC" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{x:Bind FormattedDate}" FontSize="11" Foreground="#8E8E9F"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Actions -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <Button Click="OnRenameProjectClicked" Tag="{x:Bind}" Background="Transparent" BorderThickness="0" CornerRadius="6" Padding="6">
+                                                <FontIcon Glyph="&#xE70F;" FontSize="12" Foreground="#8E8E9F"/>
+                                            </Button>
+                                            <Button Click="OnOpenProjectFolder" Tag="{x:Bind}" Background="Transparent" BorderThickness="0" CornerRadius="6" Padding="6">
+                                                <FontIcon Glyph="&#xE8B7;" FontSize="12" Foreground="#8E8E9F"/>
+                                            </Button>
+                                            <Button Click="OnDeleteProject" Tag="{x:Bind}" Background="Transparent" BorderThickness="0" CornerRadius="6" Padding="6">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="12" Foreground="#EF4444"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

@@ -115,7 +115,21 @@ public class ScreenRecorderService : IDisposable
                     {
                         try
                         {
-                            _micWriter?.Write(buffer.ToArray(), 0, buffer.Length);
+                            if (_micWriter != null && _recordStopwatch != null)
+                            {
+                                long expectedBytes = (long)(_recordStopwatch.Elapsed.TotalSeconds * _micWriter.WaveFormat.AverageBytesPerSecond);
+                                long gapBytes = expectedBytes - _micWriter.Length;
+                                long thresholdBytes = (long)(0.1 * _micWriter.WaveFormat.AverageBytesPerSecond);
+                                if (gapBytes > thresholdBytes)
+                                {
+                                    gapBytes -= gapBytes % _micWriter.WaveFormat.BlockAlign;
+                                    if (gapBytes > 0 && gapBytes < int.MaxValue)
+                                    {
+                                        _micWriter.Write(new byte[gapBytes], 0, (int)gapBytes);
+                                    }
+                                }
+                                _micWriter.Write(buffer.ToArray(), 0, buffer.Length);
+                            }
                         }
                         catch { }
                     };
@@ -132,7 +146,21 @@ public class ScreenRecorderService : IDisposable
                         {
                             try
                             {
-                                _micWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                                if (_micWriter != null && _recordStopwatch != null)
+                                {
+                                    long expectedBytes = (long)(_recordStopwatch.Elapsed.TotalSeconds * _micWriter.WaveFormat.AverageBytesPerSecond);
+                                    long gapBytes = expectedBytes - _micWriter.Length;
+                                    long thresholdBytes = (long)(0.1 * _micWriter.WaveFormat.AverageBytesPerSecond);
+                                    if (gapBytes > thresholdBytes)
+                                    {
+                                        gapBytes -= gapBytes % _micWriter.WaveFormat.BlockAlign;
+                                        if (gapBytes > 0 && gapBytes < int.MaxValue)
+                                        {
+                                            _micWriter.Write(new byte[gapBytes], 0, (int)gapBytes);
+                                        }
+                                    }
+                                    _micWriter.Write(e.Buffer, 0, e.BytesRecorded);
+                                }
                             }
                             catch { }
                         };
@@ -193,7 +221,21 @@ public class ScreenRecorderService : IDisposable
                     {
                         try
                         {
-                            _loopbackWriter?.Write(buffer.ToArray(), 0, buffer.Length);
+                            if (_loopbackWriter != null && _recordStopwatch != null)
+                            {
+                                long expectedBytes = (long)(_recordStopwatch.Elapsed.TotalSeconds * _loopbackWriter.WaveFormat.AverageBytesPerSecond);
+                                long gapBytes = expectedBytes - _loopbackWriter.Length;
+                                long thresholdBytes = (long)(0.1 * _loopbackWriter.WaveFormat.AverageBytesPerSecond);
+                                if (gapBytes > thresholdBytes)
+                                {
+                                    gapBytes -= gapBytes % _loopbackWriter.WaveFormat.BlockAlign;
+                                    if (gapBytes > 0 && gapBytes < int.MaxValue)
+                                    {
+                                        _loopbackWriter.Write(new byte[gapBytes], 0, (int)gapBytes);
+                                    }
+                                }
+                                _loopbackWriter.Write(buffer.ToArray(), 0, buffer.Length);
+                            }
                         }
                         catch { }
                     };
@@ -212,7 +254,21 @@ public class ScreenRecorderService : IDisposable
                         {
                             try
                             {
-                                _loopbackWriter?.Write(e.Buffer, 0, e.BytesRecorded);
+                                if (_loopbackWriter != null && _recordStopwatch != null)
+                                {
+                                    long expectedBytes = (long)(_recordStopwatch.Elapsed.TotalSeconds * _loopbackWriter.WaveFormat.AverageBytesPerSecond);
+                                    long gapBytes = expectedBytes - _loopbackWriter.Length;
+                                    long thresholdBytes = (long)(0.1 * _loopbackWriter.WaveFormat.AverageBytesPerSecond);
+                                    if (gapBytes > thresholdBytes)
+                                    {
+                                        gapBytes -= gapBytes % _loopbackWriter.WaveFormat.BlockAlign;
+                                        if (gapBytes > 0 && gapBytes < int.MaxValue)
+                                        {
+                                            _loopbackWriter.Write(new byte[gapBytes], 0, (int)gapBytes);
+                                        }
+                                    }
+                                    _loopbackWriter.Write(e.Buffer, 0, e.BytesRecorded);
+                                }
                             }
                             catch { }
                         };
@@ -288,7 +344,7 @@ public class ScreenRecorderService : IDisposable
             // MediaPlayerElement fails with 0xC00D36FA (SourceNotSupported) if the MP4 file
             // only contains a video stream and lacks an audio stream.
             // We use lavfi anullsrc to mix a silent audio track into the recording.
-            string dummyAudioInput = "-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100";
+            string dummyAudioInput = "-f lavfi -re -i anullsrc=channel_layout=stereo:sample_rate=44100";
             string audioEncodeArgs = "-c:a aac -shortest";
 
             string fullFfmpegArgs = $"-y {videoInputArgs} {dummyAudioInput} {vfFilter} {videoEncodeArgs} {audioEncodeArgs} -movflags +faststart \"{_currentVideoPath}\"";
@@ -342,6 +398,11 @@ public class ScreenRecorderService : IDisposable
     /// </summary>
     private static string BuildVideoEncodeArgs(string ffmpegExe, int crf)
     {
+        // Yüksek kaliteli ekran kaydı için bitrate (CRF üzerinden haritalanır)
+        // Ekran kayıtlarında zamanla pikselleşmeyi önlemek için yüksek bitrate ve keyframe (GOP) interval kullanıyoruz.
+        int bitrate = crf switch { <= 15 => 15000, <= 18 => 10000, <= 23 => 5000, _ => 3000 };
+        string gop = "-g 120"; // Her 120 karede bir tam kare (keyframe) at, 60fps'de 2 saniyeye denk gelir
+
         try
         {
             var psi = new ProcessStartInfo
@@ -361,23 +422,22 @@ public class ScreenRecorderService : IDisposable
             {
                 // Windows Media Foundation hardware encode — guaranteed WMF decode
                 // Same encoder as the WinUI3 MediaPlayer decoder path.
-                System.Diagnostics.Debug.WriteLine("[Recorder] Encoder: h264_mf");
-                return "-c:v h264_mf -pix_fmt yuv420p";
+                System.Diagnostics.Debug.WriteLine($"[Recorder] Encoder: h264_mf ({bitrate}k)");
+                return $"-c:v h264_mf -rate_control pc_vbr -b:v {bitrate}k {gop} -pix_fmt yuv420p";
             }
 
             if (output.Contains("h264_nvenc"))
             {
                 // NVIDIA hardware encode — WMF compatible output
-                int bitrate = crf switch { <= 15 => 8000, <= 18 => 5000, <= 23 => 3000, _ => 2000 };
                 System.Diagnostics.Debug.WriteLine($"[Recorder] Encoder: h264_nvenc ({bitrate}k)");
-                return $"-c:v h264_nvenc -preset p1 -b:v {bitrate}k -pix_fmt yuv420p";
+                return $"-c:v h264_nvenc -preset p1 -b:v {bitrate}k -maxrate {bitrate + 5000}k {gop} -bufsize {bitrate * 2}k -pix_fmt yuv420p";
             }
         }
         catch { }
 
         // Fallback: libx264 software encode
         System.Diagnostics.Debug.WriteLine($"[Recorder] Encoder: libx264 (crf={crf})");
-        return $"-c:v libx264 -preset ultrafast -profile:v baseline -level 3.1 -crf {crf} -pix_fmt yuv420p";
+        return $"-c:v libx264 -preset ultrafast -profile:v baseline -level 3.1 -crf {crf} {gop} -pix_fmt yuv420p";
     }
 
     public async Task StopRecordingAsync()
@@ -467,27 +527,35 @@ public class ScreenRecorderService : IDisposable
             }
             catch { }
 
-            // 4. FFmpeg'i Graceful olarak sonlandır ('q' gönder ve asenkron bekle)
+            // 4. Stop capture services feeding FFmpeg FIRST to prevent corrupting the input pipe
+            if (_windowCaptureService != null)
+            {
+                _windowCaptureService.StopCapture();
+                _windowCaptureService.Dispose();
+                _windowCaptureService = null;
+            }
+
+            // 5. FFmpeg'i Graceful olarak sonlandır ('q' gönder, stdin kapat ve asenkron bekle)
             if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
             {
                 try
                 {
-                    await _ffmpegProcess.StandardInput.WriteLineAsync("q");
-                    await _ffmpegProcess.StandardInput.FlushAsync();
-                    _ffmpegProcess.StandardInput.Close();
-
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                     try
                     {
-                        await _ffmpegProcess.WaitForExitAsync(cts.Token);
+                        await _ffmpegProcess.StandardInput.WriteLineAsync("q");
+                        await _ffmpegProcess.StandardInput.FlushAsync();
                     }
-                    catch (OperationCanceledException)
+                    catch { }
+
+                    try
                     {
-                        if (!_ffmpegProcess.HasExited)
-                        {
-                            _ffmpegProcess.Kill();
-                        }
+                        _ffmpegProcess.StandardInput.Close();
                     }
+                    catch { }
+
+                    // FFmpeg'in arabellekteki kareleri işlemesi ve mp4 dosyasını tamamlaması (moov atom) için
+                    // tamamen bitmesini bekliyoruz. Timeout uygulanmıyor ki uzun kayıtlarda video eksik kalmasın.
+                    await _ffmpegProcess.WaitForExitAsync();
                 }
                 catch { }
                 finally
@@ -495,13 +563,6 @@ public class ScreenRecorderService : IDisposable
                     _ffmpegProcess?.Dispose();
                     _ffmpegProcess = null;
                 }
-            }
-
-            if (_windowCaptureService != null)
-            {
-                _windowCaptureService.StopCapture();
-                _windowCaptureService.Dispose();
-                _windowCaptureService = null;
             }
         });
 

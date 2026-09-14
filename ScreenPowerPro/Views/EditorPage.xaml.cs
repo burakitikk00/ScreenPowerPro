@@ -213,6 +213,10 @@ public sealed partial class EditorPage : Page
 
         try
         {
+            if (VideoPlayer != null)
+            {
+                VideoPlayer.Source = null;
+            }
             _micPlayer?.Dispose();
             _micPlayer = null;
             _sysPlayer?.Dispose();
@@ -745,10 +749,11 @@ public sealed partial class EditorPage : Page
 
     private void OnMediaPlayerEnded(Windows.Media.Playback.MediaPlayer sender, object args)
     {
+        // Yalnızca oynatıcıyı durdur, tüm timeline'ı başa sarma! 
+        // Timeline döngüsü _totalDurationSeconds üzerinden OnPlaybackTimerTick'te yönetilir.
         DispatcherQueue.TryEnqueue(() =>
         {
-            PausePlayback();
-            SeekToTime(0);
+            try { sender.Pause(); } catch { }
         });
     }
 
@@ -839,7 +844,7 @@ public sealed partial class EditorPage : Page
         if (w == 0)
         {
             // Eğer arayüz tam yüklenmediyse bekle
-            Microsoft.UI.Xaml.SizeChangedEventHandler sizeChangedHandler = null;
+            Microsoft.UI.Xaml.SizeChangedEventHandler? sizeChangedHandler = null;
             sizeChangedHandler = (s, e) =>
             {
                 TimelineScrollViewer.SizeChanged -= sizeChangedHandler;
@@ -2653,13 +2658,15 @@ public sealed partial class EditorPage : Page
         double targetPx = contentRect.X + (normX * contentRect.Width);
         double targetPy = contentRect.Y + (normY * contentRect.Height);
 
-        // Odak noktasını ekranın merkezine (W/2, H/2) hizalamak için gereken Translate
-        // Bu formül: Transform origin = merkez, ancak scale ile birlikte odak noktası kaymasını telafi eder
-        double tx = (W * 0.5) - (targetPx * scale);
-        double ty = (H * 0.5) - (targetPy * scale);
+        // Odak noktasını ekranın merkezine hizalamak için gereken Translate
+        // RenderTransformOrigin="0.5,0.5" olduğu için merkez etrafında scale ediliyor.
+        // Bu yüzden formül tx = (W/2 - targetPx) * scale olmalıdır.
+        double tx = (W * 0.5 - targetPx) * scale;
+        double ty = (H * 0.5 - targetPy) * scale;
 
-        tx = Math.Clamp(tx, W * (1.0 - scale), 0);
-        ty = Math.Clamp(ty, H * (1.0 - scale), 0);
+        // Ekranın dışına çıkmaması (siyah boşluk göstermemesi) için sınırla
+        tx = Math.Clamp(tx, W * (1.0 - scale) * 0.5, W * (scale - 1.0) * 0.5);
+        ty = Math.Clamp(ty, H * (1.0 - scale) * 0.5, H * (scale - 1.0) * 0.5);
 
         VideoTransform.ScaleX     = scale;
         VideoTransform.ScaleY     = scale;
@@ -2901,7 +2908,6 @@ public sealed partial class EditorPage : Page
         }
 
         UpdateGapBlackScreen();
-        UpdateCameraForZoomEffect(_currentTimeSeconds);
 
         var ts = TimeSpan.FromSeconds(_currentTimeSeconds);
         if (_isPlaying)
@@ -3096,15 +3102,17 @@ public sealed partial class EditorPage : Page
         return new Rect(offsetX, offsetY, renderW, renderH);
     }
 
-    private void UpdateZoomSimulation()
+    private void UpdateZoomSimulation(double? customTimeSec = null)
     {
         if (!_isPageLoaded || ZoomLevelBadge == null) return;
+        
+        double timeToUse = customTimeSec ?? _currentTimeSeconds;
 
         // Mevcut fare konumunu telemetriden doğrudan kaynak video koordinatlarında al
         double cursorSrcX = -1, cursorSrcY = -1;
         if (ViewModel?.MouseMoves != null && ViewModel.MouseMoves.Count > 0)
         {
-            var pt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, _currentTimeSeconds);
+            var pt = ZoomEngineService.GetInterpolatedCursorPosition(ViewModel.MouseMoves, timeToUse);
             if (pt.HasValue)
             {
                 cursorSrcX = pt.Value.X;
@@ -3112,31 +3120,19 @@ public sealed partial class EditorPage : Page
             }
         }
 
-        var activeZoom = ViewModel?.GetCurrentZoom(cursorSrcX, cursorSrcY);
+        var activeZoom = ViewModel?.GetCurrentZoom(cursorSrcX, cursorSrcY, timeToUse);
         if (activeZoom != null)
         {
             ZoomLevelBadge.Text = $"{activeZoom.Scale:F1}x";
             if (VideoTransform != null)
             {
-                VideoTransform.ScaleX = activeZoom.Scale;
-                VideoTransform.ScaleY = activeZoom.Scale;
-
                 double natW = _naturalVideoWidth > 0 ? _naturalVideoWidth : (ViewModel?.VideoWidth > 0 ? ViewModel.VideoWidth : 1920.0);
                 double natH = _naturalVideoHeight > 0 ? _naturalVideoHeight : (ViewModel?.VideoHeight > 0 ? ViewModel.VideoHeight : 1080.0);
-                var rect = GetVideoContentRect();
 
-                double normCenterX = natW / 2.0;
-                double normCenterY = natH / 2.0;
-
-                // Zoom ölçeğine göre kenar boşlukları ve tam merkezleme ofseti hesabı
-                double maxOffsetX = (rect.Width * (activeZoom.Scale - 1.0)) / 2.0;
-                double maxOffsetY = (rect.Height * (activeZoom.Scale - 1.0)) / 2.0;
-
-                double offsetX = (normCenterX - activeZoom.TargetX) * (rect.Width / natW) * activeZoom.Scale;
-                double offsetY = (normCenterY - activeZoom.TargetY) * (rect.Height / natH) * activeZoom.Scale;
-
-                VideoTransform.TranslateX = Math.Clamp(offsetX, -maxOffsetX, maxOffsetX);
-                VideoTransform.TranslateY = Math.Clamp(offsetY, -maxOffsetY, maxOffsetY);
+                double normX = activeZoom.TargetX / natW;
+                double normY = activeZoom.TargetY / natH;
+                
+                ApplyCameraTransform(activeZoom.Scale, normX, normY);
             }
         }
         else
@@ -3144,10 +3140,7 @@ public sealed partial class EditorPage : Page
             ZoomLevelBadge.Text = "1.0x";
             if (VideoTransform != null)
             {
-                VideoTransform.ScaleX = 1.0;
-                VideoTransform.ScaleY = 1.0;
-                VideoTransform.TranslateX = 0;
-                VideoTransform.TranslateY = 0;
+                ApplyCameraTransform(1.0, 0.5, 0.5);
             }
         }
     }
@@ -3258,6 +3251,7 @@ public sealed partial class EditorPage : Page
                     {
                         try { VideoPlayer.MediaPlayer.Position = TimeSpan.FromSeconds(hoverSec); } catch { }
                     }
+                    UpdateZoomSimulation(hoverSec);
                 }
             }
         }
@@ -3286,6 +3280,7 @@ public sealed partial class EditorPage : Page
         if (!_isPlaying && VideoPlayer?.MediaPlayer != null)
         {
             try { VideoPlayer.MediaPlayer.Position = TimeSpan.FromSeconds(_currentTimeSeconds); } catch { }
+            UpdateZoomSimulation();
         }
     }
 
@@ -4390,6 +4385,14 @@ public sealed partial class EditorPage : Page
         {
             TbBezierCoords.Text = $"P1: {_bezierP1.X:F2}, {_bezierP1.Y:F2} | P2: {_bezierP2.X:F2}, {_bezierP2.Y:F2}";
         }
+
+        // Spring-Damper badge: Bezier kontrol noktalarından türetilen spring parametrelerini göster
+        if (TbSpringConfigBadge != null)
+        {
+            var cfg = ScreenPowerPro.Core.Zoom.SpringConfig.FromBezier(
+                _bezierP1.X, _bezierP1.Y, _bezierP2.X, _bezierP2.Y);
+            TbSpringConfigBadge.Text = $"k={cfg.Stiffness:F0}  d={cfg.Damping:F0}";
+        }
     }
 
     private void OnBezierGraphPointerPressed(object sender, PointerRoutedEventArgs e)
@@ -5200,7 +5203,16 @@ public sealed partial class EditorPage : Page
         }
     }
 
-    private void OnConfirmExportClicked(object sender, RoutedEventArgs e)
+
+    // --- EXPORT PROGRESS VARIABLES ---
+    private CancellationTokenSource? _exportCts;
+    private DispatcherTimer? _exportSmoothTimer;
+    private double _exportTargetProgress = 0.0;
+    private double _exportDisplayProgress = 0.0;
+    private const double ExportRingCircumference = 72.885;
+    private string? _lastOutputPath;
+
+    private async void OnConfirmExportClicked(object sender, RoutedEventArgs e)
     {
         ViewModel?.SaveProject();
 
@@ -5247,19 +5259,193 @@ public sealed partial class EditorPage : Page
             fps = parsedFps;
         }
 
-        var options = new ScreenPowerPro.Models.ExportOptions
+        ExportModalOverlay.Visibility = Visibility.Collapsed;
+        
+        await StartRenderAsync(outPath, targetWidth, targetHeight, fps);
+    }
+
+    private void OptimizeMemoryForRender()
+    {
+        try
         {
-            ProjectDir = ViewModel?.ProjectDir ?? string.Empty,
-            OutputPath = outPath,
-            TargetWidth = targetWidth,
-            TargetHeight = targetHeight,
-            TargetFps = fps,
-            Format = "mp4",
-            ResolutionLabel = $"{targetWidth}×{targetHeight}"
+            AppLog.Info("[EditorPage] Bellek optimizasyonu başlatılıyor...");
+            PausePlayback();
+            _playbackTimer?.Stop();
+            _videoAudioAnimTimer?.Stop();
+            _zoomPreviewTimer?.Stop();
+            
+            if (VideoPlayer != null) VideoPlayer.Source = null;
+            _micPlayer?.Dispose();
+            _micPlayer = null;
+            _sysPlayer?.Dispose();
+            _sysPlayer = null;
+            _pendingVideoSource?.Dispose();
+            _pendingVideoSource = null;
+
+            GC.Collect(2, GCCollectionMode.Forced, true);
+            GC.WaitForPendingFinalizers();
+            AppLog.Success("[EditorPage] Bellek optimizasyonu tamamlandı.");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"[EditorPage] OptimizeMemoryForRender hatası: {ex.Message}", ex);
+        }
+    }
+
+    private async Task RestoreMemoryAfterCancel()
+    {
+        try
+        {
+            AppLog.Info("[EditorPage] Kaynaklar geri yükleniyor...");
+            await LoadVideoAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"[EditorPage] RestoreMemoryAfterCancel hatası: {ex.Message}", ex);
+        }
+    }
+
+    private async Task StartRenderAsync(string outputPath, int width, int height, int fps)
+    {
+        if (ViewModel == null || string.IsNullOrEmpty(ViewModel.ProjectDir)) return;
+        
+        var projectService = App.Current.Services.GetRequiredService<ScreenPowerPro.Services.ProjectService>();
+        var manifest = projectService.LoadProject(ViewModel.ProjectDir);
+        if (manifest == null) return;
+        
+        _lastOutputPath = outputPath;
+        _exportCts = new CancellationTokenSource();
+        _exportTargetProgress = 0.0;
+        _exportDisplayProgress = 0.0;
+
+        // Overlay UI update
+        TbRenderFormat.Text = "MP4 (H.264)";
+        TbRenderResolution.Text = $"{width}×{height}";
+        TbRenderFps.Text = fps.ToString();
+        TbExportPercentage.Text = "0%";
+        ExportProgressRingArc.StrokeDashOffset = ExportRingCircumference;
+        TbExportStatusTitle.Text = _loc["Export_Title"] ?? "Videounuz dışa aktarılıyor...";
+        TbExportEstimatedTime.Text = "Hesaplanıyor...";
+        TbExportOperation.Text = "İşlem başlatılıyor...";
+        
+        BtnCancelRender.Visibility = Visibility.Visible;
+        RenderDoneState.Visibility = Visibility.Collapsed;
+        RenderErrorState.Visibility = Visibility.Collapsed;
+        RenderProgressOverlay.Visibility = Visibility.Visible;
+
+        if (_exportSmoothTimer == null)
+        {
+            _exportSmoothTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(25) };
+            _exportSmoothTimer.Tick += ExportSmoothTimer_Tick;
+        }
+        _exportSmoothTimer.Start();
+
+        var exportService = App.Current.Services.GetRequiredService<ExportService>();
+
+        Action<ExportProgressReport> progressHandler = (report) =>
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                _exportTargetProgress = Math.Clamp(report.ProgressPercent, 0.0, 100.0);
+                TbExportEstimatedTime.Text = report.FormattedRemainingTime;
+                TbExportOperation.Text = report.Speed > 0 ? $"Render ediliyor: %{_exportTargetProgress:F0} ({report.Speed:F1}x)" : $"Render ediliyor: %{_exportTargetProgress:F0}";
+            });
         };
 
-        ExportModalOverlay.Visibility = Visibility.Collapsed;
-        MainWindow.CurrentInstance?.NavigateToExport(options);
+        exportService.ProgressUpdated += progressHandler;
+        
+        OptimizeMemoryForRender();
+
+        try
+        {
+            await exportService.ExportVideoAsync(
+                manifest,
+                outputPath,
+                ViewModel.ProjectDir,
+                width,
+                height,
+                fps,
+                _exportCts.Token
+            );
+
+            // Success
+            _exportTargetProgress = 100.0;
+            _exportDisplayProgress = 100.0;
+            TbExportPercentage.Text = "100%";
+            ExportProgressRingArc.StrokeDashOffset = 0;
+            
+            TbExportStatusTitle.Text = _loc["Export_SuccessTitle"] ?? "Export Tamamlandı!";
+            TbExportEstimatedTime.Text = _loc["Export_SuccessDesc"] ?? "Video başarıyla aktarıldı.";
+            BtnCancelRender.Visibility = Visibility.Collapsed;
+            RenderDoneState.Visibility = Visibility.Visible;
+        }
+        catch (OperationCanceledException)
+        {
+            AppLog.Info("[EditorPage] Dışa aktarma iptal edildi.");
+            RenderProgressOverlay.Visibility = Visibility.Collapsed;
+            await RestoreMemoryAfterCancel();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"[EditorPage] Dışa aktarma hatası: {ex.Message}", ex);
+            _exportSmoothTimer?.Stop();
+            TbExportStatusTitle.Text = _loc["Export_FailedTitle"] ?? "Hata oluştu";
+            TbExportEstimatedTime.Text = "Hata oluştu";
+            TbExportOperation.Text = ex.Message;
+            TbExportPercentage.Text = "!";
+            BtnCancelRender.Visibility = Visibility.Collapsed;
+            RenderErrorState.Visibility = Visibility.Visible;
+            await RestoreMemoryAfterCancel();
+        }
+        finally
+        {
+            exportService.ProgressUpdated -= progressHandler;
+        }
+    }
+
+    private void ExportSmoothTimer_Tick(object? sender, object e)
+    {
+        if (Math.Abs(_exportDisplayProgress - _exportTargetProgress) > 0.05)
+        {
+            _exportDisplayProgress += (_exportTargetProgress - _exportDisplayProgress) * 0.18;
+            if (_exportTargetProgress >= 100.0 && _exportDisplayProgress > 99.5) _exportDisplayProgress = 100.0;
+        }
+        else
+        {
+            _exportDisplayProgress = _exportTargetProgress;
+        }
+
+        int pct = (int)Math.Round(_exportDisplayProgress);
+        TbExportPercentage.Text = $"{pct}%";
+
+        double offset = ExportRingCircumference * (1.0 - (Math.Clamp(_exportDisplayProgress, 0.0, 100.0) / 100.0));
+        ExportProgressRingArc.StrokeDashOffset = offset;
+    }
+
+    private void OnCancelRenderClicked(object sender, RoutedEventArgs e)
+    {
+        _exportCts?.Cancel();
+    }
+
+    private void OnRenderOpenFolderClicked(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_lastOutputPath))
+        {
+            if (System.IO.File.Exists(_lastOutputPath))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{_lastOutputPath}\"");
+            }
+            else if (System.IO.Directory.Exists(System.IO.Path.GetDirectoryName(_lastOutputPath)))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", System.IO.Path.GetDirectoryName(_lastOutputPath)!);
+            }
+        }
+    }
+
+    private void OnRenderBackToEditorClicked(object sender, RoutedEventArgs e)
+    {
+        RenderProgressOverlay.Visibility = Visibility.Collapsed;
+        _ = RestoreMemoryAfterCancel();
     }
 
     private static string FormatTime(double seconds)
@@ -5627,10 +5813,31 @@ public sealed partial class EditorPage : Page
 
         if (dt > 0.0001 && currentSec >= m1.Timestamp && currentSec <= m2.Timestamp)
         {
-            double t = (currentSec - m1.Timestamp) / dt;
-            double x = m1.X + (m2.X - m1.X) * t;
-            double y = m1.Y + (m2.Y - m1.Y) * t;
-            return new Point(x, y);
+            if (dt > 0.15)
+            {
+                // Eğer iki hareket arasında çok fazla zaman farkı varsa (örn. fare sabit durduysa),
+                // farenin tüm süre boyunca yavaşça sürükleniyormuş gibi (hava boşluğunda kayma) görünmesini engelle.
+                // Sadece son 50ms kala hareketi başlat.
+                double delayStart = m2.Timestamp - 0.05;
+                if (currentSec < delayStart)
+                {
+                    return new Point(m1.X, m1.Y);
+                }
+                else
+                {
+                    double t = (currentSec - delayStart) / 0.05;
+                    double x = m1.X + (m2.X - m1.X) * t;
+                    double y = m1.Y + (m2.Y - m1.Y) * t;
+                    return new Point(x, y);
+                }
+            }
+            else
+            {
+                double t = (currentSec - m1.Timestamp) / dt;
+                double x = m1.X + (m2.X - m1.X) * t;
+                double y = m1.Y + (m2.Y - m1.Y) * t;
+                return new Point(x, y);
+            }
         }
 
         return new Point(m1.X, m1.Y);
@@ -5640,17 +5847,13 @@ public sealed partial class EditorPage : Page
     {
         if (CursorOverlayCanvas == null || ViewModel == null) return;
 
-        // VideoTransform ile CursorCanvasTransform senkronizasyonu
-        if (CursorCanvasTransform != null && VideoTransform != null)
+        if (VideoTransform != null)
         {
-            CursorCanvasTransform.ScaleX = VideoTransform.ScaleX;
-            CursorCanvasTransform.ScaleY = VideoTransform.ScaleY;
-            CursorCanvasTransform.TranslateX = VideoTransform.TranslateX;
-            CursorCanvasTransform.TranslateY = VideoTransform.TranslateY;
-
             if (_cursorTransform != null)
             {
                 double baseScale = ViewModel.CursorSize > 0 ? ViewModel.CursorSize / 100.0 : 1.0;
+                // CursorOverlayCanvas ebeveyn Grid'den scale'i miras alır, bu yüzden ters (inverse) scale uyguluyoruz ki
+                // imleç görsel olarak orjinal boyutunda kalsın.
                 double invScale = VideoTransform.ScaleX > 0 ? (1.0 / VideoTransform.ScaleX) : 1.0;
                 _cursorTransform.ScaleX = baseScale * invScale;
                 _cursorTransform.ScaleY = baseScale * invScale;
@@ -5909,5 +6112,25 @@ public sealed partial class EditorPage : Page
                 }
             }
         }
+    }
+
+    // --- EXIT MODAL LOGIC ---
+    public bool IsReadyToClose { get; private set; } = false;
+
+    public void ShowExitConfirmationOverlay()
+    {
+        ExitModalOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void OnExitSaveAndCloseClicked(object sender, RoutedEventArgs e)
+    {
+        ViewModel?.SaveProject();
+        IsReadyToClose = true;
+        MainWindow.CurrentInstance?.Close();
+    }
+
+    private void OnExitCancelClicked(object sender, RoutedEventArgs e)
+    {
+        ExitModalOverlay.Visibility = Visibility.Collapsed;
     }
 }

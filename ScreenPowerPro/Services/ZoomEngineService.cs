@@ -169,11 +169,32 @@ public class ZoomEngineService
         double lastMoveY = -1;
         double lastMoveTime = -1;
 
-        Action<double> FinalizeCurrentZoom = (double endTime) => {
+        Action<double, bool> FinalizeCurrentZoom = (double endTime, bool isCancelledByMovement) => {
             if (currentEffect != null)
             {
                 double dur = endTime - currentEffect.StartTime;
-                if (dur < 0.5) dur = 0.5; // Min süre
+                
+                if (isCancelledByMovement)
+                {
+                    // "tıklayıp hemen ordan ayrıldıysa ... zoom yapma oraya"
+                    if (dur < 1.5)
+                    {
+                        // Süre çok kısaysa ("diskoya dönmesin"), zoom'u tamamen iptal et.
+                        currentEffect = null;
+                        isZoomed = false;
+                        return;
+                    }
+                }
+                else
+                {
+                    // "tıkladık o bölgede sabitsek zoom süresi fazla olabilir 3 4 saniye"
+                    // Kullanıcı sabit durduysa (timeout ile bittiyse), stabil bir izleme için süreyi uzat.
+                    if (dur < 3.0)
+                    {
+                        dur = 3.0;
+                    }
+                }
+
                 currentEffect.Duration = Math.Round(dur, 3);
                 effects.Add(currentEffect);
                 currentEffect = null;
@@ -192,7 +213,7 @@ public class ZoomEngineService
                 // 1. Idle Timeout (Zaman Aşımı) Kontrolü
                 if ((time - lastActivityTime) > idleTimeout)
                 {
-                    FinalizeCurrentZoom(lastActivityTime + idleTimeout);
+                    FinalizeCurrentZoom(lastActivityTime + idleTimeout, false);
                 }
                 
                 // 2. Velocity Check (İvme/Hız Kontrolü)
@@ -202,7 +223,7 @@ public class ZoomEngineService
                     double speed = dist / (time - lastMoveTime); // px / sec
                     if (speed > (velocityMaxDist / velocityTimeWindow)) // Hızlı hareket (örn. 4000 px/sec)
                     {
-                        FinalizeCurrentZoom(time);
+                        FinalizeCurrentZoom(time, true);
                     }
                 }
                 
@@ -212,7 +233,7 @@ public class ZoomEngineService
                     double distFromCenter = Math.Sqrt(Math.Pow(x - currentTargetX, 2) + Math.Pow(y - currentTargetY, 2));
                     if (distFromCenter > boundaryDeadzone)
                     {
-                        FinalizeCurrentZoom(time);
+                        FinalizeCurrentZoom(time, true);
                     }
                 }
             }
@@ -243,25 +264,35 @@ public class ZoomEngineService
                 else
                 {
                     // Zaten zoom durumundayız. BÜYÜTME (Scale artmaz). Sadece Panning yap.
-                    // Mevcut zoom'u burada sonlandırıp ardışık yeni bir ZoomEffect başlatarak
-                    // Render katmanının smooth pan yapmasını sağlıyoruz.
-                    double transitionStart = time;
-                    FinalizeCurrentZoom(transitionStart);
-                    
-                    isZoomed = true;
-                    currentTargetX = x;
-                    currentTargetY = y;
-                    
-                    currentEffect = new ZoomEffect
+                    double dist = Math.Sqrt(Math.Pow(x - currentTargetX, 2) + Math.Pow(y - currentTargetY, 2));
+
+                    if (dist < 400.0)
                     {
-                        Id = Guid.NewGuid().ToString("N")[..8],
-                        Name = $"Zoom {zoomIndex++}",
-                        StartTime = Math.Round(transitionStart, 3),
-                        Scale = actualScale,
-                        TargetX = Math.Round(x, 1),
-                        TargetY = Math.Round(y, 1),
-                        Easing = autoZoomMode == "instant" ? "instant" : SettingsManager.Instance.ZoomEasingFunction.ToLowerInvariant()
-                    };
+                        // Hedef yeterince yakınsa (örneğin aynı bölgede ardışık tıklamalar),
+                        // yeni bir ZoomEffect üretip kamerayı sarsma.
+                        // lastActivityTime güncellendiği için zoom süresi zaten uzayacaktır.
+                    }
+                    else
+                    {
+                        // Farklı bir alana tıklandı, smooth pan yapması için yeni zoom başlat.
+                        double transitionStart = time;
+                        FinalizeCurrentZoom(transitionStart, true);
+                        
+                        isZoomed = true;
+                        currentTargetX = x;
+                        currentTargetY = y;
+                        
+                        currentEffect = new ZoomEffect
+                        {
+                            Id = Guid.NewGuid().ToString("N")[..8],
+                            Name = $"Zoom {zoomIndex++}",
+                            StartTime = Math.Round(transitionStart, 3),
+                            Scale = actualScale,
+                            TargetX = Math.Round(x, 1),
+                            TargetY = Math.Round(y, 1),
+                            Easing = autoZoomMode == "instant" ? "instant" : SettingsManager.Instance.ZoomEasingFunction.ToLowerInvariant()
+                        };
+                    }
                 }
             }
             else
@@ -284,7 +315,7 @@ public class ZoomEngineService
 
         if (isZoomed)
         {
-            FinalizeCurrentZoom(lastActivityTime + idleTimeout);
+            FinalizeCurrentZoom(lastActivityTime + idleTimeout, false);
         }
 
         if (maxVideoDurationSec > 0)

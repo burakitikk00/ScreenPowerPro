@@ -69,6 +69,14 @@ public class WindowCaptureService : IDisposable
     private int _width;
     private int _height;
 
+    private byte[]? _captureBuffer;
+    private byte[]? _writeBuffer;
+    private readonly object _swapLock = new object();
+    private Task? _writerTask;
+    private CancellationTokenSource? _writerCts;
+    private bool _newFrameArrived = false;
+    private bool _firstFrameArrived = false;
+
     public int Width => _width;
     public int Height => _height;
 
@@ -163,6 +171,59 @@ public class WindowCaptureService : IDisposable
         _session.StartCapture();
 
         _isRunning = true;
+
+        // Initialize CFR pump double buffers
+        int bufferSize = _width * _height * 4;
+        _captureBuffer = new byte[bufferSize];
+        _writeBuffer = new byte[bufferSize];
+        _writeBuffer = new byte[bufferSize];
+
+        _writerCts = new CancellationTokenSource();
+        _newFrameArrived = false;
+        _firstFrameArrived = false;
+        _writerTask = Task.Run(async () =>
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            double frameInterval = 1000.0 / 60.0;
+            double nextFrameTime = frameInterval;
+            while (!_writerCts.Token.IsCancellationRequested)
+            {
+                if (_outputStream != null && _outputStream.CanWrite && _firstFrameArrived)
+                {
+                    lock (_swapLock)
+                    {
+                        if (_newFrameArrived)
+                        {
+                            var temp = _captureBuffer;
+                            _captureBuffer = _writeBuffer;
+                            _writeBuffer = temp;
+                            _newFrameArrived = false;
+                        }
+                    }
+
+                    try
+                    {
+                        _outputStream.Write(_writeBuffer, 0, bufferSize);
+                    }
+                    catch { }
+                }
+
+                double elapsed = sw.Elapsed.TotalMilliseconds;
+
+                if (elapsed < nextFrameTime)
+                {
+                    await Task.Delay((int)(nextFrameTime - elapsed));
+                }
+                else
+                {
+                    // If we lag behind (e.g. due to Task.Delay oversleeping), yield to avoid starvation 
+                    // but immediately continue to catch up on missed frames!
+                    await Task.Yield();
+                }
+                
+                nextFrameTime += frameInterval;
+            }
+        });
     }
 
     public void StartCapture(IntPtr targetHwnd, Stream outputStream, bool captureCursor = false)
@@ -186,13 +247,18 @@ public class WindowCaptureService : IDisposable
             var byteAccess = reference.As<IMemoryBufferByteAccess>();
             byteAccess.GetBuffer(out IntPtr dataPtr, out uint capacity);
 
-            // Write directly to FFmpeg stdin stream (rawvideo, bgra)
-            if (_outputStream != null && _outputStream.CanWrite)
+            // Copy to capture buffer quickly and return to free the frame
+            unsafe
             {
-                unsafe
+                var span = new ReadOnlySpan<byte>(dataPtr.ToPointer(), (int)capacity);
+                lock (_swapLock)
                 {
-                    var span = new ReadOnlySpan<byte>(dataPtr.ToPointer(), (int)capacity);
-                    _outputStream.Write(span);
+                    if (_captureBuffer != null && capacity <= _captureBuffer.Length)
+                    {
+                        span.CopyTo(_captureBuffer);
+                        _newFrameArrived = true;
+                        _firstFrameArrived = true;
+                    }
                 }
             }
         }
@@ -206,6 +272,15 @@ public class WindowCaptureService : IDisposable
     {
         if (!_isRunning) return;
         _isRunning = false;
+
+        _writerCts?.Cancel();
+        if (_writerTask != null)
+        {
+            try { _writerTask.Wait(500); } catch { }
+        }
+        _writerCts?.Dispose();
+        _writerCts = null;
+        _writerTask = null;
 
         _session?.Dispose();
         _session = null;

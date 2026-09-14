@@ -13,13 +13,37 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid Background="{StaticResource AppBgBrush}">
+    <Grid x:Name="RootGrid" Background="{StaticResource AppBgBrush}">
+        <Grid.Resources>
+            <Storyboard x:Name="LoadingMainAnimation" RepeatBehavior="Forever">
+                <DoubleAnimationUsingKeyFrames Storyboard.TargetName="TransDot1Main" Storyboard.TargetProperty="Y">
+                    <LinearDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                    <SplineDoubleKeyFrame KeyTime="0:0:0.3" Value="-10" KeySpline="0.25,0.1 0.25,1.0"/>
+                    <SplineDoubleKeyFrame KeyTime="0:0:0.6" Value="0" KeySpline="0.25,0.1 0.25,1.0"/>
+                    <LinearDoubleKeyFrame KeyTime="0:0:1.0" Value="0"/>
+                </DoubleAnimationUsingKeyFrames>
+                <DoubleAnimationUsingKeyFrames Storyboard.TargetName="TransPillMain" Storyboard.TargetProperty="Y">
+                    <LinearDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                    <LinearDoubleKeyFrame KeyTime="0:0:0.1" Value="0"/>
+                    <SplineDoubleKeyFrame KeyTime="0:0:0.4" Value="-10" KeySpline="0.25,0.1 0.25,1.0"/>
+                    <SplineDoubleKeyFrame KeyTime="0:0:0.7" Value="0" KeySpline="0.25,0.1 0.25,1.0"/>
+                    <LinearDoubleKeyFrame KeyTime="0:0:1.0" Value="0"/>
+                </DoubleAnimationUsingKeyFrames>
+                <DoubleAnimationUsingKeyFrames Storyboard.TargetName="TransDot2Main" Storyboard.TargetProperty="Y">
+                    <LinearDoubleKeyFrame KeyTime="0:0:0.0" Value="0"/>
+                    <LinearDoubleKeyFrame KeyTime="0:0:0.2" Value="0"/>
+                    <SplineDoubleKeyFrame KeyTime="0:0:0.5" Value="-10" KeySpline="0.25,0.1 0.25,1.0"/>
+                    <SplineDoubleKeyFrame KeyTime="0:0:0.8" Value="0" KeySpline="0.25,0.1 0.25,1.0"/>
+                    <LinearDoubleKeyFrame KeyTime="0:0:1.0" Value="0"/>
+                </DoubleAnimationUsingKeyFrames>
+            </Storyboard>
+        </Grid.Resources>
         <!-- Main Content Frame occupying full window canvas -->
         <Frame x:Name="RootFrame" />
 
-        <!-- Indeterminate Processing Overlay (shown during Stop Recording → Editor transition) -->
+        <!-- Indeterminate Processing Overlay -->
         <Grid x:Name="LoadingOverlay"
-              Background="#B2000000"
+              Background="{StaticResource AppBgBrush}"
               Visibility="Collapsed"
               HorizontalAlignment="Stretch"
               VerticalAlignment="Stretch"
@@ -28,16 +52,27 @@
             <StackPanel HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Spacing="20">
-
-                <!-- Spinning ProgressRing -->
-                <ProgressRing x:Name="ProcessingRing"
-                              IsActive="False"
-                              Width="64"
-                              Height="64"
-                              Foreground="#7C6FF7" />
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                    <Ellipse Width="12" Height="12" Fill="#A078FF">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="TransDot1Main"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Border Width="36" Height="12" CornerRadius="6" Background="#00E5FF">
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="TransPillMain"/>
+                        </Border.RenderTransform>
+                    </Border>
+                    <Ellipse Width="12" Height="12" Fill="#FACC15">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="TransDot2Main"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </StackPanel>
 
                 <!-- Status text -->
-                <TextBlock Text="Lütfen bekleyin..."
+                <TextBlock x:Name="TbMainLoadingText"
+                           Text="Editör Yükleniyor..."
                            FontSize="15"
                            FontWeight="SemiBold"
                            Foreground="#CCFFFFFF"
